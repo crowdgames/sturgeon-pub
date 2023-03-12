@@ -1,0 +1,26 @@
+t utree
+
+c A ffdddd
+c B ddffdd
+c C ddddff
+n cx  C
+n cb  B
+n cy  C
+n ax1 A
+n bx1 B
+n ax2 A
+n bx2 B
+n ay1 A
+n by1 B
+n ay2 A
+n by2 B
+e ax1 bx1
+e bx1 cx
+e ax2 bx2
+e bx2 cx
+e ay1 by1
+e by1 cy
+e ay2 by2
+e by2 cy
+e cx cb
+e cy cb

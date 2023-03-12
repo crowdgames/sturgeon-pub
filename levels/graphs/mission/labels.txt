@@ -1,0 +1,24 @@
+S Start
+e Entrance
+C Chain
+G Gate
+bm Boss (mini)
+iq item (quest)
+ti test (item)
+CF Chain (Final)
+g goal
+CP Chain (Parallel)
+CL Chain (Linear)
+F Fork
+km key (multi piece)
+lm lock (multi)
+k key
+l lock
+H Hook
+t test
+ts test (secret)
+n nothing/exploration
+kf key (final)
+lf lock (final)
+bl Boss (level)
+ib item (bonus)
