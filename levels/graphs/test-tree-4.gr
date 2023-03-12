@@ -1,0 +1,37 @@
+t dtree
+
+c 1 222277
+c 2 222299
+c 3 2222bb
+c 4 2222dd
+
+n 1a 1
+n 2a 2
+n 2b 2
+n 3a 3
+n 3b 3
+n 3c 3
+n 3d 3
+n 4a 4
+n 4b 4
+n 4c 4
+n 4d 4
+n 4e 4
+n 4f 4
+n 4g 4
+n 4h 4
+
+e 1a 2a
+e 1a 2b
+e 2a 3a
+e 2a 3b
+e 2b 3c
+e 2b 3d
+e 3a 4a
+e 3a 4b
+e 3b 4c
+e 3b 4d
+e 3c 4e
+e 3c 4f
+e 3d 4g
+e 3d 4h

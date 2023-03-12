@@ -1,0 +1,51 @@
+t dag
+
+c S ffdddd
+c L aaffaa
+c B2 ffffaa
+c B3 ffffaa
+c M ffaaff
+c E ddddff
+
+n S S
+n 0 L
+n 1 B3
+n 2-1 L
+n 3-1 L
+n 3-2 L
+n 4-1 L
+n 4-2 L
+n 4-3 L
+n 5 M
+n 6 L
+n 7 B2
+n 8-1 L
+n 9-1 L
+n 10 M
+n E E
+
+e S 0
+e 0 1
+
+e 1 2-1
+e 2-1 5
+
+e 1 3-1
+e 3-1 3-2
+e 3-2 5
+
+e 1 4-1
+e 4-1 4-2
+e 4-2 4-3
+e 4-3 5
+
+e 5 6
+e 6 7
+
+e 7 8-1
+e 8-1 10
+
+e 7 9-1
+e 9-1 10
+
+e 10 E

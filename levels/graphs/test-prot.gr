@@ -1,0 +1,48 @@
+t utree
+
+c C      dddddd
+c CA     dddddd
+c RV-C0  eeeeee
+c RV-C1  eeeeee
+c RV-C2  eeeeee
+c RC-C   eeeeee
+c N      ddddff
+c O      ffdddd
+c OX     ffdddd
+c RC-S   ffffee
+
+n 0n  N
+n 0ca CA
+n 0c  C
+n 0o  O
+
+n 0ra RV-C0
+n 0rb RV-C1
+n 0rc RV-C2
+
+n 1n  N
+n 1ca CA
+n 1c  C
+n 1o  O
+n 1ox OX
+
+n 1ra RC-C
+n 1rb RC-S
+
+e 0n  0ca
+e 0ca 0c
+e 0c  0o
+
+e 0ca 0ra
+e 0ra 0rb
+e 0rb 0rc
+
+e 0c  1n
+
+e 1n  1ca
+e 1ca 1c
+e 1c  1o
+e 1c  1ox
+
+e 1ca 1ra
+e 1ra 1rb

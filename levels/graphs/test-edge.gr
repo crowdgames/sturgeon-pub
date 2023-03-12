@@ -1,0 +1,20 @@
+t dag
+
+n 1 A
+n 2 B
+n 3 B
+n 4 B
+n 5 C
+n 6 B
+n 7 B
+n 8 B
+n 9 A
+
+e 1 2 ab
+e 2 3 bb
+e 3 4 bb
+e 4 5 bc
+e 5 6 cb
+e 6 7 bb
+e 7 8 bb
+e 8 9 ba

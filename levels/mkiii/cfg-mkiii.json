@@ -1,0 +1,48 @@
+{
+    "colors": {
+        "*": "blue",
+
+        "@": "blue",
+        "<": "blue",
+        ">": "blue",
+        "^": "blue",
+        "v": "blue",
+        "&": "blue",
+        "1": "blue",
+        "2": "blue",
+        "3": "blue",
+
+        "─": "darkblue",
+        "│": "darkblue",
+        "┐": "darkblue",
+        "┘": "darkblue",
+        "└": "darkblue",
+        "┌": "darkblue",
+
+        "o": "orange",
+        "O": "green",
+
+        "-": "lightgrey",
+        "~": "grey",
+        "X": "black",
+
+        "$": "gold",
+        "?": "gold",
+        "%": "gold",
+        ":": "saddlebrown",
+        "#": "saddlebrown",
+
+        "+": "firebrick",
+        "a": "firebrick",
+        "b": "firebrick",
+        "c": "firebrick",
+        "(": "firebrick",
+        ")": "firebrick",
+        "[": "firebrick",
+        "]": "firebrick",
+
+        "7": "darkorchid",
+        "8": "goldenrod",
+        "9": "cornflowerblue"
+    }
+}

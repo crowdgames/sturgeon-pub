@@ -1,0 +1,28 @@
+t utree
+
+c A ffdddd
+c B ddffdd
+c C ddddff
+n 1 A
+n 2 B
+n 3 C
+n 4 B
+n 5 C
+n 6 B
+n 7 B
+n 8 C
+n 9 B
+n a B
+n b B
+n c A
+e 1 2
+e 2 3
+e 3 4
+e 4 5
+e 5 6
+e 6 7
+e 7 8
+e 8 9
+e 9 a
+e a b
+e b c

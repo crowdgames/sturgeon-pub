@@ -1,0 +1,24 @@
+t dag
+
+n 00 X
+n 01 X
+n 02 X
+n 10 X
+n 11 X
+n 12 X
+n 20 X
+n 21 X
+n 22 X
+
+e 00 01 e
+e 01 02 e
+e 10 11 e
+e 11 12 e
+e 20 21 e
+e 21 22 e
+e 00 10 s
+e 10 20 s
+e 01 11 s
+e 11 21 s
+e 02 12 s
+e 12 22 s
