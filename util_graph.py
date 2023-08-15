@@ -88,7 +88,7 @@ def read_graphs(filenames):
 
     for filename in filenames:
         gr = None
-        with open(filename, 'rt') as infile:
+        with util.openz(filename, 'rt') as infile:
             for line in infile:
                 if '#' in line:
                     line = line[:line.find('#')]
@@ -101,12 +101,12 @@ def read_graphs(filenames):
                 if splt[0] == 't':
                     util.check(len(splt) == 2, 'splt len')
                     util.check(splt[1] in GTYPE_LIST, 'gtype')
-                    if grs.gtype == None:
+                    if grs.gtype is None:
                         grs.gtype = splt[1]
                     else:
                         util.check(splt[1] == grs.gtype, 'gtype mismatch')
 
-                    util.check(gr == None, 'mutliple t')
+                    util.check(gr is None, 'mutliple t')
                     if gtype_directed(grs.gtype):
                         gr = nx.DiGraph()
                     else:
@@ -158,7 +158,7 @@ def read_graphs(filenames):
                 else:
                     util.check(False, 'line: ' + line)
 
-        if gr != None:
+        if gr is not None:
             check_graph(gr, grs.gtype)
 
             grs.graphs.append(gr)
@@ -248,11 +248,11 @@ def write_graph_dot(grs, out):
     out.write('}\n')
 
 def write_graph_to_file(grs, filename):
-    if filename == None:
+    if filename is None:
         write_graph(grs, sys.stdout)
     else:
-        with open(filename, 'wt') as outfile:
-            if filename.endswith('.dot'):
+        with util.openz(filename, 'wt') as outfile:
+            if util.fileistype(filename, '.dot'):
                 write_graph_dot(grs, outfile)
             else:
                 write_graph(grs, outfile)

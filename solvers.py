@@ -169,7 +169,7 @@ class SolverImpl(Solver):
 
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
         if not self._weighted:
-            util.check(weight == None, 'solver does not support weights')
+            util.check(weight is None, 'solver does not support weights')
             return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out))
         else:
             return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out), weight)
@@ -178,7 +178,7 @@ class SolverImpl(Solver):
         util.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
 
         if not self._weighted:
-            util.check(weight == None, 'solver does not support weights')
+            util.check(weight is None, 'solver does not support weights')
             return self._IMPL_cnstr_count(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj), lo, hi)
         else:
             return self._IMPL_cnstr_count(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj), lo, hi, weight)
@@ -265,7 +265,7 @@ class PortfolioSolver(Solver):
         for proc in procs:
             proc.kill()
 
-        if result == None:
+        if result is None:
             return False
         else:
             index, self._result, self._objective = result
@@ -370,11 +370,11 @@ class PrintSolver(SolverImpl):
         return ret
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
-        print_weight = weight if weight != None else 0
+        print_weight = weight if weight is not None else 0
         self._output['cnstr_implies_disj'].append({'if':in_ll, 'then':out_lls, 'weight':print_weight})
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
-        print_weight = weight if weight != None else 0
+        print_weight = weight if weight is not None else 0
         self._output['cnstr_count'].append({'of':lls, 'min':lo, 'max':hi, 'weight':print_weight})
 
     def _IMPL_solve(self):
@@ -392,7 +392,7 @@ class Z3Solver(SolverImpl):
         self._s = z3.Optimize()
 
     def _help_add_cnstr_weight(self, cnstr, weight):
-        if weight == None:
+        if weight is None:
             self._s.add(cnstr)
         else:
             self._s.add_soft(cnstr, weight)
@@ -618,7 +618,7 @@ class ClingoFrontendSolver(SolverImpl):
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
         soft_var = []
-        if weight != None:
+        if weight is not None:
             soft_var = [self._help_new_soft_var(weight)]
 
         self._ctl_add_rule('%s :- %s.' % (';'.join(out_lls + soft_var), in_ll))
@@ -627,8 +627,8 @@ class ClingoFrontendSolver(SolverImpl):
         soft_var_body = None
         def get_soft_var_body():
             nonlocal soft_var_body
-            if soft_var_body == None:
-                if weight == None:
+            if soft_var_body is None:
+                if weight is None:
                     soft_var_body = ''
                 else:
                     soft_var_body = ' :- not %s' % self._help_new_soft_var(weight)
@@ -680,7 +680,7 @@ class ClingoFrontendSolver(SolverImpl):
         self._ctl_solve(on_model)
         util.write_time('\n')
 
-        return self._result != None
+        return self._result is not None
 
     def _IMPL_get_var(self, vv):
         return vv in self._result
@@ -733,7 +733,7 @@ class ClingoBackendSolver(SolverImpl):
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
         with self._ctl.backend() as be:
             soft_var = []
-            if weight != None:
+            if weight is not None:
                 soft_var = [self._help_new_var(be)]
 
             be.add_rule(out_lls + soft_var, [in_ll])
@@ -747,8 +747,8 @@ class ClingoBackendSolver(SolverImpl):
             soft_var = None
             def get_soft_var():
                 nonlocal soft_var
-                if soft_var == None:
-                    if weight == None:
+                if soft_var is None:
+                    if weight is None:
                         soft_var = []
                     else:
                         soft_var = [self._help_new_var(be)]
@@ -797,7 +797,7 @@ class ClingoBackendSolver(SolverImpl):
         self._ctl.solve(on_model=on_model)
         util.write_time('\n')
 
-        return self._result != None
+        return self._result is not None
 
     def _IMPL_get_var(self, vv):
         return vv in self._result
@@ -937,7 +937,7 @@ class _PySatSolverWeighted(SolverImpl):
                 util.check(False, 'count vars')
 
         else:
-            if self._option == PYSAT_OPTION_CARD and weight == None: # PySat currently only supports hard cardinality constraints
+            if self._option == PYSAT_OPTION_CARD and weight is None: # PySat currently only supports hard cardinality constraints
                 if lo == 0:
                     pass
                 elif lo == 1:
@@ -956,7 +956,7 @@ class _PySatSolverWeighted(SolverImpl):
                 elif lo == 1:
                     self._wcnf.append(lls, weight=weight)
                 else:
-                    if weight != None and len(label_var_cls) == 0:
+                    if weight is not None and len(label_var_cls) == 0:
                         label_var_cls = [self._next_var()]
 
                     cnf = pysat.card.CardEnc.atleast(lits=lls, bound=lo, top_id=self._curr_id, encoding=PYSAT_ENCODING)
@@ -965,7 +965,7 @@ class _PySatSolverWeighted(SolverImpl):
                         self._curr_id = max(self._curr_id, max(cls))
 
                 if hi < len(lls):
-                    if weight != None and len(label_var_cls) == 0:
+                    if weight is not None and len(label_var_cls) == 0:
                         label_var_cls = [self._next_var()]
 
                     cnf = pysat.card.CardEnc.atmost(lits=lls, bound=hi, top_id=self._curr_id, encoding=PYSAT_ENCODING)

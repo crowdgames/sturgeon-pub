@@ -1,5 +1,5 @@
 import argparse, itertools, json, random, sys, time
-import gutil, util
+import util, util_graph
 import networkx as nx
 
 MULTILABEL = ';'
@@ -18,21 +18,21 @@ if __name__ == '__main__':
     dot = nx.DiGraph(nx.nx_pydot.read_dot(args.dotfile))
 
     for node in dot.nodes:
-        dot.nodes[node][gutil.ATTR_LABEL] = dot.nodes[node][gutil.ATTR_LABEL].strip('"')
+        dot.nodes[node][util_graph.ATTR_LABEL] = dot.nodes[node][util_graph.ATTR_LABEL].strip('"')
     for edge in dot.edges:
-        dot.edges[edge][gutil.ATTR_LABEL] = dot.edges[edge][gutil.ATTR_LABEL].strip('"')
+        dot.edges[edge][util_graph.ATTR_LABEL] = dot.edges[edge][util_graph.ATTR_LABEL].strip('"')
 
-    grs = gutil.Graphs()
+    grs = util_graph.Graphs()
     grs.colors = {}
 
     if args.root:
-        grs.gtype = gutil.GTYPE_DAG
+        grs.gtype = util_graph.GTYPE_DAG
         root_node = None
         for node in dot.nodes:
-            if dot.nodes[node][gutil.ATTR_LABEL] == args.root:
-                util.check(root_node == None, 'multiple root nodes')
+            if dot.nodes[node][util_graph.ATTR_LABEL] == args.root:
+                util.check(root_node is None, 'multiple root nodes')
                 root_node = node
-        util.check(root_node != None, 'no root node')
+        util.check(root_node is not None, 'no root node')
 
         gr = nx.bfs_tree(dot, root_node)
 
@@ -40,7 +40,7 @@ if __name__ == '__main__':
             if not nx.has_path(gr, edge[1], edge[0]):
                 gr.add_edge(edge[0], edge[1])
     else:
-        grs.gtype = gutil.GTYPE_UGRAPH
+        grs.gtype = util_graph.GTYPE_UGRAPH
 
         gr = dot.to_undirected()
 
@@ -55,11 +55,11 @@ if __name__ == '__main__':
     gr_orig = dot
 
     for node in gr.nodes:
-        gr.nodes[node][gutil.ATTR_LABEL] = orderlabels(gr_orig.nodes[node][gutil.ATTR_LABEL])
+        gr.nodes[node][util_graph.ATTR_LABEL] = orderlabels(gr_orig.nodes[node][util_graph.ATTR_LABEL])
 
     for ea, eb in gr.edges:
-        lbla = gr_orig.edges[(ea, eb)][gutil.ATTR_LABEL] if (ea, eb) in gr_orig.edges else ''
-        lblb = gr_orig.edges[(eb, ea)][gutil.ATTR_LABEL] if (eb, ea) in gr_orig.edges else ''
+        lbla = gr_orig.edges[(ea, eb)][util_graph.ATTR_LABEL] if (ea, eb) in gr_orig.edges else ''
+        lblb = gr_orig.edges[(eb, ea)][util_graph.ATTR_LABEL] if (eb, ea) in gr_orig.edges else ''
 
         if lbla == lblb or lblb == '':
             lbl = lbla
@@ -67,8 +67,8 @@ if __name__ == '__main__':
             lbl = lblb
         else:
             lbl = lbla + MULTILABEL + lblb
-        gr.edges[(ea, eb)][gutil.ATTR_LABEL] = orderlabels(lbl)
+        gr.edges[(ea, eb)][util_graph.ATTR_LABEL] = orderlabels(lbl)
 
     grs.graphs = [gr]
 
-    gutil.write_graph_to_file(grs, args.outfile)
+    util_graph.write_graph_to_file(grs, args.outfile)

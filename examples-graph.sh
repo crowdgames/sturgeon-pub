@@ -65,8 +65,8 @@ python graph2gdesc.py --outfile work/test-grid-frame.gd --graphfile levels/graph
 python gdesc2graph.py --outfile work/test-grid-frame.dot --gdescfile work/test-grid-frame.gd --solver pysat-minicard --minsize 36 --maxsize 48 --edgeopt grid 6
 
 # dag - grid - mario
-python input2tiles.py --outfile work/mario-1-1.tiles --textfile levels/vglc/mario-1-1-generic-nostartgoal.lvl
-python tiles2graph.py --outfile work/mario-1-1.gr --tilefile work/mario-1-1.tiles --text-labels
+python input2tile.py --outfile work/mario-1-1.tile --textfile levels/vglc/mario-1-1-generic-nostartgoal.lvl
+python tile2graph.py --outfile work/mario-1-1.gr --tilefile work/mario-1-1.tile --text-labels
 python graph2gdesc.py --outfile work/mario-1-1.gd --graphfile levels/graphs/mario-colors.gr work/mario-1-1.gr
 python gdesc2graph.py --outfile work/mario-1-1-grid.dot --gdescfile work/mario-1-1.gd --solver pysat-minicard --minsize 100 --maxsize 120 --edgeopt grid 8 --label-min 1
 python gdesc2graph.py --outfile work/mario-1-1-rect.dot --gdescfile work/mario-1-1.gd --solver pysat-minicard --minsize 100 --maxsize 120 --edgeopt rect 8 --label-min 1

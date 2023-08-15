@@ -1,19 +1,19 @@
 import argparse, itertools, json, pickle, random, sys, time
-import gutil, util
+import util, util_graph
 import networkx as nx
 
 
 
 def graph_nbrs(gr, gtype, node):
     nbrs = []
-    for fra, til, label in gutil.edges_and_labels(gr):
+    for fra, til, label in util_graph.edges_and_labels(gr):
         nbr, dir_tag = None, None
 
-        if gutil.gtype_directed(gtype):
+        if util_graph.gtype_directed(gtype):
             if fra == node:
-                nbr, dir_tag = til, gutil.DIR_TIL
+                nbr, dir_tag = til, util_graph.DIR_TIL
             elif til == node:
-                nbr, dir_tag = fra, gutil.DIR_FRA
+                nbr, dir_tag = fra, util_graph.DIR_FRA
         else:
             if fra == node:
                 nbr = til
@@ -28,7 +28,7 @@ def graph_nbrs(gr, gtype, node):
 def graph2gdesc(grs, edgesonly):
     util.timer_section('extract')
 
-    grd = gutil.GraphDesc()
+    grd = util_graph.GraphDesc()
 
     grd.gtype = grs.gtype
     grd.colors = grs.colors
@@ -41,17 +41,17 @@ def graph2gdesc(grs, edgesonly):
     for gr in grs.graphs:
         total_nodes += len(gr.nodes)
 
-        for node, label in gutil.nodes_and_labels(gr):
+        for node, label in util_graph.nodes_and_labels(gr):
             if label not in grd.node_labels:
                 grd.node_labels[label] = None
                 grd.node_label_count[label] = 0
                 grd.node_label_neighbors[label] = []
 
-        for fra, til, label in gutil.edges_and_labels(gr):
+        for fra, til, label in util_graph.edges_and_labels(gr):
             if label not in grd.edge_labels:
                 grd.edge_labels[label] = None
 
-        for node, label in gutil.nodes_and_labels(gr):
+        for node, label in util_graph.nodes_and_labels(gr):
             grd.node_label_count[label] += 1
 
             nbr_labels = []
@@ -61,7 +61,7 @@ def graph2gdesc(grs, edgesonly):
                 if edgesonly:
                     nbr_node_label = None
                 else:
-                    nbr_node_label = gr.nodes[nbr_node][gutil.ATTR_LABEL]
+                    nbr_node_label = gr.nodes[nbr_node][util_graph.ATTR_LABEL]
                 nbr_labels.append((nbr_node_label, nbr_edge_label, nbr_edge_dir))
 
             nbr_labels = tuple(sorted(nbr_labels))
@@ -86,8 +86,8 @@ if __name__ == '__main__':
     parser.add_argument('--edgesonly', action='store_true', help='Make description from only edges.')
     args = parser.parse_args()
 
-    grs = gutil.read_graphs(args.graphfile)
+    grs = util_graph.read_graphs(args.graphfile)
 
     grd = graph2gdesc(grs, args.edgesonly)
-    with open(args.outfile, 'wb') as f:
-        pickle.dump(grd, f, pickle.HIGHEST_PROTOCOL)
+    with util.openz(args.outfile, 'wb') as f:
+        pickle.dump(grd, f)

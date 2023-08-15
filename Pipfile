@@ -12,9 +12,12 @@ Pillow = "*"
 networkx = "*"
 pydot = "*"
 
-python-sat = {version = "==0.1.7.dev21", extras = ["aiger", "pblib"]}
+numpy = "*"
+
 z3-solver = "*"
 clingo = "*"
-cvc5 = "*"
+python-sat = {version="==0.1.8.dev4", extras=["aiger", "approxmc", "pblib"], markers="platform_system != 'Windows'"}
+python-sat-windows = {file="https://files.pythonhosted.org/packages/45/87/16dc038ffa5bae9493c7d26162275629ea4ba01be6d50a5af0d28d4bc5b4/python_sat-0.1.8.dev4-cp310-cp310-win_amd64.whl", markers="platform_system == 'Windows'"}
+cvc5 = {version="*", markers="platform_system != 'Windows'"}
 
 [dev-packages]

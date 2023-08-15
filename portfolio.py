@@ -29,7 +29,7 @@ def run_portfolio(filename, timeout):
 
     while True:
         for solver, proc, tfile in procs:
-            if proc.poll() != None:
+            if proc.poll() is not None:
                 completed_procs.append((solver, proc, tfile))
         if len(completed_procs) != 0:
             break
@@ -67,7 +67,7 @@ def run_portfolio(filename, timeout):
                 print(line)
             if len(line) > 0 and line[0] == 'v':
                 model = line
-        if model != None:
+        if model is not None:
             print('c model from', solver)
             models.append((solver, model))
 
@@ -97,7 +97,7 @@ def run_portfolio(filename, timeout):
                     unsat += wt
 
             print('c model', solver, unsat)
-            if best_unsat == None or unsat < best_unsat:
+            if best_unsat is None or unsat < best_unsat:
                 best_model, best_solver, best_unsat = model, solver, unsat
 
         print('c! using model', best_solver)

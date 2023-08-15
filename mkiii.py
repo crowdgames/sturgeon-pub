@@ -54,7 +54,7 @@ class MKIIIInfo:
         self.use_term = None
         self.custom = None
         self.layers = None
-        self.extra_text_lines = []
+        self.extra_meta = []
 
 class CustomInfo:
     def __init__(self, solver, rng, vars_lrct, rows, cols, layers):
@@ -263,7 +263,7 @@ def get_example_info(mkiii_setup):
         ei.rep_rule_order = RR_ORD_ONE
         ei.use_term = False
 
-        ei.extra_text_lines.append(util.draw_rect_line('level', [(0, 0, 3, 3), (0, 3, 3, 6), (0, 6, 3, 9), (3, 0, 6, 3), (3, 3, 6, 6), (3, 6, 6, 9), (6, 0, 9, 3), (6, 3, 9, 6), (6, 6, 9, 9)]))
+        ei.extra_meta.append(util.meta_rect('level', [(0, 0, 3, 3), (0, 3, 3, 6), (0, 6, 3, 9), (3, 0, 6, 3), (3, 3, 6, 6), (3, 6, 6, 9), (6, 0, 9, 3), (6, 3, 9, 6), (6, 6, 9, 9)]))
 
         def _custom(ci):
             # check size
@@ -767,11 +767,13 @@ class GeneratorMKIII(generator.Generator):
         self._change_vars_rcs = None
 
     def add_rules_mkiii(self, mkiii_info):
+        print('add mkiii constraints')
+
         self._states = mkiii_info.states
         self._layers = mkiii_info.layers
         self._group_names = list(mkiii_info.rep_rule_names) if mkiii_info.rep_rule_names else None
 
-        self.append_extra_text_lines(mkiii_info.extra_text_lines)
+        self.append_extra_meta(mkiii_info.extra_meta)
 
         self._vars_lrct = {}
         self._vars_patt = {}
@@ -784,7 +786,7 @@ class GeneratorMKIII(generator.Generator):
         self._change_vars_rcs = [[]]
 
         text_to_tile = {}
-        for tile, text in self._scheme_info.tile_to_text.items():
+        for tile, text in self._scheme_info.tileset.tile_to_text.items():
             util.check(text not in text_to_tile, 'cannot have duplicate tile text ' + text + ' for mkiii')
             util.check(text in self._states, 'text ' + text + ' not in states')
             text_to_tile[text] = tile
@@ -860,7 +862,7 @@ class GeneratorMKIII(generator.Generator):
             layer_change_vars_rcs = []
 
             # terminal stays set
-            if self._vars_term != None:
+            if self._vars_term is not None:
                 if ll > 0:
                     self._solver.cnstr_implies_disj(self._vars_term[ll], True, [self._vars_term[ll + 1]], True, None)
 
@@ -871,12 +873,12 @@ class GeneratorMKIII(generator.Generator):
                     all_changes_rc[(rr, cc)] = []
 
             # set up priority vars
-            if self._vars_pri != None:
+            if self._vars_pri is not None:
                 inds_pri = []
 
             # set up rep rules
             for rep_rules_index in range(len(mkiii_info.rep_rules)):
-                if self._vars_pri != None:
+                if self._vars_pri is not None:
                     ind_pri = self._solver.make_var()
                     prev_inds_pri = list(inds_pri)
                     inds_pri.append(ind_pri)
@@ -923,7 +925,7 @@ class GeneratorMKIII(generator.Generator):
                                     for ii in range(len(rule_in)):
                                         all_changes_rc[(rr + dr * ii, cc + dc * ii)].append(change)
 
-                if self._vars_pri != None:
+                if self._vars_pri is not None:
                     # pri equals any change
                     for change in ind_changes:
                         self._solver.cnstr_implies_disj(change, True, [ind_pri], True, None)
@@ -932,9 +934,9 @@ class GeneratorMKIII(generator.Generator):
                 if rep_rules_type == RR_GRP_CHOICE:
                     # exactly one change or terminal or prev pri changed
                     changes_or_term_or_prev_pri = ind_changes
-                    if self._vars_term != None:
+                    if self._vars_term is not None:
                         changes_or_term_or_prev_pri.append(self._vars_term[ll + 1])
-                    if self._vars_pri != None:
+                    if self._vars_pri is not None:
                         changes_or_term_or_prev_pri = changes_or_term_or_prev_pri + prev_inds_pri
                     self._solver.cnstr_count(changes_or_term_or_prev_pri, True, 1, 1, None)
 
@@ -942,9 +944,9 @@ class GeneratorMKIII(generator.Generator):
                     # everything that can change does, unless terminal or prev_pri
                     for ind_change, ind_change_vin in zip(ind_changes, ind_changes_vin):
                         change_or_term_or_prev_pri = [ind_change]
-                        if self._vars_term != None:
+                        if self._vars_term is not None:
                             change_or_term_or_prev_pri.append(self._vars_term[ll + 1])
-                        if self._vars_pri != None:
+                        if self._vars_pri is not None:
                             change_or_term_or_prev_pri = change_or_term_or_prev_pri + prev_inds_pri
                         self._solver.cnstr_implies_disj(ind_change_vin, True, change_or_term_or_prev_pri, True, None)
                         self._solver.cnstr_count(change_or_term_or_prev_pri, True, 0, 1, None)
@@ -954,12 +956,12 @@ class GeneratorMKIII(generator.Generator):
 
             self._change_vars_rcs.append(layer_change_vars_rcs)
 
-            if self._vars_pri != None:
+            if self._vars_pri is not None:
                 self._vars_pri.append(inds_pri)
 
                 # exactly one priority changes, or term
                 inds_pri_or_term = list(inds_pri)
-                if self._vars_term != None:
+                if self._vars_term is not None:
                     inds_pri_or_term.append(self._vars_term[ll + 1])
                 self._solver.cnstr_count(inds_pri_or_term, True, 1, 1, None)
 
@@ -995,15 +997,15 @@ class GeneratorMKIII(generator.Generator):
             pi.names.append('initial')
 
             for ll in range(self._layers - 1):
-                if self._vars_pri != None: # RR_ORD_PRI
+                if self._vars_pri is not None: # RR_ORD_PRI
                     inds_pri = self._vars_pri[ll]
                     util.check(len(inds_pri) == len(self._group_names), 'pri and name length mismatch')
                     pri_name = None
                     for vv, name in zip(inds_pri, self._group_names):
                         if self._solver.get_var(vv):
-                            util.check(pri_name == None, 'multiple pri set')
+                            util.check(pri_name is None, 'multiple pri set')
                             pri_name = name
-                    if pri_name == None:
+                    if pri_name is None:
                         pri_name = 'none'
                     pi.names.append(pri_name)
                 else: # RR_ORD_SEQ, RR_ORD_ONE
@@ -1028,14 +1030,14 @@ class GeneratorMKIII(generator.Generator):
                     for ss in self._states:
                         vv = self._vars_lrct[(ll, rr, cc, ss)]
                         if self._solver.get_var(vv):
-                            util.check(use_ss == None, 'multiple states set')
+                            util.check(use_ss is None, 'multiple states set')
                             use_ss = ss
-                    util.check(use_ss != None, 'no state set')
+                    util.check(use_ss is not None, 'no state set')
                     level_row.append(use_ss)
                 level.append(level_row)
             pi.levels.append(level)
 
-            if self._vars_term == None or ll == 0:
+            if self._vars_term is None or ll == 0:
                 pi.term.append(None)
                 pi.first_term.append(None)
 

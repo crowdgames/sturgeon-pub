@@ -38,10 +38,10 @@ if __name__ == '__main__':
 
     tag_level = util.read_text_level(args.tagfile)
 
-    with open(args.schemefile, 'rb') as f:
+    with util.openz(args.schemefile, 'rb') as f:
         scheme_info = pickle.load(f)
 
     game_level = tag2game(tag_level, scheme_info, args.game)
     util.print_text_level(game_level)
-    with open(args.outfile, 'wt') as f:
+    with util.openz(args.outfile, 'wt') as f:
         util.print_text_level(game_level, outfile=f)

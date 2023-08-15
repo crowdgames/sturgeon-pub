@@ -1,10 +1,12 @@
-import atexit, os, pickle, shutil, subprocess, sys, time
+import atexit, bz2, copy, gzip, json, os, pickle, shutil, subprocess, sys, time
+import PIL.Image
 
 
 
 META_STR        = 'META'
-COMMENT_STR     = 'REM'
-DRAW_STR        = 'DRAW'
+
+MGROUP_PATH     = 'path'
+MGROUP_OFFPATH  = 'offpath'
 
 OPEN_TEXT       = '-'
 OPEN_TEXT_ZELDA = 'DLOMS-'
@@ -12,17 +14,17 @@ START_TEXT      = '{'
 GOAL_TEXT       = '}'
 
 DEFAULT_TEXT    = ','
-PATH_TEXT       = '.'
+PATH_TEXT       = 'p'
 
 VOID_TEXT       = ' '
 VOID_TILE       = -1
 
 SPECIAL_CHARS = [PATH_TEXT]
-TILE_CHARS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+INDEX_CHARS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 
 
-class TileInfo:
+class TileSetInfo:
     def __init__(self):
         self.tile_ids = None
 
@@ -30,9 +32,17 @@ class TileInfo:
         self.tile_to_image = None
         self.tile_image_size = None
 
-        self.tile_levels = None
-        self.tag_levels = None
-        self.game_levels = None
+class TileLevelInfo:
+    def __init__(self):
+        self.tiles = None
+        self.tags = None
+        self.games = None
+        self.meta = None
+
+class TileInfo:
+    def __init__(self):
+        self.tileset = None
+        self.levels = None
 
 
 
@@ -55,11 +65,7 @@ class SchemePatternInfo:
 
 class SchemeInfo:
     def __init__(self):
-        self.tile_ids = None
-
-        self.tile_to_text = None
-        self.tile_to_image = None
-        self.tile_image_size = None
+        self.tileset = None
 
         self.game_to_tag_to_tiles = None
 
@@ -73,7 +79,7 @@ class ReachabilitySetup:
         self.game_to_move = None
         self.wrap_cols = None
         self.goal_loc = None
-        self.goal_size = None
+        self.goal_params = None
         self.open_text = None
 
 class GameMoveInfo:
@@ -116,7 +122,9 @@ class ResultInfo:
 
         self.execution_info = None
 
-        self.extra_text_lines = []
+        self.objective = None
+
+        self.extra_meta = []
 
 
 
@@ -133,7 +141,7 @@ class SectionTimer:
     def print_section(self, section):
         curr_time = time.time()
 
-        if self._last_section != None:
+        if self._last_section is not None:
             if mute_time():
                 print('...%s done' % self._last_section, flush=True)
             else:
@@ -144,7 +152,7 @@ class SectionTimer:
         self._last_section = section
         self._last_time = curr_time
 
-        if section != None:
+        if section is not None:
             print('starting %s...' % (section), flush=True)
 
 _section_timer = None
@@ -152,16 +160,21 @@ def _timer_stop():
     global _section_timer
     _section_timer.print_section(None)
     _section_timer.print_done()
+    _section_timer = None
 
-def timer_start():
+def timer_start(print_cmdline=True):
     global _section_timer
     _section_timer = SectionTimer()
     atexit.register(_timer_stop)
-    print('running ' + subprocess.list2cmdline(sys.argv))
+    if print_cmdline:
+        print('running ' + subprocess.list2cmdline(sys.argv))
 
 def timer_section(section):
     global _section_timer
-    _section_timer.print_section(section)
+    if _section_timer is None:
+        print(section)
+    else:
+        _section_timer.print_section(section)
 
 
 
@@ -184,11 +197,13 @@ def write_portfolio(ss):
 
 
 def exit_solution_found():
-    print('--SOLVED')
+    sys.stdout.write('--SOLVED\n')
+    sys.stdout.flush()
     sys.exit(0)
 
 def exit_solution_not_found():
-    print('--NOSOLUTION')
+    sys.stdout.write('--NOSOLUTION\n')
+    sys.stdout.flush()
     sys.exit(-1)
 
 
@@ -198,7 +213,7 @@ def check(cond, msg):
         raise RuntimeError(msg)
 
 def arg_list_to_dict(parser, name, arg_list, check_option):
-    if arg_list == None:
+    if arg_list is None:
         return None
 
     res = {}
@@ -223,12 +238,30 @@ def arg_list_to_dict_options(parser, name, arg_list, val_options):
 
     return arg_list_to_dict(parser, name, arg_list, check_option)
 
+def check_tileset_match(ts0, ts1):
+    check(ts0.tile_ids == ts1.tile_ids, 'tileset mismatch')
+    check(ts0.tile_image_size == ts1.tile_image_size, 'tileset mismatch')
+
+    if ts0.tile_to_text is not None or ts1.tile_to_text is not None:
+        check(ts0.tile_to_text is not None and ts1.tile_to_text is not None, 'tileset mismatch')
+        for tile in ts0.tile_ids:
+            check(ts0.tile_to_text[tile] == ts1.tile_to_text[tile], 'tileset mismatch')
+    else:
+        check(ts0.tile_to_text is None and ts1.tile_to_text is None, 'tileset mismatch')
+
+    if ts0.tile_to_image is not None or ts1.tile_to_image is not None:
+        check(ts0.tile_to_image is not None and ts1.tile_to_image is not None, 'tileset mismatch')
+        for tile in ts0.tile_ids:
+            check(tuple(ts0.tile_to_image[tile].getdata()) == tuple(ts1.tile_to_image[tile].getdata()), 'tileset mismatch')
+    else:
+        check(ts0.tile_to_image is None and ts1.tile_to_image is None, 'tileset mismatch')
+
 def make_grid(rows, cols, elem):
     out = []
     for rr in range(rows):
         out_row = []
         for cc in range(cols):
-            out_row.append(elem)
+            out_row.append(copy.copy(elem))
         out.append(out_row)
     return out
 
@@ -246,30 +279,137 @@ def corner_indices(til, depth):
     corner_indices_helper(0, til, depth, (), ret)
     return ret
 
-def comment_line(comment):
-    return META_STR + ' ' + COMMENT_STR + ' ' + comment + '\n'
+def fileistype(fn, ext):
+    return fn.endswith(ext) or fn.endswith(ext + '.gz') or fn.endswith(ext + '.bz2')
 
-def draw_path_line(style, points):
-    return META_STR + ' ' + DRAW_STR + ' ' + 'PATH: ' + style + '; ' + ', '.join(['%d %d %d %d' % (ra, ca, rb, cd) for (ra, ca, rb, cd) in points]) + '\n'
+def fresh_image(image):
+    image_data = PIL.Image.new(image.mode, image.size)
+    image_data.putdata(image.getdata())
+    return image_data
 
-def draw_line_line(style, points):
-    return META_STR + ' ' + DRAW_STR + ' ' + 'LINE: ' + style + '; ' + ', '.join(['%d %d %d %d' % (ra, ca, rb, cd) for (ra, ca, rb, cd) in points]) + '\n'
+def trim_void_tile_level(tile_level):
+    rows, cols = len(tile_level), len(tile_level[0])
 
-def draw_tile_line(style, points):
-    return META_STR + ' ' + DRAW_STR + ' ' + 'TILE: ' + style + '; ' + ', '.join(['%d %d' % (rr, cc) for (rr, cc) in points]) + '\n'
+    rr_lo, rr_hi = rows, 0
+    for rr in range(rows):
+        any_nonvoid = False
+        for cc in range(cols):
+            if tile_level[rr][cc] != VOID_TILE:
+                any_nonvoid = True
+                break
+        if any_nonvoid:
+            rr_lo = min(rr_lo, rr)
+            rr_hi = max(rr_hi, rr + 1)
 
-def draw_rect_line(style, points):
-    return META_STR + ' ' + DRAW_STR + ' ' + 'RECT: ' + style + '; ' + ', '.join(['%d %d %d %d' % (ra, ca, rb, cd) for (ra, ca, rb, cd) in points]) + '\n'
+    cc_lo, cc_hi = cols, 0
+    for cc in range(cols):
+        any_nonvoid = False
+        for rr in range(rows):
+            if tile_level[rr][cc] != VOID_TILE:
+                any_nonvoid = True
+                break
+        if any_nonvoid:
+            cc_lo = min(cc_lo, cc)
+            cc_hi = max(cc_hi, cc + 1)
+
+    ret = []
+    for rr in range(rr_lo, rr_hi):
+        row = []
+        for cc in range(cc_lo, cc_hi):
+            row.append(tile_level[rr][cc])
+        ret.append(row)
+    print(rr_lo, rr_hi, cc_lo, cc_hi)
+    print(ret)
+    return ret
+
+def tile_level_to_text_level(tile_level, tileset):
+    rows, cols = len(tile_level), len(tile_level[0])
+
+    text_level = make_grid(rows, cols, VOID_TEXT)
+    for rr in range(rows):
+        for cc in range(cols):
+            if tile_level[rr][cc] != VOID_TILE:
+                text_level[rr][cc] = tileset.tile_to_text[tile_level[rr][cc]]
+    return text_level
+
+def tile_level_to_image_level(tile_level, tileset):
+    rows, cols = len(tile_level), len(tile_level[0])
+
+    image_level = PIL.Image.new('RGBA', (cols * tileset.tile_image_size, rows * tileset.tile_image_size), (0, 0, 0, 0))
+    for rr in range(rows):
+        for cc in range(cols):
+            if tile_level[rr][cc] != VOID_TILE:
+                image_level.paste(tileset.tile_to_image[tile_level[rr][cc]], (cc * tileset.tile_image_size, rr * tileset.tile_image_size))
+    return image_level
+
+def get_meta_path(meta):
+    if meta is not None:
+        for md in meta:
+            if md['type'] == 'geom' and md['shape'] == 'path' and md['group'] == MGROUP_PATH:
+                return [tuple(elem) for elem in md['data']]
+    return None
+
+def get_meta_properties(meta):
+    if meta is not None:
+        ret = None
+        for md in meta:
+            if md['type'] == 'property':
+                if ret is None:
+                    ret = []
+                ret += md['value']
+        return ret
+    return None
+
+def meta_check_json(obj):
+    check(type(obj) == dict, 'json')
+    check('type' in obj, 'json')
+    check(type(obj['type']) == str, 'json')
+    for key, value in obj.items():
+        check(type(key) == str, 'json')
+        check(type(value) in [str, int, float, list], 'json')
+        if type(value) == list:
+            for elem in value:
+                check(type(elem) in [str, int, float, list], 'json')
+                if type(elem) == list:
+                    for elem2 in elem:
+                        check(type(elem2) in [str, int, float], 'json')
+    return obj
+
+def meta_path(group, data):
+    return meta_check_json({ 'type': 'geom', 'shape': 'path', 'group': group, 'data': [list(elem) for elem in data] })
+
+def meta_line(group, data):
+    return meta_check_json({ 'type': 'geom', 'shape': 'line', 'group': group, 'data': [list(elem) for elem in data] })
+
+def meta_tile(group, data):
+    return meta_check_json({ 'type': 'geom', 'shape': 'tile', 'group': group, 'data': [list(elem) for elem in data] })
+
+def meta_rect(group, data):
+    return meta_check_json({ 'type': 'geom', 'shape': 'rect', 'group': group, 'data': [list(elem) for elem in data] })
+
+def meta_properties(data):
+    return meta_check_json({ 'type': 'property', 'value': data })
+
+def meta_custom(data):
+    return meta_check_json(data)
+
+def openz(filename, mode):
+    if filename.endswith('.gz'):
+        return gzip.open(filename, mode)
+    elif filename.endswith('.bz2'):
+        return bz2.open(filename, mode)
+    else:
+        return open(filename, mode)
 
 def print_result_info(result_info, replace_path_tiles):
     print('tile level')
     print_tile_level(result_info.tile_level)
 
-    if result_info.text_level != None:
+    if result_info.text_level is not None:
         print('text level')
-        print_result_text_level(result_info, replace_path_tiles)
+        print_result_text_level(result_info, [], replace_path_tiles)
 
-    if result_info.execution_info != None:
+    if result_info.execution_info is not None:
         print('execution')
         for level, name, first_term in zip(result_info.execution_info.levels, result_info.execution_info.names, result_info.execution_info.first_term):
             if first_term:
@@ -280,97 +420,176 @@ def print_result_info(result_info, replace_path_tiles):
             print_text_level(level)
             print()
 
-def save_result_info(result_info, prefix):
+def save_result_info(result_info, prefix, compress=False, result_only=False):
     result_name = prefix + '.result'
+    if compress:
+        result_name += '.gz'
     print('writing result to', result_name)
 
-    with open(result_name, 'wb') as f:
-        pickle.dump(result_info, f, pickle.HIGHEST_PROTOCOL)
+    with openz(result_name, 'wb') as f:
+        pickle.dump(result_info, f)
 
-    if result_info.text_level != None:
-        text_name = prefix + '.lvl'
-        print('writing text level to', text_name)
+    if not result_only:
+        if result_info.text_level is not None:
+            text_name = prefix + '.lvl'
+            print('writing text level to', text_name)
 
-        with open(text_name, 'wt') as f:
-            print_result_text_level(result_info, False, outfile=f)
-            for extra_text_line in result_info.extra_text_lines:
-                f.write(extra_text_line)
+            with openz(text_name, 'wt') as f:
+                print_result_text_level(result_info, result_info.extra_meta, False, outfile=f)
 
-    if result_info.image_level != None:
-        image_name = prefix + '.png'
-        print('writing image level to', image_name)
+        if result_info.image_level is not None:
+            image_name = prefix + '.png'
+            print('writing image level to', image_name)
 
-        result_info.image_level.save(image_name)
+            result_info.image_level.save(image_name)
 
-    if result_info.execution_info != None:
-        exec_folder = prefix + '_exec'
-        print('writing execution levels to', exec_folder)
-        if os.path.exists(exec_folder):
-            shutil.rmtree(exec_folder)
-        os.makedirs(exec_folder)
+        if result_info.execution_info is not None:
+            exec_folder = prefix + '_exec'
+            print('writing execution levels to', exec_folder)
+            if os.path.exists(exec_folder):
+                shutil.rmtree(exec_folder)
+            os.makedirs(exec_folder)
 
-        for ii, (level, name, changes, term) in enumerate(zip(result_info.execution_info.levels, result_info.execution_info.names, result_info.execution_info.changes, result_info.execution_info.term)):
-            descr = ['term' if term else 'step']
-            if name:
-                descr.append(name)
+            for ii, (level, name, changes, term) in enumerate(zip(result_info.execution_info.levels, result_info.execution_info.names, result_info.execution_info.changes, result_info.execution_info.term)):
+                descr = ['term' if term else 'step']
+                if name:
+                    descr.append(name)
 
-            step_name = exec_folder + ('/%02d_' % ii) + '_'.join(descr) + '_exec.lvl'
+                step_name = exec_folder + ('/%02d_' % ii) + '_'.join(descr) + '_exec.lvl'
 
-            with open(step_name, 'wt') as f:
-                print_text_level(level, outfile=f)
-                if len(result_info.extra_text_lines) != 0:
-                    f.write('\n'.join(result_info.extra_text_lines) + '\n')
+                meta = result_info.extra_meta
                 if len(changes) != 0:
-                    f.write(draw_rect_line('change', changes))
-                f.write(comment_line(' MKIII ' + (' '.join(descr))))
+                    meta.append(meta_rect('change', changes))
+                meta.append(meta_custom({'type': 'mkiii', 'desc': descr}))
 
-def print_tile_level(tile_level, outfile=sys.stdout):
+                with openz(step_name, 'wt') as f:
+                    print_text_level(level, meta=meta, outfile=f)
+
+def index_to_char(idx):
+    if idx < len(INDEX_CHARS):
+        return INDEX_CHARS[idx]
+    else:
+        return '?'
+
+def print_tile_level(tile_level, outfile=None):
+    if outfile is None:
+        outfile = sys.stdout
+
     for row in tile_level:
         for tile in row:
             if tile == VOID_TILE:
                 display_tile = VOID_TEXT
-            elif tile < len(TILE_CHARS):
-                display_tile = TILE_CHARS[tile]
             else:
-                display_tile = '?'
+                display_tile = index_to_char(tile)
             outfile.write(display_tile)
         outfile.write('\n')
 
-def print_result_text_level(result_info, replace_path_tiles, outfile=sys.stdout):
-    if result_info.reach_info:
-        print_text_level(result_info.text_level, meta_path_edges=result_info.reach_info.path_edges, meta_path_tiles=result_info.reach_info.path_tiles, meta_offpath_edges=result_info.reach_info.offpath_edges, replace_path_tiles=replace_path_tiles, outfile=outfile)
-    else:
-        print_text_level(result_info.text_level, replace_path_tiles=replace_path_tiles, outfile=outfile)
+def print_tile_level_json(tile_level, meta=None, outfile=None):
+    if outfile is None:
+        outfile = sys.stdout
 
-def print_text_level(text_level, meta_path_edges=None, meta_path_tiles=None, meta_offpath_edges=None, replace_path_tiles=False, outfile=sys.stdout):
+    out = {}
+    out['tile'] = tile_level
+    if meta != None:
+        out['meta'] = meta
+    json.dump(out, outfile)
+    outfile.write('\n')
+
+def print_result_text_level(result_info, extra_meta, replace_path_tiles, outfile=None):
+    if outfile is None:
+        outfile = sys.stdout
+
+    meta = []
+    if result_info.reach_info is not None:
+        meta.append(meta_path(MGROUP_PATH, result_info.reach_info.path_edges))
+        meta.append(meta_tile(MGROUP_PATH, result_info.reach_info.path_tiles))
+        meta.append(meta_line(MGROUP_OFFPATH, result_info.reach_info.offpath_edges))
+
+    if extra_meta is not None:
+        meta += extra_meta
+
+    if replace_path_tiles and result_info.reach_info is not None:
+        path_tiles = result_info.reach_info.path_tiles
+    else:
+        path_tiles = None
+
+    print_text_level(result_info.text_level, meta=meta, replace_path_tiles=path_tiles, outfile=outfile)
+
+def print_text_level(text_level, meta=None, replace_path_tiles=None, outfile=None):
+    if outfile is None:
+        outfile = sys.stdout
+
     for rr, row in enumerate(text_level):
         for cc, tile in enumerate(row):
-            if replace_path_tiles and (rr, cc) in meta_path_tiles:
+            if replace_path_tiles is not None and (rr, cc) in replace_path_tiles:
                 outfile.write(PATH_TEXT)
             else:
                 outfile.write(tile)
         outfile.write('\n')
 
-    if meta_path_edges != None:
-        outfile.write(draw_path_line('path', meta_path_edges))
+    if meta is not None:
+        for md in meta:
+            outfile.write(META_STR + ' ' + json.dumps(md) + '\n')
 
-    if meta_path_tiles != None:
-        outfile.write(draw_tile_line('path', meta_path_tiles))
+def process_old_meta(line):
+    TAG = 'META DRAW'
+    if line.startswith(TAG):
+        res = {}
+        res['type'] = 'geom'
 
-    if meta_offpath_edges != None:
-        outfile.write(draw_line_line('offpath', meta_offpath_edges))
+        line = line[len(TAG):].strip()
 
-def read_text_level(infilename):
-    with open(infilename, 'rt') as infile:
+        splt = line.split(':')
+        check(len(splt) == 2, 'split')
+        res['shape'] = splt[0].strip().lower()
+        line = splt[1].strip()
+
+        splt = line.split(';')
+        if len(splt) == 1:
+            points_str = splt[0].strip()
+        elif len(splt) == 2:
+            res['group'] = splt[0].strip()
+            points_str = splt[1].strip()
+        else:
+            check(False, 'split')
+
+        def _number(_s):
+            _ret = float(_s)
+            if _ret == int(_ret):
+                return int(_ret)
+            else:
+                return _ret
+
+        res['data'] = [tuple([_number(el) for el in pt.strip().split()]) for pt in points_str.split(',')]
+        return res
+
+    TAG = 'META REM'
+    if line.startswith(TAG):
+        return {'type': 'comment', 'value': line[len(TAG):].strip()}
+
+    return None
+
+def read_text_level(infilename, include_meta=False):
+    with openz(infilename, 'rt') as infile:
         lvl = []
-        for line in infile.readlines():
-            if line.startswith(META_STR):
-                continue
+        meta = []
 
+        for line in infile.readlines():
             line = line.rstrip('\n')
 
-            for special_char in SPECIAL_CHARS:
-                check(special_char not in line, 'special char ' + special_char + ' in level.')
+            old_meta = process_old_meta(line)
+            if old_meta is not None:
+                meta.append(old_meta)
+            elif line.startswith(META_STR):
+                if include_meta:
+                    meta.append(json.loads(line[len(META_STR):]))
+            else:
+                for special_char in SPECIAL_CHARS:
+                    check(special_char not in line, 'special char ' + special_char + ' in level.')
 
-            lvl.append([c for c in line])
-        return lvl
+                lvl.append([c for c in line])
+
+        if include_meta:
+            return lvl, meta
+        else:
+            return lvl

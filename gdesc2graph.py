@@ -1,5 +1,5 @@
 import argparse, itertools, json, pickle, random, sys, time
-import gutil, util, solvers
+import solvers, util, util_graph
 import networkx as nx
 
 
@@ -42,7 +42,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         vars_nodes_by_label[ll] = []
 
     node_id_order = list(range(max_size))
-    if randomize != None:
+    if randomize is not None:
         rng = random.Random(randomize)
         rng.shuffle(node_id_order)
 
@@ -89,9 +89,9 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
 
             if edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT]:
                 if jj == ii + 1:
-                    s.cnstr_count([vars_edge_by_id_by_label[(ii, jj)][None], vars_edge_by_id_by_label[(ii, jj)][gutil.LABEL_GRID_SOUTH]], True, 1, 1, None)
+                    s.cnstr_count([vars_edge_by_id_by_label[(ii, jj)][None], vars_edge_by_id_by_label[(ii, jj)][util_graph.LABEL_GRID_SOUTH]], True, 1, 1, None)
                 elif jj == ii + grid_stride:
-                    s.cnstr_count([vars_edge_by_id_by_label[(ii, jj)][None], vars_edge_by_id_by_label[(ii, jj)][gutil.LABEL_GRID_EAST]], True, 1, 1, None)
+                    s.cnstr_count([vars_edge_by_id_by_label[(ii, jj)][None], vars_edge_by_id_by_label[(ii, jj)][util_graph.LABEL_GRID_EAST]], True, 1, 1, None)
 
     # how many nodes can be missing
     s.cnstr_count(vars_nodes_by_label[None], True, 0, max_size - min_size, None)
@@ -144,7 +144,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         util.check(False, 'connect')
 
     # tree
-    if gutil.gtype_tree(grd.gtype):
+    if util_graph.gtype_tree(grd.gtype):
         missing_edges = vars_edges_by_label[None]
         missing_nodes = vars_nodes_by_label[None]
         s.cnstr_count(missing_edges + missing_nodes, [False] * len(missing_edges) + [True] * len(missing_nodes), max_size - 1, max_size - 1, None)
@@ -208,10 +208,10 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             if ea not in vars_edge_by_id_by_label or eb not in vars_edge_by_id_by_label or ec not in vars_edge_by_id_by_label or ed not in vars_edge_by_id_by_label:
                 continue
 
-            eav = vars_edge_by_id_by_label[ea][gutil.LABEL_GRID_EAST]
-            ebv = vars_edge_by_id_by_label[eb][gutil.LABEL_GRID_SOUTH]
-            ecv = vars_edge_by_id_by_label[ec][gutil.LABEL_GRID_SOUTH]
-            edv = vars_edge_by_id_by_label[ed][gutil.LABEL_GRID_EAST]
+            eav = vars_edge_by_id_by_label[ea][util_graph.LABEL_GRID_EAST]
+            ebv = vars_edge_by_id_by_label[eb][util_graph.LABEL_GRID_SOUTH]
+            ecv = vars_edge_by_id_by_label[ec][util_graph.LABEL_GRID_SOUTH]
+            edv = vars_edge_by_id_by_label[ed][util_graph.LABEL_GRID_EAST]
 
             s.cnstr_implies_disj(make_conj([ebv, ecv, edv], [True, True, True]), True, [eav], True, None)
             s.cnstr_implies_disj(make_conj([eav, ecv, edv], [True, True, True]), True, [ebv], True, None)
@@ -247,10 +247,10 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             if ea not in vars_edge_by_id_by_label or eb not in vars_edge_by_id_by_label or ec not in vars_edge_by_id_by_label or ed not in vars_edge_by_id_by_label:
                 continue
 
-            eav = vars_edge_by_id_by_label[ea][gutil.LABEL_GRID_EAST]
-            ebv = vars_edge_by_id_by_label[eb][gutil.LABEL_GRID_SOUTH]
-            ecv = vars_edge_by_id_by_label[ec][gutil.LABEL_GRID_SOUTH]
-            edv = vars_edge_by_id_by_label[ed][gutil.LABEL_GRID_EAST]
+            eav = vars_edge_by_id_by_label[ea][util_graph.LABEL_GRID_EAST]
+            ebv = vars_edge_by_id_by_label[eb][util_graph.LABEL_GRID_SOUTH]
+            ecv = vars_edge_by_id_by_label[ec][util_graph.LABEL_GRID_SOUTH]
+            edv = vars_edge_by_id_by_label[ed][util_graph.LABEL_GRID_EAST]
 
             s.cnstr_implies_disj(make_conj([eav, ebv], [True, True]), True, [ecv], True, None)
             s.cnstr_implies_disj(make_conj([eav, ebv], [True, True]), True, [edv], True, None)
@@ -273,31 +273,31 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                 # 0 > 1
                 # v   v
                 # 2 > X
-                [(np[0], np[1]), gutil.LABEL_GRID_EAST,
-                 (np[0], np[2]), gutil.LABEL_GRID_SOUTH,
-                 (np[1],  None), gutil.LABEL_GRID_SOUTH,
-                 (np[2],  None), gutil.LABEL_GRID_EAST],
+                [(np[0], np[1]), util_graph.LABEL_GRID_EAST,
+                 (np[0], np[2]), util_graph.LABEL_GRID_SOUTH,
+                 (np[1],  None), util_graph.LABEL_GRID_SOUTH,
+                 (np[2],  None), util_graph.LABEL_GRID_EAST],
                 # X > 0
                 # v   v
                 # 1 > 2
-                [(np[0], np[2]), gutil.LABEL_GRID_SOUTH,
-                 (np[1], np[2]), gutil.LABEL_GRID_EAST,
-                 ( None, np[0]), gutil.LABEL_GRID_EAST,
-                 ( None, np[1]), gutil.LABEL_GRID_SOUTH],
+                [(np[0], np[2]), util_graph.LABEL_GRID_SOUTH,
+                 (np[1], np[2]), util_graph.LABEL_GRID_EAST,
+                 ( None, np[0]), util_graph.LABEL_GRID_EAST,
+                 ( None, np[1]), util_graph.LABEL_GRID_SOUTH],
                 # 0 > X
                 # v   v
                 # 1 > 2
-                [(np[0], np[1]), gutil.LABEL_GRID_SOUTH,
-                 (np[1], np[2]), gutil.LABEL_GRID_EAST,
-                 (np[0],  None), gutil.LABEL_GRID_EAST,
-                 ( None, np[2]), gutil.LABEL_GRID_SOUTH],
+                [(np[0], np[1]), util_graph.LABEL_GRID_SOUTH,
+                 (np[1], np[2]), util_graph.LABEL_GRID_EAST,
+                 (np[0],  None), util_graph.LABEL_GRID_EAST,
+                 ( None, np[2]), util_graph.LABEL_GRID_SOUTH],
                 # 0 > 1
                 # v   v
                 # X > 2
-                [(np[0], np[1]), gutil.LABEL_GRID_EAST,
-                 (np[1], np[2]), gutil.LABEL_GRID_SOUTH,
-                 (np[0],  None), gutil.LABEL_GRID_SOUTH,
-                 ( None, np[2]), gutil.LABEL_GRID_EAST]
+                [(np[0], np[1]), util_graph.LABEL_GRID_EAST,
+                 (np[1], np[2]), util_graph.LABEL_GRID_SOUTH,
+                 (np[0],  None), util_graph.LABEL_GRID_SOUTH,
+                 ( None, np[2]), util_graph.LABEL_GRID_EAST]
             ]
 
             for ea, eal, eb, ebl, ect, ecl, edt, edl in structures:
@@ -310,8 +310,8 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
 
                 completions = []
                 for npx in node_id_order:
-                    ec = tuple([(ee if ee != None else npx) for ee in ect])
-                    ed = tuple([(ee if ee != None else npx) for ee in edt])
+                    ec = tuple([(ee if ee is not None else npx) for ee in ect])
+                    ed = tuple([(ee if ee is not None else npx) for ee in edt])
                     if ec not in vars_edge_by_id_by_label or ed not in vars_edge_by_id_by_label:
                         continue
 
@@ -334,7 +334,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             ei, ej = min(ii, jj), max(ii, jj)
             if (ei, ej) in vars_edge_by_id_by_label:
                 edges_vars.append(vars_edge_by_id_by_label[(ei, ej)])
-                edges_dir.append(None if not gutil.gtype_directed(grd.gtype) else (gutil.DIR_FRA if jj < ii else gutil.DIR_TIL))
+                edges_dir.append(None if not util_graph.gtype_directed(grd.gtype) else (util_graph.DIR_FRA if jj < ii else util_graph.DIR_TIL))
                 edges_other_node.append(jj)
 
         # missing node has no edges; using conj seems to work better than multiple individual implies
@@ -352,13 +352,13 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                         for edge_ind, nbr_ind in zip(edge_inds, nbrs_perm):
                             nbr_node_label, nbr_edge_label, nbr_edge_dir = nbrs[nbr_ind]
                             if nbr_edge_dir == edges_dir[edge_ind]:
-                                if nbr_node_label != None:
+                                if nbr_node_label is not None:
                                     nodes.append(vars_node_by_id[edges_other_node[edge_ind]][nbr_node_label])
                                 edges[edge_ind] = edges_vars[edge_ind][nbr_edge_label]
                             else:
                                 nodes, edges = None, None
                                 break
-                        if nodes != None:
+                        if nodes is not None:
                             patts.append(make_conj(edges + nodes, [True] * (len(edges) + len(nodes))))
 
             if len(patts) == 0:
@@ -372,7 +372,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
     if s.solve():
         util.timer_section('create graph')
 
-        if gutil.gtype_directed(grd.gtype):
+        if util_graph.gtype_directed(grd.gtype):
             gr = nx.DiGraph()
         else:
             gr = nx.Graph()
@@ -384,9 +384,9 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                     util.check(label == False, 'multiple labels')
                     label = ll
             util.check(label != False, 'no label')
-            if label != None:
+            if label is not None:
                 gr.add_node(ii)
-                gr.nodes[ii][gutil.ATTR_LABEL] = label
+                gr.nodes[ii][util_graph.ATTR_LABEL] = label
 
         for (ii, jj), vvs in vars_edge_by_id_by_label.items():
             label = False
@@ -395,16 +395,16 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                     util.check(label == False, 'multiple labels')
                     label = ll
             util.check(label != False, 'no label')
-            if label != None:
+            if label is not None:
                 gr.add_edge(ii, jj)
-                gr.edges[(ii, jj)][gutil.ATTR_LABEL] = label
+                gr.edges[(ii, jj)][util_graph.ATTR_LABEL] = label
 
-        gutil.check_graph(gr, grd.gtype)
+        util_graph.check_graph(gr, grd.gtype)
 
         if edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT]:
-            gutil.layout_grid(gr)
+            util_graph.layout_grid(gr)
 
-        grs = gutil.Graphs()
+        grs = util_graph.Graphs()
         grs.gtype = grd.gtype
         grs.colors = grd.colors
         grs.graphs = [gr]
@@ -438,7 +438,7 @@ if __name__ == '__main__':
     else:
         solver = solvers.PortfolioSolver(args.solver, None)
 
-    if args.edgeopt != None:
+    if args.edgeopt is not None:
         edgeopt = args.edgeopt[0]
         edgeopt_params = tuple([int(ee) for ee in args.edgeopt[1:]])
         util.check(edgeopt in EDGEOPT_LIST, '--edgeopt must be in ' + ','.join(EDGEOPT_LIST))
@@ -446,13 +446,13 @@ if __name__ == '__main__':
     label_min = util.arg_list_to_dict_int(parser, '--label-min', args.label_min)
     label_max = util.arg_list_to_dict_int(parser, '--label-max', args.label_max)
 
-    with open(args.gdescfile, 'rb') as f:
+    with util.openz(args.gdescfile, 'rb') as f:
         grd = pickle.load(f)
 
     ogrs = gdesc2graph(solver, grd, args.minsize, args.maxsize, edgeopt, edgeopt_params, label_min, label_max, args.label_count, args.connect, args.randomize)
-    if ogrs != None:
-        gutil.write_graph(ogrs, sys.stdout)
-        gutil.write_graph_to_file(ogrs, args.outfile)
+    if ogrs is not None:
+        util_graph.write_graph(ogrs, sys.stdout)
+        util_graph.write_graph_to_file(ogrs, args.outfile)
         util.exit_solution_found()
     else:
         util.exit_solution_not_found()

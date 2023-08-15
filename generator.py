@@ -1,5 +1,4 @@
 import argparse, math, pickle, pprint, random, sys, time
-import PIL.Image
 import solvers, util
 
 
@@ -11,7 +10,7 @@ class Generator:
         self._solver = solver
         self._rng = random.Random(randomize) if randomize else None
 
-        self._extra_text_lines = []
+        self._extra_meta = []
 
         self._rows = rows
         self._cols = cols
@@ -64,10 +63,12 @@ class Generator:
     def get_scheme_info(self):
         return self._scheme_info
 
-    def append_extra_text_lines(self, lines):
-        self._extra_text_lines += lines
+    def append_extra_meta(self, meta):
+        self._extra_meta += meta
 
     def add_rules_tiles(self):
+        print('add tile constraints')
+
         row_order = list(range(self._rows))
         col_order = list(range(self._cols))
 
@@ -98,7 +99,9 @@ class Generator:
                 self._solver.cnstr_count(vvs, True, 1, 1, None)
 
     def add_rules_patterns(self, weight_patterns):
-        util.check(weight_patterns == None or weight_patterns > 0, 'weight')
+        print('add pattern constraints', weight_patterns)
+
+        util.check(weight_patterns is None or weight_patterns > 0, 'weight')
 
         def add_tile_patterns(_pattern_in, _pattern_out_list):
             _pattern_in_var = self._pattern_var(_pattern_in)
@@ -146,7 +149,7 @@ class Generator:
 
                 game_patterns_info = self._scheme_info.pattern_info.game_to_patterns[game]
 
-                if game_patterns_info == None:
+                if game_patterns_info is None:
                     continue
 
                 for pattern_template_in in game_patterns_info:
@@ -154,19 +157,19 @@ class Generator:
 
                     for pattern_in in game_patterns_info[pattern_template_in]:
                         pattern_inst_in = pattern_inst(pattern_template_in, pattern_in)
-                        if pattern_inst_in == None:
+                        if pattern_inst_in is None:
                             continue
 
                         all_pattern_in_inst.append(pattern_inst_in)
 
                         for pattern_template_out in game_patterns_info[pattern_template_in][pattern_in]:
-                            if pattern_template_out == None:
+                            if pattern_template_out is None:
                                 continue
 
                             pattern_list_out = []
                             for pattern_out in game_patterns_info[pattern_template_in][pattern_in][pattern_template_out]:
                                 pattern_inst_out = pattern_inst(pattern_template_out, pattern_out)
-                                if pattern_inst_out != None:
+                                if pattern_inst_out is not None:
                                     pattern_list_out.append(pattern_inst_out)
 
                             add_tile_patterns(pattern_inst_in, pattern_list_out)
@@ -175,7 +178,9 @@ class Generator:
                     add_pattern_options(all_pattern_in_inst)
 
     def add_rules_counts(self, use_out_text_groups, counts_scale_lo, counts_scale_hi, weight_counts):
-        util.check(weight_counts == None or weight_counts > 0, 'weight')
+        print('add count constraints', weight_counts)
+
+        util.check(weight_counts is None or weight_counts > 0, 'weight')
 
         print('using output text groups' if use_out_text_groups else 'using single tile groups')
 
@@ -192,11 +197,11 @@ class Generator:
                         continue
 
                     if use_out_text_groups:
-                        util.check(self._scheme_info.tile_to_text != None, 'tile groups out text')
+                        util.check(self._scheme_info.tileset.tile_to_text is not None, 'tile groups out text')
 
                         _inv = {}
                         for _tile in _count_tag_to_tiles[_game][_tag]:
-                            _out_text = self._scheme_info.tile_to_text[_tile]
+                            _out_text = self._scheme_info.tileset.tile_to_text[_tile]
 
                             # no counts on start/goal tiles
                             if _out_text == util.START_TEXT or _out_text == util.GOAL_TEXT:
@@ -233,42 +238,49 @@ class Generator:
 
     def add_constraint_tile_counts(self, rcs, tiles, lo, hi, weight_counts):
         util.check(lo <= hi, 'counts')
-        util.check(weight_counts == None or weight_counts > 0, 'weight')
+        util.check(weight_counts is None or weight_counts > 0, 'weight')
 
         vvs = [self._tile_var(rr, cc, tile) for rr, cc in rcs for tile in tiles]
 
         self._solver.cnstr_count(vvs, True, lo, hi, weight_counts)
 
     def reachability_edges(self):
-        if self._reach_info == None:
+        if self._reach_info is None:
             return None
 
-        edges = []
+        edges = {}
         for edge_key in self._reach_vars_edge:
             fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed = edge_key
-            edges.append((fr, fc, tr, tc, pwtc))
+            edges[(fr, fc, tr, tc, pwtc)] = None
 
         return edges
 
-    def add_constraint_reach_edge(self, cfr, cfc, ctr, ctc, cpwtc, setting, weight):
+    def add_constraint_reach_edge(self, cfr, cfc, ctr, ctc, cpwtc, on_path, weight):
+        edge_vars = []
         for edge_key in self._reach_out_edges[(cfr, cfc)]:
             fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed = edge_key
             if (cfr, cfc, ctr, ctc, cpwtc) == (fr, fc, tr, tc, pwtc):
-                self._solver.cnstr_count([self._reach_vars_edge[edge_key]], setting, 1, 1, weight)
+                edge_vars.append(self._reach_vars_edge[edge_key])
 
-    def add_constraint_start(self, rr, cc, setting, weight):
+        edge_count = 1 if on_path else 0
+
+        self._solver.cnstr_count(edge_vars, True, edge_count, edge_count, weight)
+
+    def add_constraint_start(self, rr, cc, on_path, weight):
         game = self._game_level[rr][cc]
         move_info = self._reach_info.game_to_move[game]
         vv = self._tile_var(rr, cc, move_info.start_tile)
-        self._solver.cnstr_count([vv], setting, 1, 1, weight)
+        self._solver.cnstr_count([vv], on_path, 1, 1, weight)
 
-    def add_constraint_goal(self, rr, cc, setting, weight):
+    def add_constraint_goal(self, rr, cc, on_path, weight):
         game = self._game_level[rr][cc]
         move_info = self._reach_info.game_to_move[game]
         vv = self._tile_var(rr, cc, move_info.goal_tile)
-        self._solver.cnstr_count([vv], setting, 1, 1, weight)
+        self._solver.cnstr_count([vv], on_path, 1, 1, weight)
 
     def add_rules_reachability(self, reach_info):
+        print('add reachability constraints')
+
         self._reach_info = reach_info
 
         nodes = []
@@ -333,15 +345,15 @@ class Generator:
                     return _inst
 
                 need_open_path = inst_deltas(need_open_path_delta + [dest_delta])
-                if need_open_path == None:
+                if need_open_path is None:
                     continue
 
                 need_open_aux = inst_deltas(need_open_aux_delta)
-                if need_open_aux == None:
+                if need_open_aux is None:
                     continue
 
                 need_closed = inst_deltas(need_closed_delta)
-                if need_closed == None:
+                if need_closed is None:
                     continue
 
                 tr = rr + dest_delta[0]
@@ -455,7 +467,9 @@ class Generator:
     def get_result(self):
         res_info = util.ResultInfo()
 
-        res_info.extra_text_lines += self._extra_text_lines
+        res_info.objective = self._solver.get_objective()
+
+        res_info.extra_meta += self._extra_meta
 
         res_info.reach_info = None
         if self._reach_info:
@@ -464,8 +478,8 @@ class Generator:
             res_info.reach_info.offpath_edges = self._get_reach_offpath_edges(path_edge_keys)
 
         res_info.tile_level = util.make_grid(self._rows, self._cols, util.VOID_TILE)
-        res_info.text_level = util.make_grid(self._rows, self._cols, util.DEFAULT_TEXT) if self._scheme_info.tile_to_text else None
-        res_info.image_level = PIL.Image.new('RGBA', (self._cols * self._scheme_info.tile_image_size, self._rows * self._scheme_info.tile_image_size), (0, 0, 0, 0)) if self._scheme_info.tile_to_image else None
+        res_info.text_level = None
+        res_info.image_level = None
 
         set_tiles = self._get_tiles_set()
         for rr in range(self._rows):
@@ -477,22 +491,15 @@ class Generator:
                 else:
                     found_tile = util.VOID_TILE
 
+                util.check((tag == util.VOID_TEXT) == (found_tile == util.VOID_TILE), 'void')
+
                 res_info.tile_level[rr][cc] = found_tile
 
-                if tag == util.VOID_TEXT:
-                    util.check(found_tile == util.VOID_TILE, 'void')
+        if self._scheme_info.tileset.tile_to_text is not None:
+            res_info.text_level = util.tile_level_to_text_level(res_info.tile_level, self._scheme_info.tileset)
 
-                    if res_info.text_level != None:
-                        res_info.text_level[rr][cc] = util.VOID_TEXT
-
-                else:
-                    util.check(found_tile != util.VOID_TILE, 'void')
-
-                    if res_info.text_level != None:
-                        res_info.text_level[rr][cc] = self._scheme_info.tile_to_text[found_tile]
-
-                    if res_info.image_level != None:
-                        res_info.image_level.paste(self._scheme_info.tile_to_image[found_tile], (cc * self._scheme_info.tile_image_size, rr * self._scheme_info.tile_image_size))
+        if self._scheme_info.tileset.tile_to_image is not None:
+            res_info.image_level = util.tile_level_to_image_level(res_info.tile_level, self._scheme_info.tileset)
 
         return res_info
 
@@ -503,9 +510,9 @@ class Generator:
             found_tile = None
             for tile in self._vars_rc_t[(rr, cc)]:
                 if self._solver.get_var(self._vars_rc_t[(rr, cc)][tile]):
-                    util.check(found_tile == None, 'multiple tiles selected.')
+                    util.check(found_tile is None, 'multiple tiles selected.')
                     found_tile = tile
-            util.check(found_tile != None, 'no tile selected.')
+            util.check(found_tile is not None, 'no tile selected.')
             tiles[(rr, cc)] = found_tile
 
         return tiles
@@ -528,8 +535,8 @@ class Generator:
             if move_info.goal_tile in self._vars_rc_t[(rr, cc)] and self._solver.get_var(self._tile_var(rr, cc, move_info.goal_tile)):
                 goal_rc = (rr, cc)
 
-        util.check(start_rc != None, 'no start')
-        util.check(goal_rc != None, 'no goal')
+        util.check(start_rc is not None, 'no start')
+        util.check(goal_rc is not None, 'no goal')
 
         tile_path.append(start_rc)
 
@@ -548,7 +555,7 @@ class Generator:
 
                 out_reachable = self._solver.get_var(self._reach_vars_edge[edge_key])
                 if out_reachable:
-                    util.check(next_node == None, 'multiple out edges')
+                    util.check(next_node is None, 'multiple out edges')
                     util.check(need_open_path[-1] == (tr, tc), 'path does not end at node')
 
                     for nr, nc in need_open_path:
@@ -564,7 +571,7 @@ class Generator:
 
                     next_node = (tr, tc)
 
-            util.check(next_node != None or current_node == goal_rc, 'path does not end at goal')
+            util.check(next_node is not None or current_node == goal_rc, 'path does not end at goal')
 
             current_node = next_node
 

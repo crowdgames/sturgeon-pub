@@ -1,5 +1,5 @@
 import argparse, itertools, json, random, sys, time
-import gutil, util
+import util, util_graph
 import networkx as nx
 
 
@@ -13,13 +13,13 @@ if __name__ == '__main__':
     parser.add_argument('--grid', action='store_true', help='Layout as grid.')
     args = parser.parse_args()
 
-    grs = gutil.read_graphs(args.graphfile)
+    grs = util_graph.read_graphs(args.graphfile)
 
     if args.grid:
-        gutil.layout_grid(grs.graphs[0])
+        util_graph.layout_grid(grs.graphs[0])
 
-    if args.outfile == None:
-        gutil.write_graph_dot(grs, sys.stdout)
+    if args.outfile is None:
+        util_graph.write_graph_dot(grs, sys.stdout)
     else:
-        with open(args.outfile, 'wt') as outfile:
-            gutil.write_graph_dot(grs, outfile)
+        with util.openz(args.outfile, 'wt') as outfile:
+            util_graph.write_graph_dot(grs, outfile)
