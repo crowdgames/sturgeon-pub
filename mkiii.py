@@ -766,6 +766,8 @@ class GeneratorMKIII(generator.Generator):
 
         self._change_vars_rcs = None
 
+        self._text_to_tile = None
+
     def add_rules_mkiii(self, mkiii_info):
         print('add mkiii constraints')
 
@@ -785,11 +787,11 @@ class GeneratorMKIII(generator.Generator):
 
         self._change_vars_rcs = [[]]
 
-        text_to_tile = {}
+        self._text_to_tile = {}
         for tile, text in self._scheme_info.tileset.tile_to_text.items():
-            util.check(text not in text_to_tile, 'cannot have duplicate tile text ' + text + ' for mkiii')
+            util.check(text not in self._text_to_tile, 'cannot have duplicate tile text ' + text + ' for mkiii')
             util.check(text in self._states, 'text ' + text + ' not in states')
-            text_to_tile[text] = tile
+            self._text_to_tile[text] = tile
 
         layers_order = list(range(self._layers))
         rows_order = list(range(self._rows))
@@ -815,8 +817,8 @@ class GeneratorMKIII(generator.Generator):
                 for cc in cols_order:
                     for ss in states_order:
                         if ll == 0:
-                            if ss in text_to_tile:
-                                self._vars_lrct[(0, rr, cc, ss)] = self._vars_rc_t[(rr, cc)][text_to_tile[ss]]
+                            if ss in self._text_to_tile:
+                                self._vars_lrct[(0, rr, cc, ss)] = self._vars_rc_t[(rr, cc)][self._text_to_tile[ss]]
                             else:
                                 self._vars_lrct[(0, rr, cc, ss)] = self._var_state_false
                         else:
@@ -984,21 +986,19 @@ class GeneratorMKIII(generator.Generator):
         return result_info
 
     def _get_execution(self):
-        pi = util.ResultExecutionInfo()
-        pi.levels = []
-        pi.names = []
-        pi.changes = []
-        pi.term = []
-        pi.first_term = []
+        steps = []
 
-        if not self._group_names:
-            pi.names = [None] * self._layers
-        else:
-            pi.names.append('initial')
+        for ll in range(self._layers):
+            step_info = util.ExecutionStepInfo()
+            steps.append(step_info)
 
-            for ll in range(self._layers - 1):
+            if not self._group_names:
+                step_info.name = None
+            elif ll == 0:
+                step_info.name = 'initial'
+            else:
                 if self._vars_pri is not None: # RR_ORD_PRI
-                    inds_pri = self._vars_pri[ll]
+                    inds_pri = self._vars_pri[(ll - 1)]
                     util.check(len(inds_pri) == len(self._group_names), 'pri and name length mismatch')
                     pri_name = None
                     for vv, name in zip(inds_pri, self._group_names):
@@ -1007,11 +1007,10 @@ class GeneratorMKIII(generator.Generator):
                             pri_name = name
                     if pri_name is None:
                         pri_name = 'none'
-                    pi.names.append(pri_name)
+                    step_info.name = pri_name
                 else: # RR_ORD_SEQ, RR_ORD_ONE
-                    pi.names.append(self._group_names[ll % len(self._group_names)])
+                    step_info.name = self._group_names[(ll - 1) % len(self._group_names)]
 
-        for ll in range(self._layers):
             changes = []
             for cvvs, crcs in self._change_vars_rcs[ll]:
                 changed = True
@@ -1020,9 +1019,9 @@ class GeneratorMKIII(generator.Generator):
                         changed = False
                 if changed:
                     changes.append(crcs)
-            pi.changes.append(changes)
+            step_info.changes = changes
 
-            level = []
+            text_level = []
             for rr in range(self._rows):
                 level_row = []
                 for cc in range(self._cols):
@@ -1034,12 +1033,24 @@ class GeneratorMKIII(generator.Generator):
                             use_ss = ss
                     util.check(use_ss is not None, 'no state set')
                     level_row.append(use_ss)
-                level.append(level_row)
-            pi.levels.append(level)
+                text_level.append(level_row)
+            step_info.text_level = text_level
+
+            if self._scheme_info.tileset.tile_to_image is None:
+                step_info.image_level = None
+            else:
+                tile_level = []
+                for rr in range(self._rows):
+                    level_row = []
+                    for cc in range(self._cols):
+                        text = text_level[rr][cc]
+                        level_row.append(self._text_to_tile[text] if text in self._text_to_tile else util.VOID_TILE)
+                    tile_level.append(level_row)
+                step_info.image_level = util.tile_level_to_image_level(tile_level, self._scheme_info.tileset)
 
             if self._vars_term is None or ll == 0:
-                pi.term.append(None)
-                pi.first_term.append(None)
+                step_info.term = None
+                step_info.first_term = None
 
             else:
                 prev_term = False if ll == 1 else self._solver.get_var(self._vars_term[ll - 1])
@@ -1048,11 +1059,11 @@ class GeneratorMKIII(generator.Generator):
                 if prev_term:
                     util.check(curr_term, 'term unset')
 
-                pi.term.append(curr_term)
+                step_info.term = curr_term
 
                 if curr_term and not prev_term:
-                    pi.first_term.append(True)
+                    step_info.first_term = True
                 else:
-                    pi.first_term.append(False)
+                    step_info.first_term = False
 
-        return pi
+        return steps

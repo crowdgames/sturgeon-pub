@@ -104,11 +104,12 @@ class ResultReachInfo:
         self.path_tiles = None
         self.offpath_edges = None
 
-class ResultExecutionInfo:
+class ExecutionStepInfo:
     def __init__(self):
-        self.levels = None
-        self.names = None
+        self.name = None
         self.changes = None
+        self.text_level = None
+        self.image_level = None
         self.term = None
         self.first_term = None
 
@@ -411,13 +412,13 @@ def print_result_info(result_info, replace_path_tiles):
 
     if result_info.execution_info is not None:
         print('execution')
-        for level, name, first_term in zip(result_info.execution_info.levels, result_info.execution_info.names, result_info.execution_info.first_term):
-            if first_term:
+        for step_info in result_info.execution_info:
+            if step_info.first_term:
                 print('>>> TERM <<<')
                 print()
-            if name:
-                print('>>> ' + name)
-            print_text_level(level)
+            if step_info.name:
+                print('>>> ' + step_info.name)
+            print_text_level(step_info.text_level)
             print()
 
 def save_result_info(result_info, prefix, compress=False, result_only=False):
@@ -450,20 +451,25 @@ def save_result_info(result_info, prefix, compress=False, result_only=False):
                 shutil.rmtree(exec_folder)
             os.makedirs(exec_folder)
 
-            for ii, (level, name, changes, term) in enumerate(zip(result_info.execution_info.levels, result_info.execution_info.names, result_info.execution_info.changes, result_info.execution_info.term)):
-                descr = ['term' if term else 'step']
-                if name:
-                    descr.append(name)
+            for ii, step_info in enumerate(result_info.execution_info):
+                descr = ['term' if step_info.term else 'step']
+                if step_info.name:
+                    descr.append(step_info.name)
 
-                step_name = exec_folder + ('/%02d_' % ii) + '_'.join(descr) + '_exec.lvl'
+                step_prefix = exec_folder + ('/%02d_' % ii) + '_'.join(descr) + '_exec'
 
                 meta = result_info.extra_meta
-                if len(changes) != 0:
-                    meta.append(meta_rect('change', changes))
+                if len(step_info.changes) != 0:
+                    meta.append(meta_rect('change', step_info.changes))
                 meta.append(meta_custom({'type': 'mkiii', 'desc': descr}))
 
-                with openz(step_name, 'wt') as f:
-                    print_text_level(level, meta=meta, outfile=f)
+                step_text_name = step_prefix + '.lvl'
+                with openz(step_text_name, 'wt') as f:
+                    print_text_level(step_info.text_level, meta=meta, outfile=f)
+
+                if step_info.image_level is not None:
+                    step_image_name = step_prefix + '.png'
+                    step_info.image_level.save(step_image_name)
 
 def index_to_char(idx):
     if idx < len(INDEX_CHARS):

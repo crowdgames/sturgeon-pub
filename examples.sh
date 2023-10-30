@@ -93,19 +93,22 @@ python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 8 8 --solver cvc5           --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --solver clingo-fe
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --solver clingo-be
-python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --solver z3
+python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --solver z3-opt
+python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --solver z3-slv         --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4
 
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 8 8                 --solver pysat-minicard --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 8 8                 --solver cvc5           --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --solver clingo-fe
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --solver clingo-be
-python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --solver z3
+python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --solver z3-opt
+python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 8 8                 --solver z3-slv           --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns
 
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 8 8                 --reach-move platform --reach-goal l-r 6 --solver pysat-minicard --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 8 8                 --reach-move platform --reach-goal l-r 6 --solver cvc5           --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --reach-move platform --reach-goal l-r 6 --solver clingo-fe
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --reach-move platform --reach-goal l-r 6 --solver clingo-be
-python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --reach-move platform --reach-goal l-r 6 --solver z3
+python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --reach-move platform --reach-goal l-r 6 --solver z3-opt
+python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 8 8                 --reach-move platform --reach-goal l-r 6 --solver z3-slv         --no-counts
 python3 scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-1-1-TEST_t.scheme --size 4 4 --soft-patterns --reach-move platform --reach-goal l-r 6

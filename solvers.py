@@ -36,7 +36,8 @@ except ImportError:
 
 
 SOLVER_PRINT          = 'print'
-SOLVER_Z3             = 'z3'
+SOLVER_Z3_OPTIMIZE    = 'z3-opt'
+SOLVER_Z3_SOLVE       = 'z3-slv'
 SOLVER_CVC5           = 'cvc5'
 SOLVER_CLINGO_FE      = 'clingo-fe'
 SOLVER_CLINGO_BE      = 'clingo-be'
@@ -45,8 +46,11 @@ SOLVER_PYSAT_RC2      = 'pysat-rc2'
 SOLVER_PYSAT_FM_BOOL  = 'pysat-fm-boolonly'
 SOLVER_PYSAT_RC2_BOOL = 'pysat-rc2-boolonly'
 SOLVER_PYSAT_MC       = 'pysat-minicard'
-SOLVER_LIST           = [SOLVER_PRINT, SOLVER_Z3, SOLVER_CVC5, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC]
+SOLVER_LIST           = [SOLVER_PRINT, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC]
 SOLVER_NOTEST_LIST    = [SOLVER_PRINT]
+
+Z3_OPTION_SOLVE       = 'solve'
+Z3_OPTION_OPTIMIZE    = 'optimize'
 
 PYSAT_OPTION_CARD     = 'card'
 PYSAT_OPTION_BOOLONLY = 'boolonly'
@@ -57,8 +61,10 @@ PYSAT_ENCODING        = pysat.card.EncType.kmtotalizer
 def solver_id_to_solver(solver_id):
     if solver_id == SOLVER_PRINT:
         return PrintSolver()
-    elif solver_id == SOLVER_Z3:
-        return Z3Solver()
+    elif solver_id == SOLVER_Z3_OPTIMIZE:
+        return Z3SolverOptimize()
+    elif solver_id == SOLVER_Z3_SOLVE:
+        return Z3SolverSolve()
     elif solver_id == SOLVER_CVC5:
         return CVC5Solver()
     elif solver_id == SOLVER_CLINGO_FE:
@@ -108,6 +114,12 @@ class Solver:
     def get_objective(self):
         util.check(False, 'unimplemented')
 
+    def supports_weights(self):
+        return False
+
+    def supports_xforms(self):
+        return False
+
 
 
 def _wrap_var(vv):
@@ -148,13 +160,28 @@ def _unwrap_lit_lconjs(vvs, settings, negate_func):
 
     return [_unwrap_lit_lconj(vv, setting, negate_func) for vv, setting in zip(vvs, settings)]
 
+def _is_xform_t(vv):
+    return vv[0] in ['t2', 't3']
+
+def _unwrap_xform_t(vv):
+    util.check(type(vv) == tuple and vv[0] in ['t2', 't3'], 'unwrap')
+    return vv[1:]
+
+def _is_xform_x2(vv):
+    return vv[0] in ['x2']
+
+def _unwrap_xform_x2(vv):
+    util.check(type(vv) == tuple and vv[0] in ['x2'], 'unwrap')
+    return vv[1:]
+
 
 
 class SolverImpl(Solver):
-    def __init__(self, solver_id, weighted):
+    def __init__(self, solver_id, supports_weights, supports_xforms):
         super().__init__(solver_id)
 
-        self._weighted = weighted
+        self._supports_weights = supports_weights
+        self._supports_xforms = supports_xforms
 
         self._result = None
         self._objective = None
@@ -168,20 +195,18 @@ class SolverImpl(Solver):
         return _wrap_conj(self._IMPL_make_conj(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj)))
 
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
-        if not self._weighted:
+        if not self._supports_weights:
             util.check(weight is None, 'solver does not support weights')
-            return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out))
-        else:
-            return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out), weight)
+
+        return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out), weight)
 
     def cnstr_count(self, vvs, settings, lo, hi, weight):
         util.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
 
-        if not self._weighted:
+        if not self._supports_weights:
             util.check(weight is None, 'solver does not support weights')
-            return self._IMPL_cnstr_count(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj), lo, hi)
-        else:
-            return self._IMPL_cnstr_count(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj), lo, hi, weight)
+
+        return self._IMPL_cnstr_count(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj), lo, hi, weight)
 
     def solve(self):
         return self._IMPL_solve()
@@ -191,6 +216,12 @@ class SolverImpl(Solver):
 
     def get_objective(self):
         return self._objective
+
+    def supports_weights(self):
+        return self._supports_weights
+
+    def supports_xforms(self):
+        return self._supports_xforms
 
     def _IMPL_negate_var_conj_for_implies_out(self, ll):
         return self._IMPL_negate_var_conj(ll)
@@ -345,7 +376,7 @@ class PortfolioSolver(Solver):
 
 class PrintSolver(SolverImpl):
     def __init__(self):
-        super().__init__(SOLVER_PRINT, True)
+        super().__init__(SOLVER_PRINT, True, False)
 
         self._curr_id = 0
         self._output = {}
@@ -383,13 +414,20 @@ class PrintSolver(SolverImpl):
 
 
 
-class Z3Solver(SolverImpl):
-    def __init__(self):
+class _Z3Solver(SolverImpl):
+    def __init__(self, solver_id, solver_option):
         util.check(available_z3, 'z3 not available')
 
-        super().__init__(SOLVER_Z3, True)
+        util.check(solver_option in [Z3_OPTION_OPTIMIZE, Z3_OPTION_SOLVE], 'invalid option for solver: ' + solver_option)
 
-        self._s = z3.Optimize()
+        self._option = solver_option
+
+        if self._option == Z3_OPTION_OPTIMIZE:
+            super().__init__(solver_id, True, True)
+            self._s = z3.Optimize()
+        else:
+            super().__init__(solver_id, False, True)
+            self._s = z3.Solver()
 
     def _help_add_cnstr_weight(self, cnstr, weight):
         if weight is None:
@@ -410,9 +448,15 @@ class Z3Solver(SolverImpl):
             return z3.And(*lls)
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
+        if self._option != Z3_OPTION_OPTIMIZE:
+            util.check(weight is None, 'solver does not support weights')
+
         self._help_add_cnstr_weight(z3.Implies(in_ll, z3.Or(*out_lls)), weight)
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
+        if self._option != Z3_OPTION_OPTIMIZE:
+            util.check(weight is None, 'solver does not support weights')
+
         if len(lls) == 0:
             pass
 
@@ -443,10 +487,11 @@ class Z3Solver(SolverImpl):
                     self._help_add_cnstr_weight(z3.PbLe(lls_count, hi), weight)
 
     def _IMPL_solve(self):
-        def on_model(_m):
-            util.write_time('.')
+        if self._option == Z3_OPTION_OPTIMIZE:
+            def on_model(_m):
+                util.write_time('.')
 
-        self._s.set_on_model(on_model)
+            self._s.set_on_model(on_model)
 
         chk = self._s.check()
         util.write_time('\n')
@@ -461,7 +506,11 @@ class Z3Solver(SolverImpl):
 
         self._result = self._s.model()
 
-        objs = [self._s.model().evaluate(obj) for obj in self._s.objectives()]
+        if self._option == Z3_OPTION_OPTIMIZE:
+            objs = [self._s.model().evaluate(obj) for obj in self._s.objectives()]
+        else:
+            objs = []
+
         if len(objs) == 0:
             self._objective = 0
         else:
@@ -473,13 +522,110 @@ class Z3Solver(SolverImpl):
     def _IMPL_get_var(self, vv):
         return bool(self._result[vv])
 
+    def make_var_xform(self, dims):
+        if dims == 2:
+            return ('t2', z3.FreshReal(), z3.FreshReal())
+        elif dims == 3:
+            return ('t3', z3.FreshReal(), z3.FreshReal(), z3.FreshReal())
+        elif dims == 'x2':
+            return ('x2', z3.FreshReal(), z3.FreshReal(), z3.FreshReal(), z3.FreshReal(), z3.FreshReal(), z3.FreshReal())
+
+    def get_var_pos_xform(self, vv):
+        if _is_xform_t(vv):
+            vv = _unwrap_xform_t(vv)
+            return tuple([self._result[ee].numerator_as_long() / self._result[ee].denominator_as_long() for ee in vv])
+        elif _is_xform_x2(vv):
+            vv = _unwrap_xform_x2(vv)
+            return tuple([self._result[vv[2]].numerator_as_long() / self._result[vv[2]].denominator_as_long(),
+                          self._result[vv[5]].numerator_as_long() / self._result[vv[5]].denominator_as_long()])
+
+    def _xform_type(self, xforms):
+        xtypes = dict.fromkeys([vv[0] for vv in xforms])
+        util.check(len(xtypes) == 1, 'xform types')
+        xtype = next(iter(xtypes))
+        util.check(xtype in ['t2', 't3', 'x2'], 'xform types')
+        return xtype
+
+    def _xform_xtype_t(self, xtype):
+        return xtype in ['t2', 't3']
+
+    def cnstr_ident_dist_xform(self, missing_conds, xforms, minlinfdist):
+        def far(_p0, _p1):
+            return z3.Or([z3.Or(_i0 - _i1 <= -minlinfdist, _i0 - _i1 >= minlinfdist) for _i0, _i1 in zip(_p0, _p1)])
+
+        missing_conds = [_unwrap_var(vv) for vv in missing_conds]
+
+        util.check(len(missing_conds) == len(xforms), 'lengths')
+
+        if self._xform_xtype_t(self._xform_type(xforms)):
+            xforms = [_unwrap_xform_t(vv) for vv in xforms]
+            self._s.add(z3.Not(missing_conds[0]))
+            self._s.add(z3.And([p0 == 0 for p0 in xforms[0]]))
+
+            for ii in range(len(xforms)):
+                for jj in range(ii + 1, len(xforms)):
+                    self._s.add(z3.Implies(z3.And(z3.Not(missing_conds[ii]), z3.Not(missing_conds[jj])),
+                                           far(xforms[ii], xforms[jj])))
+
+        else:
+            xforms = [_unwrap_xform_x2(vv) for vv in xforms]
+            self._s.add(z3.Not(missing_conds[0]))
+            self._s.add(z3.And(xforms[0][0] == 1, xforms[0][1] == 0, xforms[0][2] == 0,
+                               xforms[0][3] == 0, xforms[0][4] == 1, xforms[0][5] == 0))
+
+            for ii in range(len(xforms)):
+                for jj in range(ii + 1, len(xforms)):
+                    self._s.add(z3.Implies(z3.And(z3.Not(missing_conds[ii]), z3.Not(missing_conds[jj])),
+                                           far([xforms[ii][2], xforms[ii][5]], [xforms[jj][2], xforms[jj][5]])))
+
+    def cnstr_implies_xform(self, cond, xform0, xform1, dxform, primary):
+        def close(_p0, _p1):
+            return z3.And([z3.And(_i0 - _i1 >= -0.01, _i0 - _i1 <= 0.01) for _i0, _i1 in zip(_p0, _p1)])
+
+        if self._xform_xtype_t(self._xform_type([xform0, xform1])):
+            xform0 = _unwrap_xform_t(xform0)
+            xform1 = _unwrap_xform_t(xform1)
+            util.check(len(dxform) == len(xform0) == len(xform1), 'dims')
+            if primary:
+                xform_apply = z3.And([p1 == p0 + dd for dd, p0, p1 in zip(dxform, xform0, xform1)])
+            else:
+                xform_apply = close(xform1, [p0 + dd for dd, p0 in zip(dxform, xform0)])
+
+        else:
+            xform0 = _unwrap_xform_x2(xform0)
+            xform1 = _unwrap_xform_x2(xform1)
+            util.check(6 == len(dxform) == len(xform0) == len(xform1), 'dims')
+            if primary:
+                xform_apply = [xform1[0] == (xform0[0] * dxform[0] + xform0[1] * dxform[3]),
+                               xform1[1] == (xform0[0] * dxform[1] + xform0[1] * dxform[4]),
+                               xform1[2] == (xform0[0] * dxform[2] + xform0[1] * dxform[5] + xform0[2]),
+                               xform1[3] == (xform0[3] * dxform[0] + xform0[4] * dxform[3]),
+                               xform1[4] == (xform0[3] * dxform[1] + xform0[4] * dxform[4]),
+                               xform1[5] == (xform0[3] * dxform[2] + xform0[4] * dxform[5] + xform0[5])]
+            else:
+                xform_apply = [close([xform1[2], xform1[5]],
+                                     [xform0[0] * dxform[2] + xform0[1] * dxform[5] + xform0[2],
+                                      xform0[3] * dxform[2] + xform0[4] * dxform[5] + xform0[5]])]
+
+        cond = _unwrap_var(cond)
+        self._s.add(z3.Implies(cond, z3.And(xform_apply)))
+
+class Z3SolverOptimize(_Z3Solver):
+    def __init__(self):
+        super().__init__(SOLVER_Z3_OPTIMIZE, Z3_OPTION_OPTIMIZE)
+
+class Z3SolverSolve(_Z3Solver):
+    def __init__(self):
+        super().__init__(SOLVER_Z3_SOLVE, Z3_OPTION_SOLVE)
+
+
 
 
 class CVC5Solver(SolverImpl):
     def __init__(self):
         util.check(available_cvc5, 'cvc5 not available')
 
-        super().__init__(SOLVER_CVC5, False)
+        super().__init__(SOLVER_CVC5, False, False)
 
         self._s = cvc5.pythonic.SimpleSolver()
 
@@ -495,7 +641,9 @@ class CVC5Solver(SolverImpl):
         else:
             return cvc5.pythonic.And(*lls)
 
-    def _IMPL_cnstr_implies_disj(self, in_ll, out_lls):
+    def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
+        util.check(weight is None, 'solver does not support weights')
+
         if len(out_lls) == 0:
             self._s.add(cvc5.pythonic.Implies(in_ll, False))
         elif len(out_lls) == 1:
@@ -503,7 +651,9 @@ class CVC5Solver(SolverImpl):
         else:
             self._s.add(cvc5.pythonic.Implies(in_ll, cvc5.pythonic.Or(*out_lls)))
 
-    def _IMPL_cnstr_count(self, lls, lo, hi):
+    def _IMPL_cnstr_count(self, lls, lo, hi, weight):
+        util.check(weight is None, 'solver does not support weights')
+
         if len(lls) == 0:
             pass
 
@@ -559,7 +709,7 @@ class ClingoFrontendSolver(SolverImpl):
     def __init__(self):
         util.check(available_clingo, 'clingo not available')
 
-        super().__init__(SOLVER_CLINGO_FE, True)
+        super().__init__(SOLVER_CLINGO_FE, True, False)
 
         self._ctl_init()
 
@@ -691,7 +841,7 @@ class ClingoBackendSolver(SolverImpl):
     def __init__(self):
         util.check(available_clingo, 'clingo not available')
 
-        super().__init__(SOLVER_CLINGO_BE, True)
+        super().__init__(SOLVER_CLINGO_BE, True, False)
 
         self._ctl = clingo.Control()
 
@@ -808,7 +958,7 @@ class PySatSolverMiniCard(SolverImpl):
     def __init__(self):
         util.check(available_pysat, 'pysat not available')
 
-        super().__init__(SOLVER_PYSAT_MC, False)
+        super().__init__(SOLVER_PYSAT_MC, False, False)
 
         self._s = pysat.solvers.Solver(name='mc')
 
@@ -834,10 +984,14 @@ class PySatSolverMiniCard(SolverImpl):
             self._s.add_clause([-ll for ll in lls] + [conj_var]) # A lls -> conj_var
             return conj_var
 
-    def _IMPL_cnstr_implies_disj(self, in_ll, out_lls):
+    def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
+        util.check(weight is None, 'solver does not support weights')
+
         self._s.add_clause([-in_ll] + out_lls)
 
-    def _IMPL_cnstr_count(self, lls, lo, hi):
+    def _IMPL_cnstr_count(self, lls, lo, hi, weight):
+        util.check(weight is None, 'solver does not support weights')
+
         if len(lls) == 0:
             pass
 
@@ -882,7 +1036,7 @@ class _PySatSolverWeighted(SolverImpl):
 
         util.check(solver_option in [PYSAT_OPTION_CARD, PYSAT_OPTION_BOOLONLY], 'invalid option for solver: ' + solver_option)
 
-        super().__init__(solver_id, True)
+        super().__init__(solver_id, True, False)
 
         self._option = solver_option
 

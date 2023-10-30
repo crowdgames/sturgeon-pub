@@ -258,7 +258,7 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
 if __name__ == '__main__':
     util.timer_start()
 
-    parser = argparse.ArgumentParser(description='Path editor.')
+    parser = argparse.ArgumentParser(description='Convert levels to explore file.')
     parser.add_argument('--outfile', required=True, type=str, help='Explore file to write to.')
     parser.add_argument('--tilefile', required=True, type=str, nargs='+', help='Input tile file(s).')
     parser.add_argument('--resultfile', type=str, nargs='+', help='Input result file(s).')

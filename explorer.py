@@ -34,7 +34,7 @@ COLOR_SELECTED  = 'black'
 
 
 class RemainingInfo:
-    def __init__(self, rows, cols):
+    def __init__(self, rows, cols, npind):
         self.levels = []
         self.nlevels = 0
 
@@ -47,7 +47,7 @@ class RemainingInfo:
         self.einds = []
         self.einds_cell = util.make_grid(rows, cols, [])
 
-        self.pinds = []
+        self.pinds = [0] * npind
 
 
 
@@ -104,13 +104,21 @@ class ExplorerFrame(tkinter.Frame):
 
         self._check = []
         self._check_var = []
+        self._check_to_pind = []
         if self._ex.npind > 0:
+            prop_and_pind = []
             for ii in range(self._ex.npind):
+                prop_and_pind.append((self._ex.pind_to_prop[ii], ii))
+            prop_and_pind = sorted(prop_and_pind)
+
+            for prop, pind in prop_and_pind:
                 chk_var = tkinter.IntVar()
-                chk = tkinter.Checkbutton(self._sidebar, text=self._ex.pind_to_prop[ii], anchor=tkinter.W, variable=chk_var, onvalue=1, offvalue=0, tristatevalue=-1, command=self._toggle_prop)
+                chk = tkinter.Checkbutton(self._sidebar, text=prop, anchor=tkinter.W, variable=chk_var, onvalue=1, offvalue=0, tristatevalue=-1, command=self._toggle_prop)
                 chk.pack()
+
                 self._check.append(chk)
                 self._check_var.append(chk_var)
+                self._check_to_pind.append(pind)
 
         self._widgets = []
 
@@ -182,7 +190,7 @@ class ExplorerFrame(tkinter.Frame):
         self._selected_einds = np.zeros(self._ex.neind, dtype=np.uint8)
         self._selected_pinds = np.zeros(self._ex.npind, dtype=np.uint8)
 
-        self._rem = RemainingInfo(self._ex.rows, self._ex.cols)
+        self._rem = RemainingInfo(self._ex.rows, self._ex.cols, self._ex.npind)
 
         self._tmp1 = np.zeros((self._nlevels, self._packed_level_len), dtype=np.uint8)
         self._tmp2 = np.zeros((self._nlevels, self._packed_level_len), dtype=bool)
@@ -225,8 +233,8 @@ class ExplorerFrame(tkinter.Frame):
 
     def _toggle_prop(self):
         with self._mutex:
-            for ii, cv in enumerate(self._check_var):
-                self._selected_pinds[ii] = (1 if cv.get() == 1 else 0)
+            for cv, pind in zip(self._check_var, self._check_to_pind):
+                self._selected_pinds[pind] = (1 if cv.get() == 1 else 0)
             self.undo_push()
             self._recompute()
             self.redraw_from_back()
@@ -333,7 +341,7 @@ class ExplorerFrame(tkinter.Frame):
 
             remaining_tiles = remaining_tiles.reshape((self._ex.rows, self._ex.cols, self._ex.ntind))
 
-            out = RemainingInfo(self._ex.rows, self._ex.cols)
+            out = RemainingInfo(self._ex.rows, self._ex.cols, self._ex.npind)
 
             out.levels = np.nonzero(self._tmp3)[0]
             out.nlevels = len(out.levels)
@@ -611,7 +619,9 @@ class ExplorerFrame(tkinter.Frame):
 
             self._label_rem.config(text=str(self._rem.nlevels) + ' level' + ('' if self._rem.nlevels == 1 else 's'))
 
-            for cb, cv, selected, remaining in zip(self._check, self._check_var, self._selected_pinds, self._rem.pinds):
+            for cb, cv, pind in zip(self._check, self._check_var, self._check_to_pind):
+                selected =  self._selected_pinds[pind]
+                remaining = self._rem.pinds[pind]
                 if remaining:
                     if self._thread is not None:
                         cb['state'] = tkinter.DISABLED
@@ -906,12 +916,13 @@ def explorer(explorer_info, cell_size, text_disp, image_disp):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Path editor.')
+    parser = argparse.ArgumentParser(description='Level Explorer.')
 
     parser.add_argument('--explorefile', required=True, type=str, help='Explore file to run, or write to.')
     parser.add_argument('--cell-size', type=int, help='Size of cells.', default=CELL_SIZE_DEF)
     parser.add_argument('--text', action='store_true', help='Try text display.')
     parser.add_argument('--image', action='store_true', help='Try image display.')
+    parser.add_argument('--test', action='store_true', help='Only test loading.')
 
     args = parser.parse_args()
 
@@ -921,6 +932,10 @@ if __name__ == '__main__':
     with util.openz(args.explorefile, 'rb') as f:
         explore_info = pickle.load(f)
 
-    print('loaded %d levels in %0.3f' % (len(explore_info.level_data), time.time() - start_time))
+    msg = 'loaded %d levels' % len(explore_info.level_data)
+    if not util.mute_time():
+        msg += (' in %0.3f' % (time.time() - start_time))
+    print(msg)
 
-    explorer(explore_info, args.cell_size, args.text, args.image)
+    if not args.test:
+        explorer(explore_info, args.cell_size, args.text, args.image)

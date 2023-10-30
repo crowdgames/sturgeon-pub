@@ -2,6 +2,12 @@ import util
 
 RANDOM_PATH_INSET = 1
 
+def point_path_from_json(point_path_json):
+    return [tuple(pt) for pt in point_path_json]
+
+def edge_path_from_json(edge_path_json):
+    return [tuple(pt) for pt in edge_path_json]
+
 def point_path_from_edge_path(edge_path):
     point_path = []
     if len(edge_path) > 0:
@@ -134,7 +140,7 @@ def get_nexts_from(pt, rows, cols, template_open_closed, are_open, are_closed, e
     return nexts
 
 def get_nexts_open_closed_from(path, reverse, rows, cols, template_open_closed):
-    path_nexts = None
+    path_nexts = {}
     path_open, path_closed = get_path_open_closed(path, template_open_closed)
 
     if len(path) > 0:

@@ -4,7 +4,7 @@ import networkx as nx
 
 
 
-def tiles2graph(tile_info, text_labels):
+def tiles2graph(tile_info, text_labels, no_edge_labels):
     util.check(len(tile_info.levels) == 1, 'only handles one tile level')
 
     if text_labels:
@@ -27,16 +27,18 @@ def tiles2graph(tile_info, text_labels):
                 node_label = tile_level[rr][cc]
 
             gr.add_node(nodeid(rr, cc))
-            gr.nodes[nodeid(rr, cc)][util_graph.ATTR_LABEL] = node_label
+            gr.nodes[nodeid(rr, cc)][util_graph.GATTR_LABEL] = node_label
+            gr.nodes[nodeid(rr, cc)][util_graph.GATTR_POSITION] = (cc, rows - rr - 1)
 
     for rr in range(rows):
         for cc in range(cols):
             if rr + 1 < rows:
                 gr.add_edge(nodeid(rr, cc), nodeid(rr + 1, cc))
-                gr.edges[(nodeid(rr, cc), nodeid(rr + 1, cc))][util_graph.ATTR_LABEL] = util_graph.LABEL_GRID_SOUTH
+                gr.edges[(nodeid(rr, cc), nodeid(rr + 1, cc))][util_graph.GATTR_LABEL] = '' if no_edge_labels else util_graph.LABEL_GRID_SOUTH
+
             if cc + 1 < cols:
                 gr.add_edge(nodeid(rr, cc), nodeid(rr, cc + 1))
-                gr.edges[(nodeid(rr, cc), nodeid(rr, cc + 1))][util_graph.ATTR_LABEL] = util_graph.LABEL_GRID_EAST
+                gr.edges[(nodeid(rr, cc), nodeid(rr, cc + 1))][util_graph.GATTR_LABEL] = '' if no_edge_labels else util_graph.LABEL_GRID_EAST
 
     gtype = util_graph.GTYPE_DAG
 
@@ -58,10 +60,11 @@ if __name__ == '__main__':
     parser.add_argument('--outfile', required=True, type=str, help='Output tile file.')
     parser.add_argument('--tilefile', required=True, type=str, help='Input tile file.')
     parser.add_argument('--text-labels', action='store_true', help='Use tile text for labels.')
+    parser.add_argument('--no-edge-labels', action='store_true', help='Don\'t output edge labels.')
     args = parser.parse_args()
 
     with util.openz(args.tilefile, 'rb') as f:
         tile_info = pickle.load(f)
 
-    ogrs = tiles2graph(tile_info, args.text_labels)
+    ogrs = tiles2graph(tile_info, args.text_labels, args.no_edge_labels)
     util_graph.write_graph_to_file(ogrs, args.outfile)

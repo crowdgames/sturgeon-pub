@@ -12,7 +12,7 @@ def gdesc2summary(grd):
     result = grs
 
     for label in grd.node_labels:
-        for nbrs in grd.node_label_neighbors[label]:
+        for central_subnode, subnodes, subedges in grd.node_label_subgraphs[label]:
             gid = len(grs.graphs)
 
             if util_graph.gtype_directed(grd.gtype):
@@ -20,27 +20,26 @@ def gdesc2summary(grd):
             else:
                 gr = nx.Graph()
 
-            central_node = f'{gid}:*'
-
-            gr.add_node(central_node)
-            gr.nodes[central_node][util_graph.ATTR_LABEL] = label
-            gr.nodes[central_node][util_graph.ATTR_HIGHLIGHT] = True
-
-            for ni, (nbr_node_label, nbr_edge_label, nbr_edge_dir) in enumerate(nbrs):
-                nbr_node = f'{gid}:{ni}'
-
-                if nbr_edge_dir == util_graph.DIR_TIL or nbr_edge_dir is None:
-                    edge = (central_node, nbr_node)
-                elif nbr_edge_dir == util_graph.DIR_FRA:
-                    edge = (nbr_node, central_node)
+            for subnode, label in subnodes.items():
+                node = f'{gid}:{subnode}'
+                gr.add_node(node)
+                gr.nodes[node][util_graph.GATTR_LABEL] = label
+                if subnode == central_subnode:
+                    gr.nodes[node][util_graph.GATTR_CENTRAL] = True
                 else:
-                    util.check(False, 'nbr_edge_dir')
+                    gr.nodes[node][util_graph.GATTR_CENTRAL] = False
 
-                gr.add_node(nbr_node)
-                gr.nodes[nbr_node][util_graph.ATTR_LABEL] = nbr_node_label
-
-                gr.add_edge(edge[0], edge[1])
-                gr.edges[edge][util_graph.ATTR_LABEL] = nbr_edge_label
+            for subedge, (label, delta, polar, cycle) in subedges.items():
+                fra = f'{gid}:{subedge[0]}'
+                til = f'{gid}:{subedge[1]}'
+                gr.add_edge(fra, til)
+                gr.edges[(fra, til)][util_graph.GATTR_LABEL] = label
+                if delta is not None:
+                    gr.edges[(fra, til)][util_graph.GATTR_DELTA] = delta
+                if polar is not None:
+                    gr.edges[(fra, til)][util_graph.GATTR_POLAR] = polar
+                if cycle is not None:
+                    gr.edges[(fra, til)][util_graph.GATTR_CYCLE] = cycle
 
             grs.graphs.append(gr)
 
@@ -61,7 +60,7 @@ if __name__ == '__main__':
 
     ogrs = gdesc2summary(grd)
     print(f'found {len(grd.node_labels)} node labels')
-    print(f'found {len(grd.edge_labels)} edge labels')
+    print(f'found {len(grd.edge_labels_etc)} edge labels/etc')
     print(f'found {len(ogrs.graphs)} neighborhoods')
 
     if args.outfile is None:

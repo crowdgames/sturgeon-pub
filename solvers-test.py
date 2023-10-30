@@ -64,10 +64,12 @@ if __name__ == '__main__':
     for solver_id in solvers_to_test:
         for use_portfolio in [False, True]:
             for use_weight in [None, 1]:
-                if solver_id in [solvers.SOLVER_CVC5, solvers.SOLVER_PYSAT_MC] and use_weight is not None:
-                    continue
-
                 print(solver_id, use_portfolio, use_weight)
+
+                solver = solvers.solver_id_to_solver(solver_id)
+                if use_weight is not None and not solver.supports_weights():
+                    print('skip')
+                    continue
 
                 for nvars, setup, expect in tests:
                     print('.', end='')

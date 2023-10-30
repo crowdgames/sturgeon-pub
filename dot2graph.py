@@ -18,9 +18,9 @@ if __name__ == '__main__':
     dot = nx.DiGraph(nx.nx_pydot.read_dot(args.dotfile))
 
     for node in dot.nodes:
-        dot.nodes[node][util_graph.ATTR_LABEL] = dot.nodes[node][util_graph.ATTR_LABEL].strip('"')
+        dot.nodes[node][util_graph.GATTR_LABEL] = dot.nodes[node][util_graph.GATTR_LABEL].strip('"')
     for edge in dot.edges:
-        dot.edges[edge][util_graph.ATTR_LABEL] = dot.edges[edge][util_graph.ATTR_LABEL].strip('"')
+        dot.edges[edge][util_graph.GATTR_LABEL] = dot.edges[edge][util_graph.GATTR_LABEL].strip('"')
 
     grs = util_graph.Graphs()
     grs.colors = {}
@@ -29,7 +29,7 @@ if __name__ == '__main__':
         grs.gtype = util_graph.GTYPE_DAG
         root_node = None
         for node in dot.nodes:
-            if dot.nodes[node][util_graph.ATTR_LABEL] == args.root:
+            if dot.nodes[node][util_graph.GATTR_LABEL] == args.root:
                 util.check(root_node is None, 'multiple root nodes')
                 root_node = node
         util.check(root_node is not None, 'no root node')
@@ -50,16 +50,17 @@ if __name__ == '__main__':
         lbls = [lbl for lbl in lbls if lbl != '']
         lbls = sorted(lbls)
         lbls = MULTILABEL.join(lbls)
+        lbls = lbls if lbls != '' else '_'
         return lbls
 
     gr_orig = dot
 
     for node in gr.nodes:
-        gr.nodes[node][util_graph.ATTR_LABEL] = orderlabels(gr_orig.nodes[node][util_graph.ATTR_LABEL])
+        gr.nodes[node][util_graph.GATTR_LABEL] = orderlabels(gr_orig.nodes[node][util_graph.GATTR_LABEL])
 
     for ea, eb in gr.edges:
-        lbla = gr_orig.edges[(ea, eb)][util_graph.ATTR_LABEL] if (ea, eb) in gr_orig.edges else ''
-        lblb = gr_orig.edges[(eb, ea)][util_graph.ATTR_LABEL] if (eb, ea) in gr_orig.edges else ''
+        lbla = gr_orig.edges[(ea, eb)][util_graph.GATTR_LABEL] if (ea, eb) in gr_orig.edges else ''
+        lblb = gr_orig.edges[(eb, ea)][util_graph.GATTR_LABEL] if (eb, ea) in gr_orig.edges else ''
 
         if lbla == lblb or lblb == '':
             lbl = lbla
@@ -67,7 +68,7 @@ if __name__ == '__main__':
             lbl = lblb
         else:
             lbl = lbla + MULTILABEL + lblb
-        gr.edges[(ea, eb)][util_graph.ATTR_LABEL] = orderlabels(lbl)
+        gr.edges[(ea, eb)][util_graph.GATTR_LABEL] = orderlabels(lbl)
 
     grs.graphs = [gr]
 

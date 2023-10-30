@@ -1,0 +1,35 @@
+t dag l2 _
+
+c A ffdddd
+c B ddffdd
+c C1 ddddff
+c C2 ddddff
+c C3 ddddff
+c C4 ddddff
+
+n 1 A 0.0 0.0
+n 2 B 2.0 0.0
+n 3 B 4.0 0.0
+n 4 B 5.0 0.0
+n 5 B 6.0 0.0
+n 6 B 8.0 0.0
+n 7 A 10.0 0.0
+
+n L1 C1 5.0 1.0
+n L2 C2 4.0 2.0
+n L3 C3 5.0 3.5
+n L4 C4 6.0 2.0
+
+e 1 2
+e 2 3
+e 3 4
+e 4 5
+e 5 6
+e 6 7
+
+e 4 L1
+e L1 L2
+e L2 L3
+e L1 L4
+e L4 L3
+e L1 L3

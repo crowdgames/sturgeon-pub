@@ -49,7 +49,7 @@ python3 input2tile.py --outfile work/vvv.tile --textfile levels/mkiii/vvv.lvl
 python3 tile2scheme.py --outfile work/vvv.scheme --tilefile work/vvv.tile --pattern noout-gc-2
 python3 scheme2output.py --outfile work/vvv --schemefile work/vvv.scheme --mkiii-example vvv --size 9 14 --mkiii-layers 47 --solver pysat-minicard
 
-python3 input2tile.py --outfile work/match.tile --textfile levels/mkiii/match.lvl
+python3 input2tile.py --outfile work/match.tile --textfile levels/mkiii/match.lvl --imagefile levels/mkiii/match.png
 python3 tile2scheme.py --outfile work/match.scheme --tilefile work/match.tile
 python3 scheme2output.py --outfile work/match --schemefile work/match.scheme --mkiii-example match --size 4 4 --mkiii-layers 10 --solver pysat-minicard
 
