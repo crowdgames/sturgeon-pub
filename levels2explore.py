@@ -1,5 +1,5 @@
 import argparse, glob, gzip, math, os, pickle, random, sys, threading, time
-import util, util_explore
+import util_common, util_explore
 import numpy as np
 import PIL.Image, PIL.ImageDraw, PIL.ImageTk
 import tkinter, tkinter.messagebox
@@ -120,7 +120,7 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
 
     for tilefile_glob in tilefiles:
         for tilefile in glob.iglob(tilefile_glob):
-            with util.openz(tilefile, 'rb') as f:
+            with util_common.openz(tilefile, 'rb') as f:
                 tile_info = pickle.load(f)
 
                 if tileset == None:
@@ -191,18 +191,18 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
                         tinds_to_tile[tuple(sorted(tinds))] = tile
 
                 else:
-                    util.check_tileset_match(tileset, tile_info.tileset)
+                    util_common.check_tileset_match(tileset, tile_info.tileset)
 
                 if tile_info.levels is not None:
                     for tli in tile_info.levels:
-                        path = util.get_meta_path(tli.meta)
-                        properties = util.get_meta_properties(tli.meta)
+                        path = util_common.get_meta_path(tli.meta)
+                        properties = util_common.get_meta_properties(tli.meta)
                         add_level(tli.tiles, path, properties)
 
     if resultfiles is not None:
         for resultfile_glob in resultfiles:
             for resultfile in glob.iglob(resultfile_glob):
-                with util.openz(resultfile, 'rb') as f:
+                with util_common.openz(resultfile, 'rb') as f:
                     result_info = pickle.load(f)
                     edges = result_info.reach_info.path_edges if result_info.reach_info is not None else []
                     add_level(result_info.tile_level, edges, None)
@@ -256,7 +256,7 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Convert levels to explore file.')
     parser.add_argument('--outfile', required=True, type=str, help='Explore file to write to.')
@@ -269,5 +269,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     explore_info = levels2explore(args.tilefile, args.resultfile, args.pad_top, args.text_only, args.image_only)
-    with util.openz(args.outfile, 'wb') as f:
+    with util_common.openz(args.outfile, 'wb') as f:
         pickle.dump(explore_info, f)

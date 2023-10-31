@@ -1,6 +1,6 @@
 import argparse, json, os, shutil, pickle, sys
+import util_common
 import PIL.Image
-import util
 
 
 
@@ -28,10 +28,10 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
             tile_text = ts.tile_to_text[tile] if ts.tile_to_text is not None else None
             tile_image = ts.tile_to_image[tile] if ts.tile_to_image is not None else None
             tile_key = get_tile_key(tile_text, tile_image if not text_key_only else None)
-            util.check(tile_key not in tile_key_to_tile_id, 'duplicate tile key in base tile info')
+            util_common.check(tile_key not in tile_key_to_tile_id, 'duplicate tile key in base tile info')
             tile_key_to_tile_id[tile_key] = tile
     else:
-        ts = util.TileSetInfo()
+        ts = util_common.TileSetInfo()
 
         ts.tile_ids = {}
 
@@ -39,7 +39,7 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
         ts.tile_to_image = {} if image_levels else None
         ts.tile_image_size = tile_image_size
 
-    ti = util.TileInfo()
+    ti = util_common.TileInfo()
     ti.tileset = ts
     if no_levels:
         ti.levels = None
@@ -53,30 +53,30 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
     elif image_levels is not None:
         level_count = len(image_levels)
     else:
-        util.check(False, 'text and image both missing')
+        util_common.check(False, 'text and image both missing')
 
     if text_levels is not None:
-        util.check(len(text_levels) == level_count, 'need same number of levels')
+        util_common.check(len(text_levels) == level_count, 'need same number of levels')
     else:
         text_levels = [None] * level_count
 
     if image_levels is not None:
-        util.check(len(image_levels) == level_count, 'need same number of levels')
+        util_common.check(len(image_levels) == level_count, 'need same number of levels')
     else:
         image_levels = [None] * level_count
 
     if tag_levels is not None:
-        util.check(len(tag_levels) == level_count, 'need same number of levels')
+        util_common.check(len(tag_levels) == level_count, 'need same number of levels')
     else:
         tag_levels = [None] * level_count
 
     if games is not None:
-        util.check(len(games) == level_count, 'need same number of levels')
+        util_common.check(len(games) == level_count, 'need same number of levels')
     else:
         games = [None] * level_count
 
     if paths is not None:
-        util.check(len(paths) == level_count, 'need same number of levels')
+        util_common.check(len(paths) == level_count, 'need same number of levels')
     else:
         paths = [None] * level_count
 
@@ -94,27 +94,27 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
             image_sz = image_level.size
 
             if ts.tile_image_size is None:
-                util.check(text_sz is not None, 'need text level to determine tile image size')
+                util_common.check(text_sz is not None, 'need text level to determine tile image size')
                 tile_size_x = image_sz[0] / text_sz[1]
                 tile_size_y = image_sz[1] / text_sz[0]
-                util.check(tile_size_y == tile_size_x and tile_size_y == int(tile_size_y) and tile_size_x == int(tile_size_x), 'can\'t determine tile image size')
+                util_common.check(tile_size_y == tile_size_x and tile_size_y == int(tile_size_y) and tile_size_x == int(tile_size_x), 'can\'t determine tile image size')
                 ts.tile_image_size = int(tile_size_x)
                 print('Tile size set to', ts.tile_image_size)
 
-            util.check(image_sz[0] % ts.tile_image_size == 0 and image_sz[1] % ts.tile_image_size == 0, 'Image size not multiple of tile size')
+            util_common.check(image_sz[0] % ts.tile_image_size == 0 and image_sz[1] % ts.tile_image_size == 0, 'Image size not multiple of tile size')
             image_sz = (image_sz[1] // ts.tile_image_size, image_sz[0] // ts.tile_image_size)
         else:
             image_sz = None
 
         if text_sz and image_sz:
-            util.check(text_sz == image_sz, 'text and image size mismatch')
+            util_common.check(text_sz == image_sz, 'text and image size mismatch')
             rows, cols = text_sz
         elif text_sz:
             rows, cols = text_sz
         elif image_sz:
             rows, cols = image_sz
         else:
-            util.check(False, 'text and image both missing')
+            util_common.check(False, 'text and image both missing')
 
         tile_level = []
         for rr in range(rows):
@@ -124,24 +124,24 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
                 tile_text_is_void = None
                 if text_level is not None:
                     tile_text = text_level[rr][cc]
-                    tile_text_is_void = (tile_text == util.VOID_TEXT)
+                    tile_text_is_void = (tile_text == util_common.VOID_TEXT)
 
                 tile_image = None
                 tile_image_is_void = None
                 if image_level is not None:
-                    tile_image = util.fresh_image(image_level.crop((cc * ts.tile_image_size, rr * ts.tile_image_size, cc * ts.tile_image_size + ts.tile_image_size, rr * ts.tile_image_size + ts.tile_image_size)).convert('RGBA'))
+                    tile_image = util_common.fresh_image(image_level.crop((cc * ts.tile_image_size, rr * ts.tile_image_size, cc * ts.tile_image_size + ts.tile_image_size, rr * ts.tile_image_size + ts.tile_image_size)).convert('RGBA'))
                     tile_image_is_void = (sum([ch for px in tile_image.getdata() for ch in px]) == 0)
 
                 if tile_text_is_void or tile_image_is_void:
-                    util.check(tile_text_is_void in [True, None], 'void')
-                    util.check(tile_image_is_void in [True, None], 'void')
-                    tile_id = util.VOID_TILE
+                    util_common.check(tile_text_is_void in [True, None], 'void')
+                    util_common.check(tile_image_is_void in [True, None], 'void')
+                    tile_id = util_common.VOID_TILE
 
                 else:
                     tile_key = get_tile_key(tile_text, tile_image if not text_key_only else None)
                     if tile_key not in tile_key_to_tile_id:
                         if base_tile_info is not None:
-                            util.check(False, 'tile missing in base tile info')
+                            util_common.check(False, 'tile missing in base tile info')
 
                         tile_id = len(ts.tile_ids)
                         ts.tile_ids[tile_id] = None
@@ -159,38 +159,38 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
             tile_level.append(tile_level_row)
 
         if tag_level is None:
-            tag_level = util.make_grid(rows, cols, util.DEFAULT_TEXT)
+            tag_level = util_common.make_grid(rows, cols, util_common.DEFAULT_TEXT)
             for rr in range(rows):
                 for cc in range(cols):
-                    if tile_level[rr][cc] == util.VOID_TILE:
-                        tag_level[rr][cc] = util.VOID_TEXT
+                    if tile_level[rr][cc] == util_common.VOID_TILE:
+                        tag_level[rr][cc] = util_common.VOID_TEXT
         else:
-            util.check(len(tag_level) == rows, 'tile and tag level row count mismatch')
+            util_common.check(len(tag_level) == rows, 'tile and tag level row count mismatch')
             for rr in range(rows):
-                util.check(len(tag_level[rr]) == cols, 'row length mismatch')
+                util_common.check(len(tag_level[rr]) == cols, 'row length mismatch')
                 for cc in range(cols):
-                    util.check((tile_level[rr][cc] == util.VOID_TILE) == (tag_level[rr][cc] == util.VOID_TEXT), 'void')
+                    util_common.check((tile_level[rr][cc] == util_common.VOID_TILE) == (tag_level[rr][cc] == util_common.VOID_TEXT), 'void')
 
         if game is None:
-            game_level = util.make_grid(rows, cols, util.DEFAULT_TEXT)
+            game_level = util_common.make_grid(rows, cols, util_common.DEFAULT_TEXT)
         else:
-            util.check(type(game) == str and len(game) == 1, 'game')
-            game_level = util.make_grid(rows, cols, game)
+            util_common.check(type(game) == str and len(game) == 1, 'game')
+            game_level = util_common.make_grid(rows, cols, game)
 
         if path is not None:
             if text_meta is None:
                 text_meta = []
-            text_meta.insert(0, util.meta_path(path))
+            text_meta.insert(0, util_common.meta_path(path))
 
-        util.print_tile_level(tile_level)
+        util_common.print_tile_level(tile_level)
         print()
-        util.print_text_level(tag_level)
+        util_common.print_text_level(tag_level)
         print()
-        util.print_text_level(game_level)
+        util_common.print_text_level(game_level)
         print()
 
         if not no_levels:
-            tli = util.TileLevelInfo()
+            tli = util_common.TileLevelInfo()
             tli.tiles = tile_level
             tli.tags = tag_level
             tli.games = game_level
@@ -201,7 +201,7 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
         print('saving image tiles')
 
         if os.path.exists(tile_output_folder):
-            shutil.rmtree(tile_output_folder)
+            shutil_common.rmtree(tile_output_folder)
         os.makedirs(tile_output_folder)
 
         for tile, tile_image in ts.tile_to_image.items():
@@ -217,7 +217,7 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Generate tiles from level and/or image.')
     parser.add_argument('--outfile', required=True, type=str, help='Output tile file.')
@@ -244,19 +244,19 @@ if __name__ == '__main__':
         parser.error('--imagefile requires --textfile or --tilesize')
 
     if args.basefile is not None:
-        with util.openz(args.basefile, 'rb') as f:
+        with util_common.openz(args.basefile, 'rb') as f:
             base_tile_info = pickle.load(f)
     else:
         base_tile_info = None
 
     if args.textfile is not None:
-        text_levels = [util.read_text_level(textfile, True) for textfile in args.textfile]
+        text_levels = [util_common.read_text_level(textfile, True) for textfile in args.textfile]
     else:
         text_levels = None
 
     if args.imagefile is not None:
         def open_and_load_image(fn):
-            with util.openz(fn, 'rb') as f:
+            with util_common.openz(fn, 'rb') as f:
                 img = PIL.Image.open(f)
                 img.load()
                 return img
@@ -265,13 +265,13 @@ if __name__ == '__main__':
         image_levels = None
 
     if args.tagfile is not None:
-        tag_levels = [util.read_text_level(tagfile) for tagfile in args.tagfile]
+        tag_levels = [util_common.read_text_level(tagfile) for tagfile in args.tagfile]
     else:
         tag_levels = None
 
     if args.pathfile is not None:
         def open_and_load_path(fn):
-            with util.openz(fn, 'rt') as f:
+            with util_common.openz(fn, 'rt') as f:
                 return [tuple(edge) for edge in json.load(f)]
         paths = [open_and_load_path(pathfile) for pathfile in args.pathfile]
     else:
@@ -279,5 +279,5 @@ if __name__ == '__main__':
 
     tile_info = input2tiles(base_tile_info, text_levels, image_levels, tag_levels, args.game, paths, args.tilesize,
                             args.no_levels, args.text_key_only, TILE_OUTPUT_FOLDER if args.savetileimages else None)
-    with util.openz(args.outfile, 'wb') as f:
+    with util_common.openz(args.outfile, 'wb') as f:
         pickle.dump(tile_info, f)

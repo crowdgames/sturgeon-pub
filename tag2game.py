@@ -1,5 +1,5 @@
 import argparse, math, pickle, pprint, random, sys, time
-import util
+import util_common
 
 
 
@@ -7,7 +7,7 @@ def tag2game(tag_level, scheme_info, game_priority):
     rows = len(tag_level)
     cols = len(tag_level[0])
 
-    game_level = util.make_grid(rows, cols, util.DEFAULT_TEXT)
+    game_level = util_common.make_grid(rows, cols, util_common.DEFAULT_TEXT)
 
     for rr in range(rows):
         for cc in range(cols):
@@ -15,19 +15,19 @@ def tag2game(tag_level, scheme_info, game_priority):
 
             found_game = False
             for game in game_priority:
-                util.check(game in scheme_info.game_to_tag_to_tiles, 'game not in scheme info')
+                util_common.check(game in scheme_info.game_to_tag_to_tiles, 'game not in scheme info')
                 if tag in scheme_info.game_to_tag_to_tiles[game]:
                     game_level[rr][cc] = game
                     found_game = True
                     break
-            util.check(found_game, 'tag ' + tag + ' not found in games')
+            util_common.check(found_game, 'tag ' + tag + ' not found in games')
 
     return game_level
 
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Generate game file from tag (and scheme) file.')
     parser.add_argument('--outfile', required=True, type=str, help='Output game level file.')
@@ -36,12 +36,12 @@ if __name__ == '__main__':
     parser.add_argument('--game', required=True, type=str, nargs='+', help='Game priority.')
     args = parser.parse_args()
 
-    tag_level = util.read_text_level(args.tagfile)
+    tag_level = util_common.read_text_level(args.tagfile)
 
-    with util.openz(args.schemefile, 'rb') as f:
+    with util_common.openz(args.schemefile, 'rb') as f:
         scheme_info = pickle.load(f)
 
     game_level = tag2game(tag_level, scheme_info, args.game)
-    util.print_text_level(game_level)
-    with util.openz(args.outfile, 'wt') as f:
-        util.print_text_level(game_level, outfile=f)
+    util_common.print_text_level(game_level)
+    with util_common.openz(args.outfile, 'wt') as f:
+        util_common.print_text_level(game_level, outfile=f)

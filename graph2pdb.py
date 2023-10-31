@@ -1,5 +1,5 @@
 import argparse
-import util
+import util_common
 
 
 
@@ -80,7 +80,7 @@ def graph2pdb(gr, output):
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Converts pdb to graph file')
     parser.add_argument('--graphfile', required=True, type=str, help='Input graph file.')

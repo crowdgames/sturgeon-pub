@@ -1,4 +1,4 @@
-import util
+import util_common
 
 
 
@@ -94,7 +94,7 @@ def get_move_template(reach_move):
                     elif reach_move == RMOVE_SUPERCAT2:
                         need_open_aux = [(1, dc), (-1, 0)]
                     else:
-                        util.check(False, 'reach_move')
+                        util_common.check(False, 'reach_move')
                     need_closed = [(1, 0)]
                     move_template.append((dest, need_open_path, need_open_aux, need_closed))
 
@@ -123,7 +123,7 @@ def get_move_template(reach_move):
                 need_closed = [(1, 0)]
                 move_template.append((dest, need_open_path, need_open_aux, need_closed))
     else:
-        util.check(False, 'reach_move ' + reach_move)
+        util_common.check(False, 'reach_move ' + reach_move)
 
     move_template_uniq = []
     for arc in move_template:
@@ -135,9 +135,9 @@ def get_move_template(reach_move):
 
 
 def get_reach_info(rows, cols, reach_setup, scheme_info):
-    util.check(scheme_info.tileset.tile_to_text is not None, 'reachability only for (text) level generation')
+    util_common.check(scheme_info.tileset.tile_to_text is not None, 'reachability only for (text) level generation')
 
-    reach_info = util.ReachabilityInfo()
+    reach_info = util_common.ReachabilityInfo()
 
 
 
@@ -215,31 +215,31 @@ def get_reach_info(rows, cols, reach_setup, scheme_info):
     elif reach_setup.goal_loc == RGOAL_BR_TL:
         r_botright_to_topleft(reach_setup.goal_params[0], reach_setup.goal_params[0], reach_info.start_rcs, reach_info.goal_rcs)
     else:
-        util.check(False, 'reach_goal_loc ' + reach_setup.goal_loc)
+        util_common.check(False, 'reach_goal_loc ' + reach_setup.goal_loc)
 
 
 
     reach_info.game_to_move = {}
 
     for game, reach_move in reach_setup.game_to_move.items():
-        game_move = util.GameMoveInfo()
+        game_move = util_common.GameMoveInfo()
         reach_info.game_to_move[game] = game_move
 
         game_move.start_tile, game_move.goal_tile, game_move.open_tiles = None, None, []
         for tag, tiles in scheme_info.game_to_tag_to_tiles[game].items():
             for tile in tiles:
                 text = scheme_info.tileset.tile_to_text[tile]
-                if text == util.START_TEXT:
-                    util.check(game_move.start_tile is None, 'multiple tiles with start text')
+                if text == util_common.START_TEXT:
+                    util_common.check(game_move.start_tile is None, 'multiple tiles with start text')
                     game_move.start_tile = tile
-                if text == util.GOAL_TEXT:
-                    util.check(game_move.goal_tile is None, 'multiple tiles with goal text')
+                if text == util_common.GOAL_TEXT:
+                    util_common.check(game_move.goal_tile is None, 'multiple tiles with goal text')
                     game_move.goal_tile = tile
                 if text in reach_setup.open_text:
                     game_move.open_tiles.append(tile)
-        util.check(game_move.start_tile is not None, 'no tiles with start text')
-        util.check(game_move.goal_tile is not None, 'no tiles with goal text')
-        util.check(len(game_move.open_tiles) > 0, 'no tiles with open text')
+        util_common.check(game_move.start_tile is not None, 'no tiles with start text')
+        util_common.check(game_move.goal_tile is not None, 'no tiles with goal text')
+        util_common.check(len(game_move.open_tiles) > 0, 'no tiles with open text')
 
         game_move.wrap_cols = reach_setup.wrap_cols
         game_move.move_template = get_move_template(reach_move)

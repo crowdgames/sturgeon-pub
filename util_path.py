@@ -1,4 +1,4 @@
-import util
+import util_common
 
 RANDOM_PATH_INSET = 1
 
@@ -14,7 +14,7 @@ def point_path_from_edge_path(edge_path):
         (fr, fc, tr, tc) = edge_path[0]
         point_path.append((fr, fc))
     for (fr, fc, tr, tc) in edge_path:
-        util.check((fr, fc) == point_path[-1], 'edge path')
+        util_common.check((fr, fc) == point_path[-1], 'edge path')
         point_path.append((tr, tc))
     return point_path
 
@@ -31,17 +31,17 @@ def order_edge_path(edge_path_unordered):
     src = None
     for a, b, c, d in edge_path_unordered:
         if (a, b) not in dsts:
-            util.check(src is None, 'multiple starts in path')
+            util_common.check(src is None, 'multiple starts in path')
             src = (a, b)
-    util.check(src is not None, 'no starts in path')
+    util_common.check(src is not None, 'no starts in path')
 
     edge_path = []
     while src in src_to_dst:
         dst = src_to_dst[src]
         edge_path.append((src[0], src[1], dst[0], dst[1]))
-        util.check(len(edge_path) <= len(edge_path_unordered), 'path lengths')
+        util_common.check(len(edge_path) <= len(edge_path_unordered), 'path lengths')
         src = dst
-    util.check(len(edge_path) == len(edge_path_unordered), 'path lengths')
+    util_common.check(len(edge_path) == len(edge_path_unordered), 'path lengths')
 
     return edge_path
 
@@ -52,7 +52,7 @@ def edge_path_from_lines(prefix, lines):
             edges_str = line[len(prefix):]
             for edge in edges_str.split(','):
                 edge = tuple([int(el) for el in edge.strip().split()])
-                util.check(len(edge) == 4, 'edge length')
+                util_common.check(len(edge) == 4, 'edge length')
                 edge_path.append(edge)
             return edge_path
     return None
@@ -94,9 +94,9 @@ def get_level_open_closed(text_level, open_text):
     are_open = {}
     are_closed = {}
 
-    util.check(util.START_TEXT not in open_text and util.GOAL_TEXT not in open_text, 'start/goal in open_text')
+    util_common.check(util_common.START_TEXT not in open_text and util_common.GOAL_TEXT not in open_text, 'start/goal in open_text')
 
-    open_start_goal_text = open_text + util.START_TEXT + util.GOAL_TEXT
+    open_start_goal_text = open_text + util_common.START_TEXT + util_common.GOAL_TEXT
 
     for rr in range(len(text_level)):
         for cc in range(len(text_level[rr])):

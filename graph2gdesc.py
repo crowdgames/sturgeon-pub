@@ -1,5 +1,5 @@
 import argparse, itertools, json, math, pickle, random, sys, time
-import util, util_graph
+import util_common, util_graph
 import networkx as nx
 
 
@@ -13,7 +13,7 @@ def check_node_positions(gr):
     for node in gr.nodes:
         if util_graph.GATTR_POSITION not in gr.nodes[node]:
             any_node_missing_position = True
-    util.check(not any_node_missing_position, 'node positions')
+    util_common.check(not any_node_missing_position, 'node positions')
 
 def rotate_node_positions(gr):
     ret = gr.copy()
@@ -42,7 +42,7 @@ def edge_polars_from_node_positions(gr):
         dx = til_pos[0] - fra_pos[0]
         dy = til_pos[1] - fra_pos[1]
         mag = math.sqrt(dx ** 2 + dy ** 2)
-        util.check(mag > 0.01, 'mag')
+        util_common.check(mag > 0.01, 'mag')
         rdx += dx / mag
         rdy += dy / mag
         rnum += 1
@@ -50,7 +50,7 @@ def edge_polars_from_node_positions(gr):
     rdx /= rnum
     rdy /= rnum
     rmag = math.sqrt(rdx ** 2 + rdy ** 2)
-    util.check(rmag > 0.01, 'mag')
+    util_common.check(rmag > 0.01, 'mag')
     rdx /= rmag
     rdy /= rmag
 
@@ -96,11 +96,24 @@ def edge_polars_from_node_positions(gr):
 
             queue.append(til)
 
-def local_subgraph(gr, node, nrad):
-    util.check(nrad in NRAD_LIST, 'nrad')
+def subgraph_from_nodes(gr, subnodes):
+    subgraph = gr.__class__()
 
-    subnodes = [node] + list(nx.all_neighbors(gr, node))
-    subgraph = gr.subgraph(subnodes).copy()
+    for node, attr in gr.nodes.items():
+        if node in subnodes:
+            subgraph.add_node(node, **attr)
+
+    for (fra, til), attr in gr.edges.items():
+        if fra in subnodes and til in subnodes:
+            subgraph.add_edge(fra, til, **attr)
+
+    return subgraph
+
+def local_subgraph(gr, node, nrad):
+    util_common.check(nrad in NRAD_LIST, 'nrad')
+
+    subnodes = [node] + list(sorted(nx.all_neighbors(gr, node)))
+    subgraph = subgraph_from_nodes(gr, subnodes)
 
     if nrad in [NRAD_EDGE, NRAD_NODE]:
         to_remove = []
@@ -141,10 +154,10 @@ def graph_desc(gr, node):
     return (new_ids[node], nodes, edges)
 
 def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
-    util.timer_section('extract')
+    util_common.timer_section('extract')
 
-    util.check(not edge_deltas or not edge_polars, 'cannot use both edge deltas and polars')
-    util.check(not rotate or edge_deltas, 'can only use rotate with edge deltas')
+    util_common.check(not edge_deltas or not edge_polars, 'cannot use both edge deltas and polars')
+    util_common.check(not rotate or edge_deltas, 'can only use rotate with edge deltas')
 
     grd = util_graph.GraphDesc()
 
@@ -174,15 +187,18 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
         cycles = []
         for gr in grs.graphs:
             ugr = gr.to_undirected(as_view=True)
-            for cycle_basis in nx.cycle_basis(ugr):
-                cycle_subgraph = gr.subgraph(cycle_basis).copy()
+
+            cycle_bases = tuple(sorted([tuple(sorted(cycle_basis)) for cycle_basis in nx.cycle_basis(ugr)]))
+
+            for cycle_basis in cycle_bases:
+                cycle_subgraph = subgraph_from_nodes(gr, cycle_basis)
                 clen = len(cycle_subgraph)
 
                 ci_mapping = None
                 for eci, (existing_subgraph, existing_eis) in enumerate(cycles):
                     matcher = nx.algorithms.isomorphism.DiGraphMatcher(cycle_subgraph, existing_subgraph, node_match=nm, edge_match=em)
                     found_mappings = list(matcher.subgraph_isomorphisms_iter())
-                    util.check(len(found_mappings) <= 1, 'multiple mappings found')
+                    util_common.check(len(found_mappings) <= 1, 'multiple mappings found')
                     if len(found_mappings) != 0:
                         ci_mapping = eci, found_mappings[0]
                         break
@@ -256,7 +272,7 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Extract description from example graph.')
     parser.add_argument('--outfile', required=True, type=str, help='Output file.')
@@ -272,5 +288,5 @@ if __name__ == '__main__':
     grs = util_graph.read_graphs(args.graphfile)
 
     grd = graph2gdesc(grs, args.nrad, args.cycle_label, args.edge_delta or args.edge_delta_rotate, args.edge_polar, args.edge_delta_rotate)
-    with util.openz(args.outfile, 'wb') as f:
+    with util_common.openz(args.outfile, 'wb') as f:
         pickle.dump(grd, f)

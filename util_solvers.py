@@ -1,5 +1,5 @@
 import json, multiprocessing, queue, random, sys
-import util
+import util_common
 
 try:
     available_z3 = False
@@ -82,7 +82,7 @@ def solver_id_to_solver(solver_id):
     elif solver_id == SOLVER_PYSAT_MC:
         return PySatSolverMiniCard()
     else:
-        util.check(False, 'solver ' + solver_id + ' unrecognized.')
+        util_common.check(False, 'solver ' + solver_id + ' unrecognized.')
 
 
 
@@ -94,25 +94,25 @@ class Solver:
         return self._solver_id
 
     def make_var(self):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def make_conj(self, vvs, settings):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def cnstr_count(self, vvs, settings, lo, hi, weight):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def solve(self):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def get_var(self, vv):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def get_objective(self):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def supports_weights(self):
         return False
@@ -135,15 +135,15 @@ def _is_conj(vv):
     return vv[0] == 'c'
 
 def _unwrap_var(vv):
-    util.check(type(vv) == tuple and len(vv) == 2 and vv[0] == 'v', 'unwrap')
+    util_common.check(type(vv) == tuple and len(vv) == 2 and vv[0] == 'v', 'unwrap')
     return vv[1]
 
 def _unwrap_conj(vv):
-    util.check(type(vv) == tuple and len(vv) == 2 and vv[0] == 'c', 'unwrap')
+    util_common.check(type(vv) == tuple and len(vv) == 2 and vv[0] == 'c', 'unwrap')
     return vv[1]
 
 def _unwrap_any(vv):
-    util.check(type(vv) == tuple and len(vv) == 2 and vv[0] in ['v', 'c'], 'unwrap')
+    util_common.check(type(vv) == tuple and len(vv) == 2 and vv[0] in ['v', 'c'], 'unwrap')
     return vv[1]
 
 def _unwrap_lit_lconj(vv, setting, negate_func):
@@ -156,7 +156,7 @@ def _unwrap_lit_lconjs(vvs, settings, negate_func):
     if settings in [True, False]:
         settings = [settings for vv in vvs]
     else:
-        util.check(len(vvs) == len(settings), 'different vvs and settings lengths')
+        util_common.check(len(vvs) == len(settings), 'different vvs and settings lengths')
 
     return [_unwrap_lit_lconj(vv, setting, negate_func) for vv, setting in zip(vvs, settings)]
 
@@ -164,14 +164,14 @@ def _is_xform_t(vv):
     return vv[0] in ['t2', 't3']
 
 def _unwrap_xform_t(vv):
-    util.check(type(vv) == tuple and vv[0] in ['t2', 't3'], 'unwrap')
+    util_common.check(type(vv) == tuple and vv[0] in ['t2', 't3'], 'unwrap')
     return vv[1:]
 
 def _is_xform_x2(vv):
     return vv[0] in ['x2']
 
 def _unwrap_xform_x2(vv):
-    util.check(type(vv) == tuple and vv[0] in ['x2'], 'unwrap')
+    util_common.check(type(vv) == tuple and vv[0] in ['x2'], 'unwrap')
     return vv[1:]
 
 
@@ -190,21 +190,21 @@ class SolverImpl(Solver):
         return _wrap_var(self._IMPL_make_var())
 
     def make_conj(self, vvs, settings):
-        util.check(len(vvs) > 0, 'empty conj')
+        util_common.check(len(vvs) > 0, 'empty conj')
 
         return _wrap_conj(self._IMPL_make_conj(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj)))
 
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
         if not self._supports_weights:
-            util.check(weight is None, 'solver does not support weights')
+            util_common.check(weight is None, 'solver does not support weights')
 
         return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out), weight)
 
     def cnstr_count(self, vvs, settings, lo, hi, weight):
-        util.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
+        util_common.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
 
         if not self._supports_weights:
-            util.check(weight is None, 'solver does not support weights')
+            util_common.check(weight is None, 'solver does not support weights')
 
         return self._IMPL_cnstr_count(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj), lo, hi, weight)
 
@@ -227,25 +227,25 @@ class SolverImpl(Solver):
         return self._IMPL_negate_var_conj(ll)
 
     def _IMPL_negate_var_conj(self, ll):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def _IMPL_make_var(self):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def _IMPL_make_conj(self, lls):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def _IMPL_cnstr_implies_disj(self, ll_in, lls_out, weight):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def _IMPL_solve(self):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
     def _IMPL_get_var(self, vv):
-        util.check(False, 'unimplemented')
+        util_common.check(False, 'unimplemented')
 
 
 
@@ -267,7 +267,7 @@ class PortfolioSolver(Solver):
         return len(self._solver_var_conjs) - 1
 
     def make_conj(self, vvs, settings):
-        util.check(len(vvs) > 0, 'empty conj')
+        util_common.check(len(vvs) > 0, 'empty conj')
 
         self._solver_var_conjs.append(_wrap_conj((tuple(vvs), settings)))
         return len(self._solver_var_conjs) - 1
@@ -276,7 +276,7 @@ class PortfolioSolver(Solver):
         self._solver_commands.append(('cnstr_implies_disj', (in_vv, in_vv_setting, out_vvs, out_vv_settings, weight)))
 
     def cnstr_count(self, vvs, settings, lo, hi, weight):
-        util.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
+        util_common.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
 
         self._solver_commands.append(('cnstr_count', (vvs, settings, lo, hi, weight)))
 
@@ -291,7 +291,7 @@ class PortfolioSolver(Solver):
         try:
             result = q.get(timeout=self._timeout)
         except queue.Empty:
-            util.write_portfolio('portfolio timeout\n')
+            util_common.write_portfolio('portfolio timeout\n')
 
         for proc in procs:
             proc.kill()
@@ -300,7 +300,7 @@ class PortfolioSolver(Solver):
             return False
         else:
             index, self._result, self._objective = result
-            util.write_portfolio('portfolio using %d %s\n' % (index, self._solver_ids[index]))
+            util_common.write_portfolio('portfolio using %d %s\n' % (index, self._solver_ids[index]))
             return True
 
     def get_var(self, vv):
@@ -314,7 +314,7 @@ class PortfolioSolver(Solver):
         s_ret = None
 
         try:
-            util.write_portfolio('portfolio starting %d %s\n' % (s_index, s_solver_id))
+            util_common.write_portfolio('portfolio starting %d %s\n' % (s_index, s_solver_id))
 
             s_solver = solver_id_to_solver(s_solver_id)
 
@@ -336,16 +336,16 @@ class PortfolioSolver(Solver):
                 elif _is_conj(s_var_conj):
                     s_conjs_inds.append(s_ind)
                 else:
-                    util.check(False, 'var_conj')
+                    util_common.check(False, 'var_conj')
 
             random.Random(s_index).shuffle(s_vars_inds)
 
             for s_ind in s_vars_inds:
-                util.check(_is_var(s_solver_var_conjs[s_ind]), 'var')
+                util_common.check(_is_var(s_solver_var_conjs[s_ind]), 'var')
                 s_var_conj_map[s_ind] = s_solver.make_var()
 
             for s_ind in s_conjs_inds:
-                util.check(_is_conj(s_solver_var_conjs[s_ind]), 'conj')
+                util_common.check(_is_conj(s_solver_var_conjs[s_ind]), 'conj')
                 s_info = _unwrap_conj(s_solver_var_conjs[s_ind])
                 s_var_conj_map[s_ind] = s_solver.make_conj(translate_vars(s_info[0]), s_info[1])
 
@@ -355,7 +355,7 @@ class PortfolioSolver(Solver):
                 elif s_func_name == 'cnstr_count':
                     s_solver.cnstr_count(translate_vars(s_args[0]), s_args[1], s_args[2], s_args[3], s_args[4])
                 else:
-                    util.check(False, 's_func_name')
+                    util_common.check(False, 's_func_name')
 
             if s_solver.solve():
                 s_vars_set = {}
@@ -365,10 +365,10 @@ class PortfolioSolver(Solver):
 
                 s_ret = (s_index, s_vars_set, s_solver.get_objective())
 
-            util.write_portfolio('portfolio finishing %d %s\n' % (s_index, s_solver_id))
+            util_common.write_portfolio('portfolio finishing %d %s\n' % (s_index, s_solver_id))
 
         except Exception as e:
-            util.write_portfolio('portfolio error %d %s %s\n' % (s_index, s_solver_id, e))
+            util_common.write_portfolio('portfolio error %d %s %s\n' % (s_index, s_solver_id, e))
 
         s_q.put(s_ret)
 
@@ -416,9 +416,9 @@ class PrintSolver(SolverImpl):
 
 class _Z3Solver(SolverImpl):
     def __init__(self, solver_id, solver_option):
-        util.check(available_z3, 'z3 not available')
+        util_common.check(available_z3, 'z3 not available')
 
-        util.check(solver_option in [Z3_OPTION_OPTIMIZE, Z3_OPTION_SOLVE], 'invalid option for solver: ' + solver_option)
+        util_common.check(solver_option in [Z3_OPTION_OPTIMIZE, Z3_OPTION_SOLVE], 'invalid option for solver: ' + solver_option)
 
         self._option = solver_option
 
@@ -449,13 +449,13 @@ class _Z3Solver(SolverImpl):
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
         if self._option != Z3_OPTION_OPTIMIZE:
-            util.check(weight is None, 'solver does not support weights')
+            util_common.check(weight is None, 'solver does not support weights')
 
         self._help_add_cnstr_weight(z3.Implies(in_ll, z3.Or(*out_lls)), weight)
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
         if self._option != Z3_OPTION_OPTIMIZE:
-            util.check(weight is None, 'solver does not support weights')
+            util_common.check(weight is None, 'solver does not support weights')
 
         if len(lls) == 0:
             pass
@@ -468,7 +468,7 @@ class _Z3Solver(SolverImpl):
             elif lo == 1 and hi == 1:
                 self._help_add_cnstr_weight(lls[0], weight)
             else:
-                util.check(False, 'count vars')
+                util_common.check(False, 'count vars')
 
         else:
             lls_count = [(vv, 1) for vv in lls]
@@ -489,19 +489,19 @@ class _Z3Solver(SolverImpl):
     def _IMPL_solve(self):
         if self._option == Z3_OPTION_OPTIMIZE:
             def on_model(_m):
-                util.write_time('.')
+                util_common.write_time('.')
 
             self._s.set_on_model(on_model)
 
         chk = self._s.check()
-        util.write_time('\n')
-        util.write_time(str(chk) + '\n')
+        util_common.write_time('\n')
+        util_common.write_time(str(chk) + '\n')
 
         if chk == z3.unsat:
             return False
 
         if chk == z3.unknown:
-            util.write_time(str(self._s.reason_unknown()) + '\n')
+            util_common.write_time(str(self._s.reason_unknown()) + '\n')
             return False
 
         self._result = self._s.model()
@@ -514,7 +514,7 @@ class _Z3Solver(SolverImpl):
         if len(objs) == 0:
             self._objective = 0
         else:
-            util.check(len(objs) == 1, 'cost length')
+            util_common.check(len(objs) == 1, 'cost length')
             self._objective = objs[0].as_long()
 
         return True
@@ -541,9 +541,9 @@ class _Z3Solver(SolverImpl):
 
     def _xform_type(self, xforms):
         xtypes = dict.fromkeys([vv[0] for vv in xforms])
-        util.check(len(xtypes) == 1, 'xform types')
+        util_common.check(len(xtypes) == 1, 'xform types')
         xtype = next(iter(xtypes))
-        util.check(xtype in ['t2', 't3', 'x2'], 'xform types')
+        util_common.check(xtype in ['t2', 't3', 'x2'], 'xform types')
         return xtype
 
     def _xform_xtype_t(self, xtype):
@@ -555,7 +555,7 @@ class _Z3Solver(SolverImpl):
 
         missing_conds = [_unwrap_var(vv) for vv in missing_conds]
 
-        util.check(len(missing_conds) == len(xforms), 'lengths')
+        util_common.check(len(missing_conds) == len(xforms), 'lengths')
 
         if self._xform_xtype_t(self._xform_type(xforms)):
             xforms = [_unwrap_xform_t(vv) for vv in xforms]
@@ -585,7 +585,7 @@ class _Z3Solver(SolverImpl):
         if self._xform_xtype_t(self._xform_type([xform0, xform1])):
             xform0 = _unwrap_xform_t(xform0)
             xform1 = _unwrap_xform_t(xform1)
-            util.check(len(dxform) == len(xform0) == len(xform1), 'dims')
+            util_common.check(len(dxform) == len(xform0) == len(xform1), 'dims')
             if primary:
                 xform_apply = z3.And([p1 == p0 + dd for dd, p0, p1 in zip(dxform, xform0, xform1)])
             else:
@@ -594,7 +594,7 @@ class _Z3Solver(SolverImpl):
         else:
             xform0 = _unwrap_xform_x2(xform0)
             xform1 = _unwrap_xform_x2(xform1)
-            util.check(6 == len(dxform) == len(xform0) == len(xform1), 'dims')
+            util_common.check(6 == len(dxform) == len(xform0) == len(xform1), 'dims')
             if primary:
                 xform_apply = [xform1[0] == (xform0[0] * dxform[0] + xform0[1] * dxform[3]),
                                xform1[1] == (xform0[0] * dxform[1] + xform0[1] * dxform[4]),
@@ -623,7 +623,7 @@ class Z3SolverSolve(_Z3Solver):
 
 class CVC5Solver(SolverImpl):
     def __init__(self):
-        util.check(available_cvc5, 'cvc5 not available')
+        util_common.check(available_cvc5, 'cvc5 not available')
 
         super().__init__(SOLVER_CVC5, False, False)
 
@@ -642,7 +642,7 @@ class CVC5Solver(SolverImpl):
             return cvc5.pythonic.And(*lls)
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
-        util.check(weight is None, 'solver does not support weights')
+        util_common.check(weight is None, 'solver does not support weights')
 
         if len(out_lls) == 0:
             self._s.add(cvc5.pythonic.Implies(in_ll, False))
@@ -652,7 +652,7 @@ class CVC5Solver(SolverImpl):
             self._s.add(cvc5.pythonic.Implies(in_ll, cvc5.pythonic.Or(*out_lls)))
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
-        util.check(weight is None, 'solver does not support weights')
+        util_common.check(weight is None, 'solver does not support weights')
 
         if len(lls) == 0:
             pass
@@ -665,7 +665,7 @@ class CVC5Solver(SolverImpl):
             elif lo == 1 and hi == 1:
                 self._s.add(lls[0])
             else:
-                util.check(False, 'count vars')
+                util_common.check(False, 'count vars')
 
         else:
             lls_if = sum([cvc5.pythonic.If(ll, 1, 0) for ll in lls])
@@ -685,14 +685,14 @@ class CVC5Solver(SolverImpl):
 
     def _IMPL_solve(self):
         chk = self._s.check()
-        util.write_time('\n')
-        util.write_time(str(chk) + '\n')
+        util_common.write_time('\n')
+        util_common.write_time(str(chk) + '\n')
 
         if chk == cvc5.pythonic.unsat:
             return False
 
         if chk == cvc5.pythonic.unknown:
-            util.write_time(str(self._s.reason_unknown()) + '\n')
+            util_common.write_time(str(self._s.reason_unknown()) + '\n')
             return False
 
         self._result = self._s.model()
@@ -707,7 +707,7 @@ class CVC5Solver(SolverImpl):
 
 class ClingoFrontendSolver(SolverImpl):
     def __init__(self):
-        util.check(available_clingo, 'clingo not available')
+        util_common.check(available_clingo, 'clingo not available')
 
         super().__init__(SOLVER_CLINGO_FE, True, False)
 
@@ -733,7 +733,7 @@ class ClingoFrontendSolver(SolverImpl):
         weight_func = 'soft%d' % weight
 
         if weight in self._soft_var_weights:
-            util.check(self._soft_var_weights[weight] == weight_func, 'weight and weight_func mismatch')
+            util_common.check(self._soft_var_weights[weight] == weight_func, 'weight and weight_func mismatch')
         else:
             self._soft_var_weights[weight] = weight_func
 
@@ -795,7 +795,7 @@ class ClingoFrontendSolver(SolverImpl):
             elif lo == 1 and hi == 1:
                 self._ctl_add_rule('%s%s.' % (lls[0], get_soft_var_body()))
             else:
-                util.check(False, 'count vars')
+                util_common.check(False, 'count vars')
 
         else:
             lo_str = ''
@@ -811,12 +811,12 @@ class ClingoFrontendSolver(SolverImpl):
 
     def _IMPL_solve(self):
         def on_model(_m):
-            util.write_time('.')
+            util_common.write_time('.')
 
             if len(_m.cost) == 0:
                 self._objective = 0
             else:
-                util.check(len(_m.cost) == 1, 'cost length')
+                util_common.check(len(_m.cost) == 1, 'cost length')
                 self._objective = _m.cost[0]
 
             self._result = {}
@@ -828,7 +828,7 @@ class ClingoFrontendSolver(SolverImpl):
 
         self._ctl_ground()
         self._ctl_solve(on_model)
-        util.write_time('\n')
+        util_common.write_time('\n')
 
         return self._result is not None
 
@@ -839,7 +839,7 @@ class ClingoFrontendSolver(SolverImpl):
 
 class ClingoBackendSolver(SolverImpl):
     def __init__(self):
-        util.check(available_clingo, 'clingo not available')
+        util_common.check(available_clingo, 'clingo not available')
 
         super().__init__(SOLVER_CLINGO_BE, True, False)
 
@@ -889,7 +889,7 @@ class ClingoBackendSolver(SolverImpl):
             be.add_rule(out_lls + soft_var, [in_ll])
 
             if len(soft_var) != 0:
-                util.check(len(soft_var) == 1, 'soft var')
+                util_common.check(len(soft_var) == 1, 'soft var')
                 be.add_minimize(1, [(soft_var[0], weight)])
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
@@ -916,7 +916,7 @@ class ClingoBackendSolver(SolverImpl):
                 elif lo == 1 and hi == 1:
                     be.add_rule(get_soft_var(), [-lls[0]])
                 else:
-                    util.check(False, 'count vars')
+                    util_common.check(False, 'count vars')
 
             else:
                 if lo == 0:
@@ -931,12 +931,12 @@ class ClingoBackendSolver(SolverImpl):
 
     def _IMPL_solve(self):
         def on_model(_m):
-            util.write_time('.')
+            util_common.write_time('.')
 
             if len(_m.cost) == 0:
                 self._objective = 0
             else:
-                util.check(len(_m.cost) == 1, 'cost length')
+                util_common.check(len(_m.cost) == 1, 'cost length')
                 self._objective = _m.cost[0]
 
             self._result = {}
@@ -945,7 +945,7 @@ class ClingoBackendSolver(SolverImpl):
                     self._result[atom] = None
 
         self._ctl.solve(on_model=on_model)
-        util.write_time('\n')
+        util_common.write_time('\n')
 
         return self._result is not None
 
@@ -956,7 +956,7 @@ class ClingoBackendSolver(SolverImpl):
 
 class PySatSolverMiniCard(SolverImpl):
     def __init__(self):
-        util.check(available_pysat, 'pysat not available')
+        util_common.check(available_pysat, 'pysat not available')
 
         super().__init__(SOLVER_PYSAT_MC, False, False)
 
@@ -985,12 +985,12 @@ class PySatSolverMiniCard(SolverImpl):
             return conj_var
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
-        util.check(weight is None, 'solver does not support weights')
+        util_common.check(weight is None, 'solver does not support weights')
 
         self._s.add_clause([-in_ll] + out_lls)
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
-        util.check(weight is None, 'solver does not support weights')
+        util_common.check(weight is None, 'solver does not support weights')
 
         if len(lls) == 0:
             pass
@@ -1003,7 +1003,7 @@ class PySatSolverMiniCard(SolverImpl):
             elif lo == 1 and hi == 1:
                 self._s.add_clause([lls[0]])
             else:
-                util.check(False, 'count vars')
+                util_common.check(False, 'count vars')
 
         else:
             if lo == 0:
@@ -1032,9 +1032,9 @@ class PySatSolverMiniCard(SolverImpl):
 
 class _PySatSolverWeighted(SolverImpl):
     def __init__(self, solver_id, solver_option):
-        util.check(available_pysat, 'pysat not available')
+        util_common.check(available_pysat, 'pysat not available')
 
-        util.check(solver_option in [PYSAT_OPTION_CARD, PYSAT_OPTION_BOOLONLY], 'invalid option for solver: ' + solver_option)
+        util_common.check(solver_option in [PYSAT_OPTION_CARD, PYSAT_OPTION_BOOLONLY], 'invalid option for solver: ' + solver_option)
 
         super().__init__(solver_id, True, False)
 
@@ -1088,7 +1088,7 @@ class _PySatSolverWeighted(SolverImpl):
             elif lo == 1 and hi == 1:
                 self._wcnf.append([lls[0]], weight=weight)
             else:
-                util.check(False, 'count vars')
+                util_common.check(False, 'count vars')
 
         else:
             if self._option == PYSAT_OPTION_CARD and weight is None: # PySat currently only supports hard cardinality constraints

@@ -1,4 +1,4 @@
-import generator, util
+import util_common, util_generator
 
 
 
@@ -263,12 +263,12 @@ def get_example_info(mkiii_setup):
         ei.rep_rule_order = RR_ORD_ONE
         ei.use_term = False
 
-        ei.extra_meta.append(util.meta_rect('level', [(0, 0, 3, 3), (0, 3, 3, 6), (0, 6, 3, 9), (3, 0, 6, 3), (3, 3, 6, 6), (3, 6, 6, 9), (6, 0, 9, 3), (6, 3, 9, 6), (6, 6, 9, 9)]))
+        ei.extra_meta.append(util_common.meta_rect('level', [(0, 0, 3, 3), (0, 3, 3, 6), (0, 6, 3, 9), (3, 0, 6, 3), (3, 3, 6, 6), (3, 6, 6, 9), (6, 0, 9, 3), (6, 3, 9, 6), (6, 6, 9, 9)]))
 
         def _custom(ci):
             # check size
-            util.check(ci.rows == 9, 'doku size')
-            util.check(ci.cols == 9, 'doku size')
+            util_common.check(ci.rows == 9, 'doku size')
+            util_common.check(ci.cols == 9, 'doku size')
 
             # start
             init_range(ci, '-', ci.layers - 1, ci.layers - 1)
@@ -743,13 +743,13 @@ def get_example_info(mkiii_setup):
         ei.custom = _custom
 
     else:
-        util.check(False, 'mkiii_setup example' + mkiii_setup.example)
+        util_common.check(False, 'mkiii_setup example' + mkiii_setup.example)
 
     return ei
 
 
 
-class GeneratorMKIII(generator.Generator):
+class GeneratorMKIII(util_generator.Generator):
     def __init__(self, solver, randomize, rows, cols, scheme_info, tag_level, game_level):
         super().__init__(solver, randomize, rows, cols, scheme_info, tag_level, game_level)
 
@@ -789,8 +789,8 @@ class GeneratorMKIII(generator.Generator):
 
         self._text_to_tile = {}
         for tile, text in self._scheme_info.tileset.tile_to_text.items():
-            util.check(text not in self._text_to_tile, 'cannot have duplicate tile text ' + text + ' for mkiii')
-            util.check(text in self._states, 'text ' + text + ' not in states')
+            util_common.check(text not in self._text_to_tile, 'cannot have duplicate tile text ' + text + ' for mkiii')
+            util_common.check(text in self._states, 'text ' + text + ' not in states')
             self._text_to_tile[text] = tile
 
         layers_order = list(range(self._layers))
@@ -850,14 +850,14 @@ class GeneratorMKIII(generator.Generator):
         elif mkiii_info.rep_rule_order == RR_ORD_PRI:
             self._vars_pri = []
         else:
-            util.check(False, 'rep_rule_order')
+            util_common.check(False, 'rep_rule_order')
 
         if mkiii_info.rep_rule_order == RR_ORD_ONE:
-            util.check(len(mkiii_info.rep_rules) == 1, 'rep_rule_order')
+            util_common.check(len(mkiii_info.rep_rules) == 1, 'rep_rule_order')
         elif mkiii_info.rep_rule_order in [RR_ORD_SEQ, RR_ORD_PRI]:
-            util.check(len(mkiii_info.rep_rules) > 1, 'rep_rule_order')
+            util_common.check(len(mkiii_info.rep_rules) > 1, 'rep_rule_order')
         else:
-            util.check(False, 'rep_rule_order')
+            util_common.check(False, 'rep_rule_order')
 
         for ll in range(self._layers - 1):
             # keep track of change vars
@@ -899,12 +899,12 @@ class GeneratorMKIII(generator.Generator):
                     for cc in range(self._cols):
                         for rule_info in rep_rules:
                             rule_dirs, rule_in, rule_out = rule_info
-                            util.check(len(rule_in) == len(rule_out), 'rule in and out different lengths')
+                            util_common.check(len(rule_in) == len(rule_out), 'rule in and out different lengths')
 
                             for dr, dc in rule_dirs:
-                                util.check(abs(dr) + abs(dc) <= 1, 'dr and/or dc out of range')
+                                util_common.check(abs(dr) + abs(dc) <= 1, 'dr and/or dc out of range')
                                 if dr == dc == 0:
-                                    util.check(len(rule_in) == len(rule_out) == 1, 'rule has length but no direction')
+                                    util_common.check(len(rule_in) == len(rule_out) == 1, 'rule has length but no direction')
 
                                 if rr + dr * len(rule_in) >= -1 and rr + dr * len(rule_in) <= self._rows and cc + dc * len(rule_in) >= -1 and cc + dc * len(rule_in) <= self._cols:
                                     vin = []
@@ -954,7 +954,7 @@ class GeneratorMKIII(generator.Generator):
                         self._solver.cnstr_count(change_or_term_or_prev_pri, True, 0, 1, None)
 
                 else:
-                    util.check(False, 'rep_rules_type')
+                    util_common.check(False, 'rep_rules_type')
 
             self._change_vars_rcs.append(layer_change_vars_rcs)
 
@@ -989,7 +989,7 @@ class GeneratorMKIII(generator.Generator):
         steps = []
 
         for ll in range(self._layers):
-            step_info = util.ExecutionStepInfo()
+            step_info = util_common.ExecutionStepInfo()
             steps.append(step_info)
 
             if not self._group_names:
@@ -999,11 +999,11 @@ class GeneratorMKIII(generator.Generator):
             else:
                 if self._vars_pri is not None: # RR_ORD_PRI
                     inds_pri = self._vars_pri[(ll - 1)]
-                    util.check(len(inds_pri) == len(self._group_names), 'pri and name length mismatch')
+                    util_common.check(len(inds_pri) == len(self._group_names), 'pri and name length mismatch')
                     pri_name = None
                     for vv, name in zip(inds_pri, self._group_names):
                         if self._solver.get_var(vv):
-                            util.check(pri_name is None, 'multiple pri set')
+                            util_common.check(pri_name is None, 'multiple pri set')
                             pri_name = name
                     if pri_name is None:
                         pri_name = 'none'
@@ -1029,9 +1029,9 @@ class GeneratorMKIII(generator.Generator):
                     for ss in self._states:
                         vv = self._vars_lrct[(ll, rr, cc, ss)]
                         if self._solver.get_var(vv):
-                            util.check(use_ss is None, 'multiple states set')
+                            util_common.check(use_ss is None, 'multiple states set')
                             use_ss = ss
-                    util.check(use_ss is not None, 'no state set')
+                    util_common.check(use_ss is not None, 'no state set')
                     level_row.append(use_ss)
                 text_level.append(level_row)
             step_info.text_level = text_level
@@ -1044,9 +1044,9 @@ class GeneratorMKIII(generator.Generator):
                     level_row = []
                     for cc in range(self._cols):
                         text = text_level[rr][cc]
-                        level_row.append(self._text_to_tile[text] if text in self._text_to_tile else util.VOID_TILE)
+                        level_row.append(self._text_to_tile[text] if text in self._text_to_tile else util_common.VOID_TILE)
                     tile_level.append(level_row)
-                step_info.image_level = util.tile_level_to_image_level(tile_level, self._scheme_info.tileset)
+                step_info.image_level = util_common.tile_level_to_image_level(tile_level, self._scheme_info.tileset)
 
             if self._vars_term is None or ll == 0:
                 step_info.term = None
@@ -1057,7 +1057,7 @@ class GeneratorMKIII(generator.Generator):
                 curr_term = self._solver.get_var(self._vars_term[ll])
 
                 if prev_term:
-                    util.check(curr_term, 'term unset')
+                    util_common.check(curr_term, 'term unset')
 
                 step_info.term = curr_term
 

@@ -13,7 +13,7 @@ pipenv install
 pipenv shell
 ```
 
-See `examples.sh`, `examples-app.sh`, `examples-blend.sh`, `examples-mkiii.sh`, `examples-graph.sh` and `examples-explore.sh` for example usage (within pipenv).
+See `examples_basic.sh`, `examples_app.sh`, `examples_blend.sh`, `examples_mkiii.sh`, `examples_graph.sh` and `examples_explore.sh` for example usage (within pipenv).
 
 ## Related Publications
 

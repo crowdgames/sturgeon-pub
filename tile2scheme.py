@@ -1,5 +1,5 @@
 import argparse, pickle, pprint, sys
-import util
+import util_common
 
 
 
@@ -90,7 +90,7 @@ def normalize(tile_dict):
 
 def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
     ti = tile_info
-    si = util.SchemeInfo()
+    si = util_common.SchemeInfo()
 
     si.tileset = ti.tileset
 
@@ -99,7 +99,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
     if divs_size is None:
         si.count_info = None
     else:
-        si.count_info = util.SchemeCountInfo()
+        si.count_info = util_common.SchemeCountInfo()
 
         si.count_info.divs_size = divs_size
         si.count_info.divs_to_game_to_tag_to_tile_count = {}
@@ -110,7 +110,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
     if game_to_patterns_delta is None:
         si.pattern_info = None
     else:
-        si.pattern_info = util.SchemePatternInfo()
+        si.pattern_info = util_common.SchemePatternInfo()
 
         si.pattern_info.game_to_patterns = {}
 
@@ -123,20 +123,20 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
 
         for game, patterns_delta in game_to_patterns_delta.items():
             if patterns_delta == PATTERN_DYN_NO_OUT_2GRAM_COLS:
-                util.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
+                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
 
                 gram_rows = [len(tli.tiles) for tli in ti.levels]
-                util.check(len(set(gram_rows)) == 1, 'all levels must be same height')
+                util_common.check(len(set(gram_rows)) == 1, 'all levels must be same height')
                 gram_rows = gram_rows[0]
 
                 si.pattern_info.stride_rows = 0
                 patterns_delta = [([(rr, cc) for rr in range(gram_rows) for cc in range(2)], None)]
                 game_to_patterns_delta[game] = patterns_delta
             elif patterns_delta == PATTERN_DYN_3GRAM_COLS:
-                util.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
+                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
 
                 gram_rows = [len(tli.tiles) for tli in ti.levels]
-                util.check(len(set(gram_rows)) == 1, 'all levels must be same height')
+                util_common.check(len(set(gram_rows)) == 1, 'all levels must be same height')
                 gram_rows = gram_rows[0]
 
                 si.pattern_info.stride_rows = 0
@@ -144,10 +144,10 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                                    [(rr, 2) for rr in range(gram_rows)])]
                 game_to_patterns_delta[game] = patterns_delta
             elif patterns_delta == PATTERN_DYN_2GRAM_ROWS:
-                util.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
+                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
 
                 gram_cols = [len(tli.tiles[0]) for tli in ti.levels]
-                util.check(len(set(gram_cols)) == 1, 'all levels must be same width')
+                util_common.check(len(set(gram_cols)) == 1, 'all levels must be same width')
                 gram_cols = gram_cols[0]
 
                 si.pattern_info.stride_cols = 0
@@ -155,7 +155,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                                    [(1, cc) for cc in range(gram_cols)])]
                 game_to_patterns_delta[game] = patterns_delta
             elif patterns_delta == PATTERN_DYN_ZGRAM_COLS:
-                util.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
+                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
 
                 si.pattern_info.stride_rows = 11
                 patterns_delta = [([(rr, 0) for rr in range(11)],
@@ -164,7 +164,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                                    [(11, 0)])]
                 game_to_patterns_delta[game] = patterns_delta
             elif patterns_delta == PATTERN_DYN_ROOMS:
-                util.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
+                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
 
                 si.pattern_info.stride_rows = 11
                 si.pattern_info.stride_cols = 3
@@ -203,9 +203,9 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
 
         if level_rotate:
             for ii in range(3):
-                tile_level = util.rotate_grid_cw(tile_level)
-                tag_level = util.rotate_grid_cw(tag_level)
-                game_level = util.rotate_grid_cw(game_level)
+                tile_level = util_common.rotate_grid_cw(tile_level)
+                tag_level = util_common.rotate_grid_cw(tag_level)
+                game_level = util_common.rotate_grid_cw(game_level)
 
                 tile_levels.append(tile_level)
                 tag_levels.append(tag_level)
@@ -215,7 +215,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
         rows = len(tile_level)
         cols = len(tile_level[0])
 
-        util.print_tile_level(tile_level)
+        util_common.print_tile_level(tile_level)
         print()
 
         for rr in range(rows):
@@ -224,9 +224,9 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                 tag = tag_level[rr][cc]
                 game = game_level[rr][cc]
 
-                util.check(game != util.VOID_TEXT, 'void game')
-                util.check((tile == util.VOID_TILE) == (tag == util.VOID_TEXT), 'void')
-                if tile == util.VOID_TILE:
+                util_common.check(game != util_common.VOID_TEXT, 'void game')
+                util_common.check((tile == util_common.VOID_TILE) == (tag == util_common.VOID_TEXT), 'void')
+                if tile == util_common.VOID_TILE:
                     continue
 
                 if game not in si.game_to_tag_to_tiles:
@@ -236,7 +236,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                 si.game_to_tag_to_tiles[game][tag][tile] = None
 
         if si.count_info is not None:
-            util.check(si.count_info.divs_size[0] <= rows and si.count_info.divs_size[1] <= cols, 'level to small for divs')
+            util_common.check(si.count_info.divs_size[0] <= rows and si.count_info.divs_size[1] <= cols, 'level to small for divs')
 
             for rr_divs in range(si.count_info.divs_size[0]):
                 for cc_divs in range(si.count_info.divs_size[1]):
@@ -259,9 +259,9 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                             tag = tag_level[rr][cc]
                             game = game_level[rr][cc]
 
-                            util.check(game != util.VOID_TEXT, 'void game')
-                            util.check((tile == util.VOID_TILE) == (tag == util.VOID_TEXT), 'void')
-                            if tile == util.VOID_TILE:
+                            util_common.check(game != util_common.VOID_TEXT, 'void game')
+                            util_common.check((tile == util_common.VOID_TILE) == (tag == util_common.VOID_TEXT), 'void')
+                            if tile == util_common.VOID_TILE:
                                 continue
 
                             inc(si.count_info.divs_to_game_to_tag_to_tile_count[(rr_divs, cc_divs)][game], tag, tile, 1)
@@ -289,7 +289,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                             _nc = cc + _dc
 
                             if _nr <= -1 or _nr >= rows or _nc <= -1 or _nc >= cols:
-                                _nbr_tile = util.VOID_TILE
+                                _nbr_tile = util_common.VOID_TILE
                             else:
                                 _nbr_tile = tile_level[_nr][_nc]
 
@@ -343,7 +343,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Create scheme from tile info and (optionally) tag level.')
     parser.add_argument('--outfile', required=True, type=str, help='Output scheme file.')
@@ -357,11 +357,11 @@ if __name__ == '__main__':
     if args.quiet:
         sys.stdout = open(os.devnull, 'w')
 
-    with util.openz(args.tilefile, 'rb') as f:
+    with util_common.openz(args.tilefile, 'rb') as f:
         tile_info = pickle.load(f)
 
     if args.pattern is not None:
-        game_to_patterns_name = util.arg_list_to_dict_options(parser, '--pattern', args.pattern, PATTERN_DICT.keys())
+        game_to_patterns_name = util_common.arg_list_to_dict_options(parser, '--pattern', args.pattern, PATTERN_DICT.keys())
         game_to_patterns_delta = {}
         for game, patterns_name in game_to_patterns_name.items():
             game_to_patterns_delta[game] = PATTERN_DICT[patterns_name]
@@ -369,5 +369,5 @@ if __name__ == '__main__':
         game_to_patterns_delta = None
 
     scheme_info = tiles2scheme(tile_info, args.countdivs, game_to_patterns_delta, args.level_rotate)
-    with util.openz(args.outfile, 'wb') as f:
+    with util_common.openz(args.outfile, 'wb') as f:
         pickle.dump(scheme_info, f)

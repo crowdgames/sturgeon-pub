@@ -1,5 +1,5 @@
 import argparse, glob, gzip, math, os, pickle, random, sys, threading, time
-import util, util_explore, util_path
+import util_common, util_explore, util_path
 import numpy as np
 import PIL.Image, PIL.ImageDraw, PIL.ImageTk
 import tkinter, tkinter.messagebox
@@ -38,14 +38,14 @@ class RemainingInfo:
         self.levels = []
         self.nlevels = 0
 
-        self.texts = util.make_grid(rows, cols, [])
-        self.texts_sqrt = util.make_grid(rows, cols, 0)
+        self.texts = util_common.make_grid(rows, cols, [])
+        self.texts_sqrt = util_common.make_grid(rows, cols, 0)
 
-        self.images = util.make_grid(rows, cols, [])
-        self.images_sqrt = util.make_grid(rows, cols, 0)
+        self.images = util_common.make_grid(rows, cols, [])
+        self.images_sqrt = util_common.make_grid(rows, cols, 0)
 
         self.einds = []
-        self.einds_cell = util.make_grid(rows, cols, [])
+        self.einds_cell = util_common.make_grid(rows, cols, [])
 
         self.pinds = [0] * npind
 
@@ -185,7 +185,7 @@ class ExplorerFrame(tkinter.Frame):
         self._mouse_evt = None
         self._mouse = None
 
-        self._selected_tiles = np.array(util.make_grid(self._ex.rows, self._ex.cols, [0] * self._ex.ntind), dtype=np.uint8)
+        self._selected_tiles = np.array(util_common.make_grid(self._ex.rows, self._ex.cols, [0] * self._ex.ntind), dtype=np.uint8)
         self._selected_tiles_auto = self._selected_tiles.copy()
         self._selected_einds = np.zeros(self._ex.neind, dtype=np.uint8)
         self._selected_pinds = np.zeros(self._ex.npind, dtype=np.uint8)
@@ -720,38 +720,38 @@ class ExplorerFrame(tkinter.Frame):
                 filename = 'explorer-out'
                 filenames = []
 
-                tile_level = util.make_grid(self._ex.rows, self._ex.cols, util.VOID_TILE)
+                tile_level = util_common.make_grid(self._ex.rows, self._ex.cols, util_common.VOID_TILE)
                 for rr in range(self._ex.rows):
                     for cc in range(self._ex.cols):
                         tinds = tuple(np.nonzero(remaining_tiles[rr][cc])[0])
                         if tinds != (self._ex.void_tind,):
                             tile_level[rr][cc] = self._ex.tinds_to_tile[tinds]
-                tile_level = util.trim_void_tile_level(tile_level)
+                tile_level = util_common.trim_void_tile_level(tile_level)
 
                 meta = []
                 if self._ex.neind > 0:
                     edges = [self._ex.eind_to_edge[eind] for eind in self._rem.einds]
                     path_edges = util_path.order_edge_path(edges)
-                    meta.append(util.meta_path(util.MGROUP_PATH, path_edges))
+                    meta.append(util_common.meta_path(util_common.MGROUP_PATH, path_edges))
                 if self._ex.npind > 0:
                     props = [self._ex.pind_to_prop[pind] for pind in np.nonzero(self._rem.pinds)[0]]
-                    meta.append(util.meta_properties(props))
+                    meta.append(util_common.meta_properties(props))
 
                 tile_filename = filename + '.tlvl'
                 filenames.append(tile_filename)
-                with util.openz(tile_filename, 'wt') as f:
-                    util.print_tile_level_json(tile_level, meta=meta, outfile=f)
+                with util_common.openz(tile_filename, 'wt') as f:
+                    util_common.print_tile_level_json(tile_level, meta=meta, outfile=f)
 
                 if len(self._ex.tind_to_text) > 0:
-                    text_level = util.tile_level_to_text_level(tile_level, self._ex.tileset)
+                    text_level = util_common.tile_level_to_text_level(tile_level, self._ex.tileset)
 
                     text_filename = filename + '.lvl'
                     filenames.append(text_filename)
-                    with util.openz(text_filename, 'wt') as f:
-                        util.print_text_level(text_level, meta=meta, outfile=f)
+                    with util_common.openz(text_filename, 'wt') as f:
+                        util_common.print_text_level(text_level, meta=meta, outfile=f)
 
                 if len(self._ex.tind_to_image) > 0:
-                    image_level = util.tile_level_to_image_level(tile_level, self._ex.tileset)
+                    image_level = util_common.tile_level_to_image_level(tile_level, self._ex.tileset)
 
                     image_filename = filename + '.png'
                     filenames.append(image_filename)
@@ -929,11 +929,11 @@ if __name__ == '__main__':
     print('loading...')
     start_time = time.time()
 
-    with util.openz(args.explorefile, 'rb') as f:
+    with util_common.openz(args.explorefile, 'rb') as f:
         explore_info = pickle.load(f)
 
     msg = 'loaded %d levels' % len(explore_info.level_data)
-    if not util.mute_time():
+    if not util_common.mute_time():
         msg += (' in %0.3f' % (time.time() - start_time))
     print(msg)
 

@@ -1,11 +1,11 @@
 import argparse, itertools, json, random, sys, time
-import util, util_graph
+import util_common, util_graph
 import networkx as nx
 
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Convert a dot file to a graph file.')
     parser.add_argument('--outfile', type=str, help='Output file.')
@@ -22,5 +22,5 @@ if __name__ == '__main__':
     if args.outfile is None:
         util_graph.write_graph_dot(grs, args.no_dot_etc, sys.stdout)
     else:
-        with util.openz(args.outfile, 'wt') as outfile:
+        with util_common.openz(args.outfile, 'wt') as outfile:
             util_graph.write_graph_dot(grs, args.no_dot_etc, outfile)

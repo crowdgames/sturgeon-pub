@@ -1,11 +1,11 @@
 import os, sys
-import util, solvers
+import util_common, util_solvers
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         solvers_to_test = sys.argv[1:]
     else:
-        solvers_to_test = list(sorted(set(solvers.SOLVER_LIST) - set(solvers.SOLVER_NOTEST_LIST)))
+        solvers_to_test = list(sorted(set(util_solvers.SOLVER_LIST) - set(util_solvers.SOLVER_NOTEST_LIST)))
 
     os.environ['STG_MUTE_TIME'] = '1'
     os.environ['STG_MUTE_PORT'] = '1'
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             for use_weight in [None, 1]:
                 print(solver_id, use_portfolio, use_weight)
 
-                solver = solvers.solver_id_to_solver(solver_id)
+                solver = util_solvers.solver_id_to_solver(solver_id)
                 if use_weight is not None and not solver.supports_weights():
                     print('skip')
                     continue
@@ -74,14 +74,14 @@ if __name__ == '__main__':
                 for nvars, setup, expect in tests:
                     print('.', end='')
                     if use_portfolio:
-                        solver = solvers.PortfolioSolver([solver_id], None)
+                        solver = util_solvers.PortfolioSolver([solver_id], None)
                     else:
-                        solver = solvers.solver_id_to_solver(solver_id)
+                        solver = util_solvers.solver_id_to_solver(solver_id)
                     vvs = [solver.make_var() for ii in range(nvars)]
                     setup(solver, use_weight, *vvs)
                     solver.solve()
                     res = [solver.get_var(vv) for vv in vvs]
-                    util.check(res == expect, 'var')
+                    util_common.check(res == expect, 'var')
                     obj = solver.get_objective()
-                    util.check(obj == 0, 'objective')
+                    util_common.check(obj == 0, 'objective')
                 print()

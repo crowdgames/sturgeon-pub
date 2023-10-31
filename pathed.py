@@ -1,5 +1,5 @@
 import argparse, hashlib, io, math, multiprocessing, os, pickle, random, sys, time
-import custom, reach, scheme2output, solvers, util, util_path
+import scheme2output, util_common, util_custom, util_path, util_reach, util_solvers
 import PIL.Image, PIL.ImageTk
 import tkinter
 
@@ -58,7 +58,7 @@ class PathCanvas(tkinter.Canvas):
         self._reverse = False
 
         self._move_template = move_template
-        self._template_open_closed = util_path.get_template_open_closed(reach.get_move_template(self._move_template))
+        self._template_open_closed = util_path.get_template_open_closed(util_reach.get_move_template(self._move_template))
 
         self._schemefile = schemefile
         self._outfolder = outfolder
@@ -115,44 +115,44 @@ class PathCanvas(tkinter.Canvas):
 
     @staticmethod
     def gen_proc_body(q, rows, cols, seed, start_goal, path_points, move_template, schemefile, want_image, outfile):
-        util.timer_start(False)
+        util_common.timer_start(False)
 
         if outfile is not None:
-            outfile_file = util.openz(outfile + '.log', 'wt')
+            outfile_file = util_common.openz(outfile + '.log', 'wt')
             sys.stdout = outfile_file
 
-        with util.openz(schemefile, 'rb') as f:
+        with util_common.openz(schemefile, 'rb') as f:
             scheme_info = pickle.load(f)
 
-        tag_game_level = util.make_grid(rows, cols, util.DEFAULT_TEXT)
-        solver = solvers.PySatSolverRC2()
+        tag_game_level = util_common.make_grid(rows, cols, util_common.DEFAULT_TEXT)
+        solver = util_solvers.PySatSolverRC2()
 
-        reach_setup = util.ReachabilitySetup()
+        reach_setup = util_common.ReachabilitySetup()
         reach_setup.wrap_cols = False
-        reach_setup.open_text = util.OPEN_TEXT
-        reach_setup.game_to_move = { util.DEFAULT_TEXT: move_template }
-        reach_setup.goal_loc = reach.RGOAL_ALL
+        reach_setup.open_text = util_common.OPEN_TEXT
+        reach_setup.game_to_move = { util_common.DEFAULT_TEXT: move_template }
+        reach_setup.goal_loc = util_reach.RGOAL_ALL
         reach_setup.goal_params = []
 
         custom_cnstrs = []
         if start_goal is not None:
-            custom_cnstrs.append(custom.OutPathEndsConstraint(start_goal[0], start_goal[1], start_goal[2], start_goal[3], WEIGHT_PATH))
+            custom_cnstrs.append(util_custom.OutPathEndsConstraint(start_goal[0], start_goal[1], start_goal[2], start_goal[3], WEIGHT_PATH))
         if path_points is not None:
-            custom_cnstrs.append(custom.OutPathConstraint(path_points, WEIGHT_PATH))
+            custom_cnstrs.append(util_custom.OutPathConstraint(path_points, WEIGHT_PATH))
 
         result_info = scheme2output.scheme2output(scheme_info, tag_game_level, tag_game_level, solver, seed, WEIGHT_PATTERN, WEIGHT_COUNTS, scheme2output.COUNTS_SCALE_HALF, reach_setup, None, custom_cnstrs, False)
 
         if outfile is not None and result_info is not None:
             print('saving to', outfile)
-            util.save_result_info(result_info, outfile)
+            util_common.save_result_info(result_info, outfile)
 
         encode_result_info(result_info, want_image)
         q.put(result_info)
 
         if result_info:
-            util.exit_solution_found()
+            util_common.exit_solution_found()
         else:
-            util.exit_solution_not_found()
+            util_common.exit_solution_not_found()
 
     def on_timer(self):
         if self._gen_proc is not None:
@@ -386,7 +386,7 @@ class PathCanvas(tkinter.Canvas):
 
     def on_key_w(self, event):
         if self._gen_path is not None and len(self._gen_path) >= 2:
-            are_open, are_closed = util_path.get_level_open_closed(self._gen_text, util.OPEN_TEXT)
+            are_open, are_closed = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT)
             self._path = util_path.shortest_path_between(self._gen_path[0], self._gen_path[-1], self._rows, self._cols, self._template_open_closed, are_open, are_closed)
             self.new_manual_path(False)
 
@@ -427,7 +427,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Path editor.')
 
     parser.add_argument('--size', required=True, type=int, nargs=2, help='Level size.')
-    parser.add_argument('--reach-move', required=True, type=str, help='Use reachability move rules, from: ' + ','.join(reach.RMOVE_LIST) + '.')
+    parser.add_argument('--reach-move', required=True, type=str, help='Use reachability move rules, from: ' + ','.join(util_reach.RMOVE_LIST) + '.')
     parser.add_argument('--schemefile', type=str, help='Input scheme file.')
     parser.add_argument('--outfolder', type=str, help='Output folder.')
 

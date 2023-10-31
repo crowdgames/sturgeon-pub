@@ -1,5 +1,5 @@
 import argparse, itertools, json, pickle, random, sys, time
-import util, util_graph
+import util_common, util_graph
 import networkx as nx
 
 
@@ -48,14 +48,14 @@ def gdesc2summary(grd):
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Summarize graph description.')
     parser.add_argument('--outfile', type=str, help='Output file.')
     parser.add_argument('--gdescfile', required=True, type=str, help='Input graph description file.')
     args = parser.parse_args()
 
-    with util.openz(args.gdescfile, 'rb') as f:
+    with util_common.openz(args.gdescfile, 'rb') as f:
         grd = pickle.load(f)
 
     ogrs = gdesc2summary(grd)

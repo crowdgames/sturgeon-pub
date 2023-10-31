@@ -1,5 +1,5 @@
 import sys
-import util
+import util_common
 import networkx as nx
 
 
@@ -60,7 +60,7 @@ def gtype_directed(gtype):
     elif gtype in [GTYPE_UTREE, GTYPE_UGRAPH]:
         return False
     else:
-        util.check(False, 'Unknown gtype ' + str(gtype))
+        util_common.check(False, 'Unknown gtype ' + str(gtype))
 
 def gtype_tree(gtype):
     if gtype in [GTYPE_UTREE, GTYPE_DTREE]:
@@ -68,21 +68,21 @@ def gtype_tree(gtype):
     elif gtype in [GTYPE_DAG, GTYPE_UGRAPH]:
         return False
     else:
-        util.check(False, 'Unknown gtype ' + str(gtype))
+        util_common.check(False, 'Unknown gtype ' + str(gtype))
 
 def check_graph(gr, gtype):
-    util.check(len(gr.nodes) > 0, 'no nodes')
+    util_common.check(len(gr.nodes) > 0, 'no nodes')
 
     if gtype_directed(gtype):
-        util.check(nx.is_weakly_connected(gr), 'not connected')
+        util_common.check(nx.is_weakly_connected(gr), 'not connected')
     else:
-        util.check(nx.is_connected(gr), 'not connected')
+        util_common.check(nx.is_connected(gr), 'not connected')
 
     if gtype_tree(gtype):
-        util.check(nx.is_tree(gr), 'not a tree')
+        util_common.check(nx.is_tree(gr), 'not a tree')
 
     if gtype_directed(gtype):
-        util.check(nx.is_directed_acyclic_graph(gr), 'not dag')
+        util_common.check(nx.is_directed_acyclic_graph(gr), 'not dag')
 
 def graph_node_cattrs(gr):
     node_cattrs = {}
@@ -147,7 +147,7 @@ def read_graphs(filenames):
 
     for filename in filenames:
         gr = None
-        with util.openz(filename, 'rt') as infile:
+        with util_common.openz(filename, 'rt') as infile:
             for line in infile:
                 if '#' in line:
                     line = line[:line.find('#')]
@@ -161,96 +161,96 @@ def read_graphs(filenames):
                 splt = splt[1:]
 
                 if key == 't':
-                    util.check(len(splt) == 3, 'splt len')
-                    util.check(splt[0] in GTYPE_LIST, 'gtype')
+                    util_common.check(len(splt) == 3, 'splt len')
+                    util_common.check(splt[0] in GTYPE_LIST, 'gtype')
                     if grs.gtype is None:
                         grs.gtype = splt[0]
                     else:
-                        util.check(grs.gtype == splt[0], 'gtype mismatch')
+                        util_common.check(grs.gtype == splt[0], 'gtype mismatch')
 
                     t_node_cattrs = splt[1] if splt[1] != CATTR_NONE else ''
                     if node_cattrs is None:
                         node_cattrs = t_node_cattrs
                     else:
-                        util.check(node_cattrs == t_node_cattrs, 'node mismatch')
+                        util_common.check(node_cattrs == t_node_cattrs, 'node mismatch')
 
                     t_edge_cattrs = splt[2] if splt[2] != CATTR_NONE else ''
                     if edge_cattrs is None:
                         edge_cattrs = t_edge_cattrs
                     else:
-                        util.check(edge_cattrs == t_edge_cattrs, 'node mismatch')
+                        util_common.check(edge_cattrs == t_edge_cattrs, 'node mismatch')
 
-                    util.check(gr is None, 'mutliple t')
+                    util_common.check(gr is None, 'mutliple t')
                     if gtype_directed(grs.gtype):
                         gr = nx.DiGraph()
                     else:
                         gr = nx.Graph()
 
                 elif key == 'n':
-                    util.check(len(splt) >= 1, 'splt len')
+                    util_common.check(len(splt) >= 1, 'splt len')
                     node = splt[0]
                     splt = splt[1:]
-                    util.check(not gr.has_node(node), f'no duplicate nodes {filename} {node}')
+                    util_common.check(not gr.has_node(node), f'no duplicate nodes {filename} {node}')
                     gr.add_node(node)
                     gr.nodes[node][GATTR_LABEL] = ''
                     for cattr in node_cattrs:
                         if cattr == CATTR_LABEL:
-                            util.check(len(splt) >= 1, 'splt len')
+                            util_common.check(len(splt) >= 1, 'splt len')
                             gr.nodes[node][GATTR_LABEL] = splt[0]
                             splt = splt[1:]
                         elif cattr == CATTR_POSITION2:
-                            util.check(len(splt) >= 2, 'splt len')
+                            util_common.check(len(splt) >= 2, 'splt len')
                             pos = (float(splt[0]), float(splt[1]))
                             gr.nodes[node][GATTR_POSITION] = pos
                             splt = splt[2:]
                         elif cattr == CATTR_POSITION3:
-                            util.check(len(splt) >= 3, 'splt len')
+                            util_common.check(len(splt) >= 3, 'splt len')
                             pos = (float(splt[0]), float(splt[1]), float(splt[2]))
                             gr.nodes[node][GATTR_POSITION] = pos
                             splt = splt[3:]
                         elif cattr == CATTR_CENTRAL:
-                            util.check(len(splt) >= 1, 'splt len')
+                            util_common.check(len(splt) >= 1, 'splt len')
                             gr.nodes[node][GATTR_CENTRAL] = (splt[0] == 'T')
                             splt = splt[1:]
                         else:
-                            util.check(False, 'unrecognized')
-                    util.check(len(splt) == 0, 'unused')
+                            util_common.check(False, 'unrecognized')
+                    util_common.check(len(splt) == 0, 'unused')
 
                 elif key == 'e':
-                    util.check(len(splt) >= 2, 'splt len')
+                    util_common.check(len(splt) >= 2, 'splt len')
                     fra, til = splt[0], splt[1]
                     splt = splt[2:]
-                    util.check(fra != til, 'no self edges')
-                    util.check(not gr.has_edge(fra, til), f'no duplicate edges {filename} {fra} {til}')
+                    util_common.check(fra != til, 'no self edges')
+                    util_common.check(not gr.has_edge(fra, til), f'no duplicate edges {filename} {fra} {til}')
                     gr.add_edge(fra, til)
                     gr.edges[(fra, til)][GATTR_LABEL] = ''
                     for cattr in edge_cattrs:
                         if cattr == CATTR_LABEL:
-                            util.check(len(splt) >= 1, 'splt len')
+                            util_common.check(len(splt) >= 1, 'splt len')
                             gr.edges[(fra, til)][GATTR_LABEL] = splt[0]
                             splt = splt[1:]
                         elif cattr == CATTR_DELTA2:
-                            util.check(len(splt) >= 2, 'splt len')
+                            util_common.check(len(splt) >= 2, 'splt len')
                             gr.edges[(fra, til)][GATTR_DELTA] = (float(splt[0]), float(splt[1]))
                             splt = splt[2:]
                         elif cattr == CATTR_DELTA3:
-                            util.check(len(splt) >= 3, 'splt len')
+                            util_common.check(len(splt) >= 3, 'splt len')
                             gr.edges[(fra, til)][GATTR_DELTA] = (float(splt[0]), float(splt[1]), float(splt[2]))
                             splt = splt[3:]
                         elif cattr == CATTR_POLAR:
-                            util.check(len(splt) >= 3, 'splt len')
+                            util_common.check(len(splt) >= 3, 'splt len')
                             gr.edges[(fra, til)][GATTR_POLAR] = (float(splt[0]), float(splt[1]), splt[2] == 'T')
                             splt = splt[3:]
                         elif cattr == CATTR_CYCLE:
-                            util.check(len(splt) >= 1, 'splt len')
+                            util_common.check(len(splt) >= 1, 'splt len')
                             gr.edges[(fra, til)][GATTR_CYCLE] = splt[0]
                             splt = splt[1:]
                         else:
-                            util.check(False, 'unrecognized')
-                    util.check(len(splt) == 0, 'unused')
+                            util_common.check(False, 'unrecognized')
+                    util_common.check(len(splt) == 0, 'unused')
 
                 elif key == 'c':
-                    util.check(len(splt) == 2, 'splt len')
+                    util_common.check(len(splt) == 2, 'splt len')
                     label = splt[0]
                     color = splt[1]
                     if label not in grs.colors:
@@ -260,19 +260,19 @@ def read_graphs(filenames):
                         colors_warned[label] = None
 
                 else:
-                    util.check(False, 'line: ' + line)
+                    util_common.check(False, 'line: ' + line)
 
         if gr is not None:
             check_graph(gr, grs.gtype)
 
             grs.graphs.append(gr)
 
-    util.check(len(grs.graphs) != 0, 'no graphs loaded')
+    util_common.check(len(grs.graphs) != 0, 'no graphs loaded')
 
     return grs
 
 def write_graph(grs, out):
-    util.check(len(grs.graphs) == 1, 'can only write single graph')
+    util_common.check(len(grs.graphs) == 1, 'can only write single graph')
     gr = grs.graphs[0]
 
     node_cattrs = graph_node_cattrs(gr)
@@ -389,16 +389,16 @@ def write_graph_to_file(grs, filename):
     if filename is None:
         write_graph(grs, sys.stdout)
     else:
-        with util.openz(filename, 'wt') as outfile:
-            if util.fileistype(filename, '.dot'):
+        with util_common.openz(filename, 'wt') as outfile:
+            if util_common.fileistype(filename, '.dot'):
                 write_graph_dot(grs, False, outfile)
             else:
                 write_graph(grs, outfile)
 
 def get_root_node(gr):
-    util.check(gr.is_directed(), 'graph not directed')
+    util_common.check(gr.is_directed(), 'graph not directed')
     roots = [nn for nn, dd in gr.in_degree() if dd == 0]
-    util.check(len(roots) == 1, 'graph does not have 1 root')
+    util_common.check(len(roots) == 1, 'graph does not have 1 root')
     return roots[0]
 
 def layout_grid(gr):
@@ -424,13 +424,13 @@ def layout_grid(gr):
             elif gr.edges[out_edge][GATTR_LABEL] == LABEL_GRID_SOUTH:
                 out_pos = (pos[0], pos[1] - 1)
             else:
-                util.check(False, 'grid edge label')
+                util_common.check(False, 'grid edge label')
 
             if GATTR_POSITION in gr.nodes[out_node]:
-                util.check(gr.nodes[out_node][GATTR_POSITION] == out_pos, 'different positions found')
+                util_common.check(gr.nodes[out_node][GATTR_POSITION] == out_pos, 'different positions found')
 
             else:
-                util.check(out_pos not in used_pos, 'duplicate pos')
+                util_common.check(out_pos not in used_pos, 'duplicate pos')
                 gr.nodes[out_node][GATTR_POSITION] = out_pos
                 used_pos[out_pos] = out_node
 

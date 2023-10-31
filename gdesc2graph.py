@@ -1,5 +1,5 @@
 import argparse, itertools, json, math, pickle, random, sys, time
-import solvers, util, util_graph
+import util_common, util_graph, util_solvers
 import networkx as nx
 
 
@@ -17,25 +17,25 @@ EDGEOPT_LIST   = [EDGEOPT_TRI, EDGEOPT_BAND, EDGEOPT_STRIPE, EDGEOPT_GRID, EDGEO
 
 def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, label_max, label_count, forbid_cycle, require_cycle, connect, randomize):
     # set up solver vars
-    util.timer_section('set up')
+    util_common.timer_section('set up')
 
     if label_min:
         for ll in label_min:
-            util.check(ll == util.DEFAULT_TEXT or ll in grd.node_labels, 'no label_min')
+            util_common.check(ll == util_common.DEFAULT_TEXT or ll in grd.node_labels, 'no label_min')
     if label_max:
         for ll in label_max:
-            util.check(ll == util.DEFAULT_TEXT or ll in grd.node_labels, 'no label_max')
+            util_common.check(ll == util_common.DEFAULT_TEXT or ll in grd.node_labels, 'no label_max')
 
     if edgeopt == EDGEOPT_TRI:
-        util.check(len(edgeopt_params) == 0, 'edgeopt_params')
+        util_common.check(len(edgeopt_params) == 0, 'edgeopt_params')
     elif edgeopt == EDGEOPT_BAND:
-        util.check(len(edgeopt_params) == 1, 'edgeopt_params')
+        util_common.check(len(edgeopt_params) == 1, 'edgeopt_params')
     elif edgeopt == EDGEOPT_STRIPE:
-        util.check(len(edgeopt_params) >= 1, 'edgeopt_params')
+        util_common.check(len(edgeopt_params) >= 1, 'edgeopt_params')
     elif edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT]:
-        util.check(len(edgeopt_params) == 1, 'edgeopt_params')
+        util_common.check(len(edgeopt_params) == 1, 'edgeopt_params')
     else:
-        util.check(False, 'edgeopt')
+        util_common.check(False, 'edgeopt')
 
     use_edge_deltas = None
     use_edge_polars = None
@@ -45,23 +45,23 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             print('WARNING: graph is not directed but edges have deltas/polars, ignoring')
         else:
             for label, delta, polar, cycle in grd.edge_labels_etc:
-                util.check((delta0 is None) == (delta is None), 'edge delta')
-                util.check((polar0 is None) == (polar is None), 'edge polar')
+                util_common.check((delta0 is None) == (delta is None), 'edge delta')
+                util_common.check((polar0 is None) == (polar is None), 'edge polar')
 
-            util.check(not ((delta0 is not None) and (polar0 is not None)), 'edge delta and polar')
+            util_common.check(not ((delta0 is not None) and (polar0 is not None)), 'edge delta and polar')
 
             if delta0 is not None:
                 use_edge_deltas = len(delta0)
-                util.check(use_edge_deltas in [2, 3], 'edge delta dimensions')
+                util_common.check(use_edge_deltas in [2, 3], 'edge delta dimensions')
                 for label, delta, polar, cycle in grd.edge_labels_etc:
-                    util.check(len(delta) == use_edge_deltas, 'edge delta')
+                    util_common.check(len(delta) == use_edge_deltas, 'edge delta')
 
             elif polar0 is not None:
                 use_edge_polars = True
 
     if use_edge_deltas is not None or use_edge_polars is not None:
-        util.check(use_edge_deltas is None or use_edge_polars is None, 'cannot have both edge deltas and polars')
-        util.check(s.supports_xforms(), 'has edge deltas but solver does not support transformations')
+        util_common.check(use_edge_deltas is None or use_edge_polars is None, 'cannot have both edge deltas and polars')
+        util_common.check(s.supports_xforms(), 'has edge deltas but solver does not support transformations')
 
     # node labels
     labels_plus_none = list(grd.node_labels) + [None]
@@ -104,7 +104,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                 _label, _delta, _polar, _cycle = _label_etc
                 if _label == _with_label:
                     _ret.append(_edges[_label_etc])
-        util.check(len(_ret) == 1, 'edge labels')
+        util_common.check(len(_ret) == 1, 'edge labels')
         return _ret[0]
 
     edge_labels_etc_plus_none = list(grd.edge_labels_etc) + [None]
@@ -130,7 +130,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             if (ii + grid_stride) < max_size:
                 jjs.append(ii + grid_stride)
         else:
-            util.check(False, 'edgeopt')
+            util_common.check(False, 'edgeopt')
 
         for jj in jjs:
             vars_edge_by_id_by_label_etc[(ii, jj)] = {}
@@ -157,10 +157,10 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                     continue
 
                 label, delta, polar, cycle = label_etc
-                util.check(cycle is not None, 'cycle check but no cycle attr')
+                util_common.check(cycle is not None, 'cycle check but no cycle attr')
                 if cycle != '_':
                     vars_edges_have_cycle.append(edge_var)
-        util.check(len(vars_edges_have_cycle) > 0, 'cycle check but no cycle edges')
+        util_common.check(len(vars_edges_have_cycle) > 0, 'cycle check but no cycle edges')
         if forbid_cycle:
             s.cnstr_count(vars_edges_have_cycle, True, 0, 0, None)
         if require_cycle:
@@ -178,10 +178,10 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
 
                 label, delta, polar, cycle = label_etc
                 if use_edge_deltas is not None:
-                    util.check(delta is not None and len(delta) == use_edge_deltas, 'edge delta')
+                    util_common.check(delta is not None and len(delta) == use_edge_deltas, 'edge delta')
                     s.cnstr_implies_xform(edge_var, node_vars_ii, node_vars_jj, delta, True)
                 elif use_edge_polars is not None:
-                    util.check(polar is not None, 'edge polar')
+                    util_common.check(polar is not None, 'edge polar')
                     delta_mag, delta_ang, delta_primary = polar
                     dxform_r = [math.cos(delta_ang), -math.sin(delta_ang), 0, math.sin(delta_ang), math.cos(delta_ang), 0]
                     dxform_t = [1, 0, delta_mag, 0, 1, 0]
@@ -241,7 +241,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             s.cnstr_count([vars_node_connect[connect_layers - 1][ii], vars_node_by_id[ii][None]], True, 1, 1, None)
 
     else:
-        util.check(False, 'connect')
+        util_common.check(False, 'connect')
 
     # tree
     if util_graph.gtype_tree(grd.gtype):
@@ -256,14 +256,14 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         if label_min:
             if ll in label_min:
                 ll_min = max(ll_min, label_min[ll])
-            elif util.DEFAULT_TEXT in label_min:
-                ll_min = max(ll_min, label_min[util.DEFAULT_TEXT])
+            elif util_common.DEFAULT_TEXT in label_min:
+                ll_min = max(ll_min, label_min[util_common.DEFAULT_TEXT])
 
         if label_max:
             if ll in label_max:
                 ll_max = min(ll_max, label_max[ll])
-            elif util.DEFAULT_TEXT in label_max:
-                ll_max = min(ll_max, label_max[util.DEFAULT_TEXT])
+            elif util_common.DEFAULT_TEXT in label_max:
+                ll_max = min(ll_max, label_max[util_common.DEFAULT_TEXT])
 
         if label_count:
             ll_min = max(ll_min, int(min_size * 0.5 * grd.node_label_count[ll]))
@@ -310,7 +310,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             s.cnstr_implies_disj(s.make_conj([eav, ebv, ecv], [True, True, True]), True, [edv], True, None)
 
     # add neighbor constraints
-    util.timer_section('add neighbor constraints')
+    util_common.timer_section('add neighbor constraints')
 
     for ii in node_id_order:
         nbr_edges = {}
@@ -332,7 +332,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             for central_subnode, subnodes, subedges in grd.node_label_subgraphs[label]:
                 node_inds_set = itertools.permutations(possible_nbr_nodes, len(subnodes) - 1)
                 other_subnodes = [subnode for subnode in subnodes if subnode != central_subnode]
-                util.check(len(other_subnodes) == len(subnodes) - 1, 'sizes')
+                util_common.check(len(other_subnodes) == len(subnodes) - 1, 'sizes')
 
                 for node_inds in node_inds_set:
                     subnode_id_mapping = {}
@@ -359,8 +359,8 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                             else:
                                 ei, ej = fra, til
                         else:
-                            util.check(use_edge_deltas is None, 'undirected edge delta') # TODO edge flip vars ?
-                            util.check(use_edge_polars is None, 'undirected edge polar')
+                            util_common.check(use_edge_deltas is None, 'undirected edge delta') # TODO edge flip vars ?
+                            util_common.check(use_edge_polars is None, 'undirected edge polar')
                             ei, ej = min(fra, til), max(fra, til)
 
                         if (ei, ej) not in vars_edge_by_id_by_label_etc:
@@ -390,11 +390,11 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             else:
                 s.cnstr_implies_disj(vars_node_by_id[ii][label], True, patts, True, None)
 
-    util.timer_section('solve')
+    util_common.timer_section('solve')
 
     result = None
     if s.solve():
-        util.timer_section('create graph')
+        util_common.timer_section('create graph')
 
         if util_graph.gtype_directed(grd.gtype):
             gr = nx.DiGraph()
@@ -405,9 +405,9 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             label = False
             for ll, vv in vvs.items():
                 if s.get_var(vv):
-                    util.check(label == False, 'multiple labels')
+                    util_common.check(label == False, 'multiple labels')
                     label = ll
-            util.check(label != False, 'no label')
+            util_common.check(label != False, 'no label')
             if label is not None:
                 gr.add_node(ii)
                 gr.nodes[ii][util_graph.GATTR_LABEL] = label
@@ -418,9 +418,9 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             label_etc = False
             for ll, vv in vvs.items():
                 if s.get_var(vv):
-                    util.check(label_etc == False, 'multiple labels/delta')
+                    util_common.check(label_etc == False, 'multiple labels/delta')
                     label_etc = ll
-            util.check(label_etc != False, 'no label/et')
+            util_common.check(label_etc != False, 'no label/et')
             if label_etc is not None:
                 label, delta, polar, cycle = label_etc
                 gr.add_edge(ii, jj)
@@ -449,8 +449,8 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                         continue
                     pos_jj = gr.nodes[jj][util_graph.GATTR_POSITION]
 
-                    util.check(len(pos_ii) == len(pos_jj), 'lengths')
-                    util.check(max([abs(pi - pj) for pi, pj in zip(pos_ii, pos_jj)]) >= MIN_LINF_DIST, 'dist')
+                    util_common.check(len(pos_ii) == len(pos_jj), 'lengths')
+                    util_common.check(max([abs(pi - pj) for pi, pj in zip(pos_ii, pos_jj)]) >= MIN_LINF_DIST, 'dist')
 
         grs = util_graph.Graphs()
         grs.gtype = grd.gtype
@@ -458,17 +458,17 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         grs.graphs = [gr]
         result = grs
 
-    util.timer_section(None)
+    util_common.timer_section(None)
 
     return result
 
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Generate graphs based on example graph.')
-    parser.add_argument('--solver', type=str, nargs='+', choices=solvers.SOLVER_LIST, default=[solvers.SOLVER_PYSAT_RC2], help='Solver name, from: ' + ','.join(solvers.SOLVER_LIST) + '.')
+    parser.add_argument('--solver', type=str, nargs='+', choices=util_solvers.SOLVER_LIST, default=[util_solvers.SOLVER_PYSAT_RC2], help='Solver name, from: ' + ','.join(util_solvers.SOLVER_LIST) + '.')
     parser.add_argument('--outfile', required=True, type=str, help='Output file.')
     parser.add_argument('--gdescfile', required=True, type=str, help='Input graph description file.')
     parser.add_argument('--minsize', required=True, type=int, help='Minimum size.')
@@ -484,25 +484,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if len(args.solver) == 1:
-        solver = solvers.solver_id_to_solver(args.solver[0])
+        solver = util_solvers.solver_id_to_solver(args.solver[0])
     else:
-        solver = solvers.PortfolioSolver(args.solver, None)
+        solver = util_solvers.PortfolioSolver(args.solver, None)
 
     if args.edgeopt is not None:
         edgeopt = args.edgeopt[0]
         edgeopt_params = tuple([int(ee) for ee in args.edgeopt[1:]])
-        util.check(edgeopt in EDGEOPT_LIST, '--edgeopt must be in ' + ','.join(EDGEOPT_LIST))
+        util_common.check(edgeopt in EDGEOPT_LIST, '--edgeopt must be in ' + ','.join(EDGEOPT_LIST))
 
-    label_min = util.arg_list_to_dict_int(parser, '--label-min', args.label_min)
-    label_max = util.arg_list_to_dict_int(parser, '--label-max', args.label_max)
+    label_min = util_common.arg_list_to_dict_int(parser, '--label-min', args.label_min)
+    label_max = util_common.arg_list_to_dict_int(parser, '--label-max', args.label_max)
 
-    with util.openz(args.gdescfile, 'rb') as f:
+    with util_common.openz(args.gdescfile, 'rb') as f:
         grd = pickle.load(f)
 
     ogrs = gdesc2graph(solver, grd, args.minsize, args.maxsize, edgeopt, edgeopt_params, label_min, label_max, args.label_count, args.cycle_no, args.cycle_yes, args.connect, args.randomize)
     if ogrs is not None:
         util_graph.write_graph(ogrs, sys.stdout)
         util_graph.write_graph_to_file(ogrs, args.outfile)
-        util.exit_solution_found()
+        util_common.exit_solution_found()
     else:
-        util.exit_solution_not_found()
+        util_common.exit_solution_not_found()

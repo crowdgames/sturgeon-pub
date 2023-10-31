@@ -1,5 +1,5 @@
 import argparse, json, pickle, sys, time
-import util, util_explore
+import util_common, util_explore
 import numpy as np
 
 
@@ -18,7 +18,7 @@ def explore2summary(ex, summarize_levels, summarize_edges):
     for tind, image in ex.tind_to_image.items():
         image_id = id(image)
         if image_id not in image_ids:
-            image_ids[image_id] = util.index_to_char(len(image_ids))
+            image_ids[image_id] = util_common.index_to_char(len(image_ids))
 
     print('index text:  ', ''.join([(ex.tind_to_text[tind] if tind in ex.tind_to_text else ' ') for tind in range(ex.ntind)]))
     print('index image: ', ''.join([(image_ids[id(ex.tind_to_image[tind])] if tind in ex.tind_to_image else ' ')  for tind in range(ex.ntind)]))
@@ -56,7 +56,7 @@ def explore2summary(ex, summarize_levels, summarize_edges):
             print(''.join([str(vv) for vv in level]))
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Summarize explore file.')
     parser.add_argument('--explorefile', required=True, type=str, help='Input explore file.')
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--edges', action='store_true', help='Include edges in summary.')
     args = parser.parse_args()
 
-    with util.openz(args.explorefile, 'rb') as f:
+    with util_common.openz(args.explorefile, 'rb') as f:
         ex = pickle.load(f)
 
     explore2summary(ex, args.levels, args.edges)

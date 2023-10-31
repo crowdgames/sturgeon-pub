@@ -1,5 +1,5 @@
 import argparse, itertools, json, random, sys, time
-import util, util_graph
+import util_common, util_graph
 import networkx as nx
 
 MULTILABEL = ';'
@@ -7,7 +7,7 @@ MULTILABEL = ';'
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Convert a dot file to a graph file.')
     parser.add_argument('--outfile', type=str, help='Output file.')
@@ -30,9 +30,9 @@ if __name__ == '__main__':
         root_node = None
         for node in dot.nodes:
             if dot.nodes[node][util_graph.GATTR_LABEL] == args.root:
-                util.check(root_node is None, 'multiple root nodes')
+                util_common.check(root_node is None, 'multiple root nodes')
                 root_node = node
-        util.check(root_node is not None, 'no root node')
+        util_common.check(root_node is not None, 'no root node')
 
         gr = nx.bfs_tree(dot, root_node)
 

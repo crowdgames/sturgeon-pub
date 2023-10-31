@@ -1,14 +1,14 @@
 import argparse, os, shutil, pickle, sys
-import util, util_graph
+import util_common, util_graph
 import networkx as nx
 
 
 
 def tiles2graph(tile_info, text_labels, no_edge_labels):
-    util.check(len(tile_info.levels) == 1, 'only handles one tile level')
+    util_common.check(len(tile_info.levels) == 1, 'only handles one tile level')
 
     if text_labels:
-        util.check(tile_info.tileset.tile_to_text, 'no text')
+        util_common.check(tile_info.tileset.tile_to_text, 'no text')
 
     tile_level = tile_info.levels[0].tiles
 
@@ -54,7 +54,7 @@ def tiles2graph(tile_info, text_labels, no_edge_labels):
 
 
 if __name__ == '__main__':
-    util.timer_start()
+    util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Generate tiles from level and/or image.')
     parser.add_argument('--outfile', required=True, type=str, help='Output tile file.')
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-edge-labels', action='store_true', help='Don\'t output edge labels.')
     args = parser.parse_args()
 
-    with util.openz(args.tilefile, 'rb') as f:
+    with util_common.openz(args.tilefile, 'rb') as f:
         tile_info = pickle.load(f)
 
     ogrs = tiles2graph(tile_info, args.text_labels, args.no_edge_labels)
