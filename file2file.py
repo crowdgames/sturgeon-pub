@@ -158,5 +158,12 @@ if __name__ == '__main__':
         with util_common.openz(args.outfile, 'wb') as f:
             pickle.dump(ti, f)
 
+    elif util_common.fileistype(args.infile, '.tile') and util_common.fileistype(args.outfile, '.jtileset'):
+        with util_common.openz(args.infile, 'rb') as f:
+            ti = pickle.load(f)
+        with util_common.openz(args.outfile, 'wt') as f:
+            json.dump(wrap2json(ti.tileset, tileset2json), f)
+            f.write('\n')
+
     else:
         util_common.check(False, 'unrecognized conversion')

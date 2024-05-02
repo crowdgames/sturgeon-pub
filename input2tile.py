@@ -201,7 +201,7 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
         print('saving image tiles')
 
         if os.path.exists(tile_output_folder):
-            shutil_common.rmtree(tile_output_folder)
+            shutil.rmtree(tile_output_folder)
         os.makedirs(tile_output_folder)
 
         for tile, tile_image in ts.tile_to_image.items():

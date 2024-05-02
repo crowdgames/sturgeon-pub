@@ -3,24 +3,25 @@ import PIL.Image
 
 
 
-META_STR        = 'META'
+META_STR         = 'META'
 
-MGROUP_PATH     = 'path'
-MGROUP_OFFPATH  = 'offpath'
+MGROUP_PATH      = 'path'
+MGROUP_OFFPATH   = 'offpath'
+MGROUP_REACHABLE = 'reachable'
 
-OPEN_TEXT       = '-'
-OPEN_TEXT_ZELDA = 'DLOMS-'
-START_TEXT      = '{'
-GOAL_TEXT       = '}'
+OPEN_TEXT        = '-'
+OPEN_TEXT_ZELDA  = 'DLOMS-'
+START_TEXT       = '{'
+GOAL_TEXT        = '}'
 
-DEFAULT_TEXT    = ','
-PATH_TEXT       = 'p'
+DEFAULT_TEXT     = ','
+PATH_TEXT        = 'p'
 
-VOID_TEXT       = ' '
-VOID_TILE       = -1
+VOID_TEXT        = ' '
+VOID_TILE        = -1
 
-SPECIAL_CHARS = [PATH_TEXT]
-INDEX_CHARS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+SPECIAL_CHARS    = [PATH_TEXT]
+INDEX_CHARS      = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 
 
@@ -72,31 +73,39 @@ class SchemeInfo:
         self.count_info = None
         self.pattern_info = None
 
-
-
-class ReachabilitySetup:
+class ReachJunctionSetup:
     def __init__(self):
+        self.text = None
+        self.loc = None
+        self.loc_params = None
+
+class ReachConnectSetup:
+    def __init__(self):
+        self.src = None
+        self.dst = None
         self.game_to_move = None
-        self.wrap_cols = None
-        self.goal_loc = None
-        self.goal_params = None
         self.open_text = None
+        self.wrap_cols = None
+        self.unreachable = None
+
+class ReachJunctionInfo:
+    def __init__(self):
+        self.text = None
+        self.rcs = None
+        self.game_to_junction_tile = None
 
 class GameMoveInfo:
     def __init__(self):
-        self.start_tile = None
-        self.goal_tile = None
-        self.open_tiles = None
-
         self.move_template = None
+        self.open_tiles = None
         self.wrap_cols = None
 
-class ReachabilityInfo:
+class ReachConnectInfo:
     def __init__(self):
-        self.start_rcs = None
-        self.goal_rcs = None
-
+        self.src = None
+        self.dst = None
         self.game_to_move = None
+        self.unreachable = None
 
 class ResultReachInfo:
     def __init__(self):
@@ -123,7 +132,8 @@ class ResultInfo:
 
         self.execution_info = None
 
-        self.objective = None
+        self.solver_id = None
+        self.solver_objective = None
 
         self.extra_meta = []
 
@@ -212,6 +222,15 @@ def exit_solution_not_found():
 def check(cond, msg):
     if not cond:
         raise RuntimeError(msg)
+
+def strtobool(val):
+    vallo = val.lower()
+    if vallo in ['y', 'yes', 't', 'true', 'on', '1']:
+        return True
+    elif vallo in ['n', 'no', 'f', 'false', 'off', '0']:
+        return False
+    else:
+        raise ValueError('invalid truth value \'' + str(val) + '\'')
 
 def arg_list_to_dict(parser, name, arg_list, check_option):
     if arg_list is None:
@@ -394,6 +413,17 @@ def meta_properties(data):
 def meta_custom(data):
     return meta_check_json(data)
 
+def remove_meta_geom_groups(meta, groups):
+    if meta is None:
+        return None
+
+    ret = []
+    for md in meta:
+        if md['type'] == 'geom' and md['group'] in groups:
+            continue
+        ret.append(md)
+    return ret
+
 def openz(filename, mode):
     if filename.endswith('.gz'):
         return gzip.open(filename, mode)
@@ -402,13 +432,28 @@ def openz(filename, mode):
     else:
         return open(filename, mode)
 
+def get_meta_from_result(result_info):
+    meta = []
+
+    meta.append(meta_custom({ 'type': 'solver', 'id': result_info.solver_id, 'objective': result_info.solver_objective }))
+
+    for reach_info in result_info.reach_info:
+        meta.append(meta_path(MGROUP_PATH, reach_info.path_edges))
+        meta.append(meta_tile(MGROUP_PATH, reach_info.path_tiles))
+        meta.append(meta_line(MGROUP_OFFPATH, reach_info.offpath_edges))
+
+    if result_info.extra_meta is not None:
+        meta += result_info.extra_meta
+
+    return meta
+
 def print_result_info(result_info, replace_path_tiles):
     print('tile level')
     print_tile_level(result_info.tile_level)
 
     if result_info.text_level is not None:
         print('text level')
-        print_result_text_level(result_info, [], replace_path_tiles)
+        print_result_text_level(result_info, replace_path_tiles)
 
     if result_info.execution_info is not None:
         print('execution')
@@ -421,22 +466,23 @@ def print_result_info(result_info, replace_path_tiles):
             print_text_level(step_info.text_level)
             print()
 
-def save_result_info(result_info, prefix, compress=False, result_only=False):
-    result_name = prefix + '.result'
-    if compress:
-        result_name += '.gz'
-    print('writing result to', result_name)
+def save_result_info(result_info, prefix, compress=False, save_level=True, save_result=True, save_tlvl=True):
+    if save_result:
+        result_name = prefix + '.result'
+        if compress:
+            result_name += '.gz'
+        print('writing result to', result_name)
 
-    with openz(result_name, 'wb') as f:
-        pickle.dump(result_info, f)
+        with openz(result_name, 'wb') as f:
+            pickle.dump(result_info, f)
 
-    if not result_only:
+    if save_level:
         if result_info.text_level is not None:
             text_name = prefix + '.lvl'
             print('writing text level to', text_name)
 
             with openz(text_name, 'wt') as f:
-                print_result_text_level(result_info, result_info.extra_meta, False, outfile=f)
+                print_result_text_level(result_info, False, outfile=f)
 
         if result_info.image_level is not None:
             image_name = prefix + '.png'
@@ -471,6 +517,15 @@ def save_result_info(result_info, prefix, compress=False, result_only=False):
                     step_image_name = step_prefix + '.png'
                     step_info.image_level.save(step_image_name)
 
+    if save_tlvl:
+        json_name = prefix + '.tlvl'
+        if compress:
+            json_name += '.gz'
+        print('writing json to', json_name)
+
+        with openz(json_name, 'wt') as f:
+            print_tile_level_json(result_info.tile_level, meta=get_meta_from_result(result_info), outfile=f)
+
 def index_to_char(idx):
     if idx < len(INDEX_CHARS):
         return INDEX_CHARS[idx]
@@ -494,25 +549,19 @@ def print_tile_level_json(tile_level, meta=None, outfile=None):
     if outfile is None:
         outfile = sys.stdout
 
-    out = {}
-    out['tile'] = tile_level
+    json_data = {}
+    json_data['tile_level'] = tile_level
     if meta != None:
-        out['meta'] = meta
-    json.dump(out, outfile)
+        json_data['meta'] = meta
+
+    json.dump(json_data, outfile)
     outfile.write('\n')
 
-def print_result_text_level(result_info, extra_meta, replace_path_tiles, outfile=None):
+def print_result_text_level(result_info, replace_path_tiles, outfile=None):
     if outfile is None:
         outfile = sys.stdout
 
-    meta = []
-    if result_info.reach_info is not None:
-        meta.append(meta_path(MGROUP_PATH, result_info.reach_info.path_edges))
-        meta.append(meta_tile(MGROUP_PATH, result_info.reach_info.path_tiles))
-        meta.append(meta_line(MGROUP_OFFPATH, result_info.reach_info.offpath_edges))
-
-    if extra_meta is not None:
-        meta += extra_meta
+    meta = get_meta_from_result(result_info)
 
     if replace_path_tiles and result_info.reach_info is not None:
         path_tiles = result_info.reach_info.path_tiles

@@ -4,6 +4,13 @@ import util_common
 
 
 class Generator:
+    class ConnectItem:
+        def __init__(self):
+            self.connect_info = None
+            self.vars_node = None
+            self.vars_edge = None
+            self.out_edges = None
+
     def __init__(self, solver, randomize, rows, cols, scheme_info, tag_level, game_level):
         super().__init__()
 
@@ -25,10 +32,8 @@ class Generator:
         self._var_void_true = self._solver.make_var()
         self._solver.cnstr_count([self._var_void_true], True, 1, 1, None)
 
-        self._reach_info = None
-        self._reach_vars_node = {}
-        self._reach_vars_edge = {}
-        self._reach_out_edges = None
+        self._reach_junction_info = {}
+        self._reach_connect_item = []
 
     def _tile_var(self, rr, cc, tile):
         if (rr, cc) in self._vars_rc_t:
@@ -53,6 +58,12 @@ class Generator:
             self._vars_pattern[key] = self._solver.make_conj([self._tile_var(pr, pc, ptile) for pr, pc, ptile in pattern], True)
 
         return self._vars_pattern[key]
+
+    def get_num_reach_connect(self):
+        return len(self._reach_connect_item)
+
+    def is_unreachable(self, connect_index):
+        return self._reach_connect_item[connect_index].connect_info.unreachable
 
     def get_rows(self):
         return self._rows
@@ -225,7 +236,7 @@ class Generator:
 
                         _lo = max(0,         math.floor(counts_scale_lo * len(_rcs) * _wt))
                         _hi = min(len(_rcs), math.ceil (counts_scale_hi * len(_rcs) * _wt))
-                        self.add_constraint_tile_counts(_rcs, _tiles, _lo, _hi, weight_counts)
+                        self.add_constraint_tile_counts([(_rr, _cc, _tiles) for _rr, _cc in _rcs], _lo, _hi, weight_counts)
 
         for rr_divs in range(self._scheme_info.count_info.divs_size[0]):
             for cc_divs in range(self._scheme_info.count_info.divs_size[1]):
@@ -236,31 +247,28 @@ class Generator:
 
                 add_counts(rr_lo, rr_hi, cc_lo, cc_hi, self._scheme_info.count_info.divs_to_game_to_tag_to_tile_count[(rr_divs, cc_divs)])
 
-    def add_constraint_tile_counts(self, rcs, tiles, lo, hi, weight_counts):
+    def add_constraint_tile_counts(self, rcts, lo, hi, weight_counts):
         util_common.check(lo <= hi, 'counts')
         util_common.check(weight_counts is None or weight_counts > 0, 'weight')
 
-        vvs = [self._tile_var(rr, cc, tile) for rr, cc in rcs for tile in tiles]
+        vvs = [self._tile_var(rr, cc, tile) for rr, cc, tiles in rcts for tile in tiles]
 
         self._solver.cnstr_count(vvs, True, lo, hi, weight_counts)
 
-    def reachability_edges(self):
-        if self._reach_info is None:
-            return None
-
+    def reachability_edges(self, connect_index):
         edges = {}
-        for edge_key in self._reach_vars_edge:
-            fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed = edge_key
+        for edge_key in self._reach_connect_item[connect_index].vars_edge:
+            fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
             edges[(fr, fc, tr, tc, pwtc)] = None
 
         return edges
 
-    def add_constraint_reach_edge(self, cfr, cfc, ctr, ctc, cpwtc, on_path, weight):
+    def add_constraint_reach_edge(self, connect_index, cfr, cfc, ctr, ctc, cpwtc, on_path, weight):
         edge_vars = []
-        for edge_key in self._reach_out_edges[(cfr, cfc)]:
-            fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed = edge_key
+        for edge_key in self._reach_connect_item[connect_index].out_edges[(cfr, cfc)]:
+            fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
             if (cfr, cfc, ctr, ctc, cpwtc) == (fr, fc, tr, tc, pwtc):
-                edge_vars.append(self._reach_vars_edge[edge_key])
+                edge_vars.append(self._reach_connect_item[connect_index].vars_edge[edge_key])
 
         edge_count = 1 if on_path else 0
 
@@ -268,55 +276,65 @@ class Generator:
 
     def add_constraint_start(self, rr, cc, on_path, weight):
         game = self._game_level[rr][cc]
-        move_info = self._reach_info.game_to_move[game]
-        vv = self._tile_var(rr, cc, move_info.start_tile)
+        start_tile = self._reach_junction_info[util_common.START_TEXT].game_to_junction_tile[game]
+        vv = self._tile_var(rr, cc, start_tile)
         self._solver.cnstr_count([vv], on_path, 1, 1, weight)
 
     def add_constraint_goal(self, rr, cc, on_path, weight):
         game = self._game_level[rr][cc]
-        move_info = self._reach_info.game_to_move[game]
-        vv = self._tile_var(rr, cc, move_info.goal_tile)
+        goal_tile = self._reach_junction_info[util_common.GOAL_TEXT].game_to_junction_tile[game]
+        vv = self._tile_var(rr, cc, goal_tile)
         self._solver.cnstr_count([vv], on_path, 1, 1, weight)
 
-    def add_rules_reachability(self, reach_info):
-        print('add reachability constraints')
+    def add_rules_reachability_junction(self, reach_junction_info):
+        print('add reachability junction constraints')
 
-        self._reach_info = reach_info
+        util_common.check(reach_junction_info is not None, 'must have reach_junction_info')
+        util_common.check(reach_junction_info.text not in self._reach_junction_info, 'cannot add multiple reach_junction_info with same text')
+
+        self._reach_junction_info[reach_junction_info.text] = reach_junction_info
+
+        possible_vvs = []
+        impossible_vvs = []
+        for (rr, cc) in self._vars_rc_t:
+            game = self._game_level[rr][cc]
+            game_junction_tile = reach_junction_info.game_to_junction_tile[game]
+
+            if self._tile_has_var(rr, cc, game_junction_tile):
+                vv = self._tile_var(rr, cc, game_junction_tile)
+                if (rr, cc) in reach_junction_info.rcs:
+                    possible_vvs.append(vv)
+                else:
+                    impossible_vvs.append(vv)
+
+        # exactly one junction in possible tiles
+        if len(possible_vvs) > 0:
+            self._solver.cnstr_count(possible_vvs, True, 1, 1, None)
+
+        # no junction in impossible tiles
+        if len(impossible_vvs) > 0:
+            self._solver.cnstr_count(impossible_vvs, True, 0, 0, None)
+
+    def add_rules_reachability_connect(self, reach_connect_info):
+        print('add reachability connect constraints')
+
+        util_common.check(reach_connect_info is not None, 'must have reach_connect_info')
+        util_common.check(reach_connect_info.src in self._reach_junction_info is not None, 'cannot add reach move without source junction')
+        util_common.check(reach_connect_info.dst in self._reach_junction_info is not None, 'cannot add reach move without destination junction')
 
         nodes = []
         in_edges = {}
         out_edges = {}
 
-        possible_start_vvs, possible_goal_vvs = [], []
-        impossible_start_vvs, impossible_goal_vvs = [], []
-        for (rr, cc) in self._vars_rc_t:
-            game = self._game_level[rr][cc]
-            move_info = reach_info.game_to_move[game]
+        reach_vars_node = {}
+        reach_vars_edge = {}
 
-            if self._tile_has_var(rr, cc, move_info.start_tile):
-                vv = self._tile_var(rr, cc, move_info.start_tile)
-                if (rr, cc) in reach_info.start_rcs:
-                    possible_start_vvs.append(vv)
-                else:
-                    impossible_start_vvs.append(vv)
-            if self._tile_has_var(rr, cc, move_info.goal_tile):
-                vv = self._tile_var(rr, cc, move_info.goal_tile)
-                if (rr, cc) in reach_info.goal_rcs:
-                    possible_goal_vvs.append(vv)
-                else:
-                    impossible_goal_vvs.append(vv)
-
-        # exactly one start in possible tiles
-        self._solver.cnstr_count(possible_start_vvs, True, 1, 1, None)
-
-        # no start in impossible tiles
-        self._solver.cnstr_count(impossible_start_vvs, True, 0, 0, None)
-
-        # exactly one goal in possible tiles
-        self._solver.cnstr_count(possible_goal_vvs, True, 1, 1, None)
-
-        # no goal in impossible tiles
-        self._solver.cnstr_count(impossible_goal_vvs, True, 0, 0, None)
+        connect_item = Generator.ConnectItem()
+        connect_item.connect_info = reach_connect_info
+        connect_item.vars_node = reach_vars_node
+        connect_item.vars_edge = reach_vars_edge
+        connect_item.out_edges = out_edges
+        self._reach_connect_item.append(connect_item)
 
         for rr, cc in self._vars_rc_t:
             util_common.check(not self._tile_has_var(rr, cc, util_common.VOID_TILE), 'void tile')
@@ -326,13 +344,13 @@ class Generator:
             out_edges[node] = {}
             in_edges[node] = {}
 
-            self._reach_vars_node[(rr, cc)] = self._solver.make_var()
+            reach_vars_node[(rr, cc)] = self._solver.make_var()
 
         for rr, cc in nodes:
             game = self._game_level[rr][cc]
-            move_info = reach_info.game_to_move[game]
+            move_info = reach_connect_info.game_to_move[game]
 
-            for dest_delta, need_open_path_delta, need_open_aux_delta, need_closed_delta in move_info.move_template:
+            for dest_delta, need_open_path_delta, need_open_aux_delta, need_closed_path_delta, need_closed_aux_delta in move_info.move_template:
                 def inst_deltas(_deltas):
                     _inst = ()
                     for _dr, _dc in _deltas:
@@ -344,7 +362,7 @@ class Generator:
                         _inst = _inst + ((_nr, _nc),)
                     return _inst
 
-                need_open_path = inst_deltas(need_open_path_delta + [dest_delta])
+                need_open_path = inst_deltas(need_open_path_delta)
                 if need_open_path is None:
                     continue
 
@@ -352,8 +370,12 @@ class Generator:
                 if need_open_aux is None:
                     continue
 
-                need_closed = inst_deltas(need_closed_delta)
-                if need_closed is None:
+                need_closed_path = inst_deltas(need_closed_path_delta)
+                if need_closed_path is None:
+                    continue
+
+                need_closed_aux = inst_deltas(need_closed_aux_delta)
+                if need_closed_aux is None:
                     continue
 
                 tr = rr + dest_delta[0]
@@ -362,21 +384,26 @@ class Generator:
                 pwtc = tc
                 if move_info.wrap_cols: tc = tc % self._cols
 
-                edge_key = (rr, cc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed)
+                if (tr, tc) not in nodes:
+                    continue
+
+                edge_key = (rr, cc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux)
 
                 out_edges[(rr, cc)][edge_key] = None
                 in_edges[(tr, tc)][edge_key] = None
 
-                if edge_key not in self._reach_vars_edge:
-                    self._reach_vars_edge[edge_key] = self._solver.make_var()
+                if edge_key not in reach_vars_edge:
+                    reach_vars_edge[edge_key] = self._solver.make_var()
 
         open_vars = {}
         for rr, cc in nodes:
             game = self._game_level[rr][cc]
-            move_info = reach_info.game_to_move[game]
+            src_tile = self._reach_junction_info[reach_connect_info.src].game_to_junction_tile[game]
+            dst_tile = self._reach_junction_info[reach_connect_info.dst].game_to_junction_tile[game]
+            move_info = reach_connect_info.game_to_move[game]
 
-            # TODO: treat start and goal tiles separately from open tiles?
-            all_open_tiles = move_info.open_tiles + [move_info.start_tile, move_info.goal_tile]
+            # TODO: treat src and dst tiles separately from open tiles?
+            all_open_tiles = move_info.open_tiles + [src_tile, dst_tile]
 
             if len(all_open_tiles) == 1:
                 open_var = self._tile_var(rr, cc, all_open_tiles[0])
@@ -388,74 +415,135 @@ class Generator:
                 self._solver.cnstr_implies_disj(open_var, True, open_tile_vvs, True, None)
             open_vars[(rr, cc)] = open_var
 
-        for rr, cc in nodes:
-            game = self._game_level[rr][cc]
-            move_info = reach_info.game_to_move[game]
+        if reach_connect_info.unreachable:
+            for rr, cc in nodes:
+                game = self._game_level[rr][cc]
+                src_tile = self._reach_junction_info[reach_connect_info.src].game_to_junction_tile[game]
+                dst_tile = self._reach_junction_info[reach_connect_info.dst].game_to_junction_tile[game]
+                move_info = reach_connect_info.game_to_move[game]
 
-            reach_node_var = self._reach_vars_node[(rr, cc)]
+                reach_node_var = reach_vars_node[(rr, cc)]
+                node_open_var = open_vars[(rr, cc)]
 
-            out_vvs = []
-            for edge_key in out_edges[(rr, cc)]:
-                reach_out_edge_var = self._reach_vars_edge[edge_key]
-                out_vvs.append(reach_out_edge_var)
+                # node reachable and outgoing edge means outgoing edge reachable
+                for edge_key in out_edges[(rr, cc)]:
+                    reach_out_edge_var = reach_vars_edge[edge_key]
 
-                fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed = edge_key
-                util_common.check((fr, fc) == (rr, cc), 'edge')
+                    fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+                    util_common.check((fr, fc) == (rr, cc), 'edge')
 
-                self._solver.cnstr_implies_disj(reach_node_var, False, [reach_out_edge_var], False, None) # !reach_node_var -> !reach_out_edge_var
+                    out_vvs = []
+                    out_settings = []
 
-                for nor, noc in need_open_path + need_open_aux:
-                    open_out_var = open_vars[(nor, noc)]
-                    self._solver.cnstr_implies_disj(open_out_var, False, [reach_out_edge_var], False, None) # !open_out_var -> !reach_out_edge_var
+                    out_vvs.append(reach_node_var)
+                    out_settings.append(True)
 
-                for ncr, ncc in need_closed:
-                    open_out_var = open_vars[(ncr, ncc)]
-                    self._solver.cnstr_implies_disj(open_out_var, True, [reach_out_edge_var], False, None) # open_out_var -> !reach_out_edge_var
+                    for nor, noc in need_open_path + ((tr, tc),) + need_open_aux:
+                        open_out_var = open_vars[(nor, noc)]
+                        out_vvs.append(open_out_var)
+                        out_settings.append(True)
 
-            in_vvs = []
-            for edge_key in in_edges[(rr, cc)]:
-                reach_in_edge_var = self._reach_vars_edge[edge_key]
-                in_vvs.append(reach_in_edge_var)
+                    for ncr, ncc in need_closed_path + need_closed_aux:
+                        open_out_var = open_vars[(ncr, ncc)]
+                        out_vvs.append(open_out_var)
+                        out_settings.append(False)
 
-            # at most 1 in edge
-            if len(in_vvs) > 0:
-                self._solver.cnstr_count(in_vvs, True, 0, 1, None)
+                    out_conj = self._solver.make_conj(out_vvs, out_settings)
+                    self._solver.cnstr_implies_disj(out_conj, True, [reach_out_edge_var], True, None)
 
-            # at most 1 out edge
-            if len(out_vvs) > 0:
-                self._solver.cnstr_count(out_vvs, True, 0, 1, None)
+                # any incoming edge reachable and open means node reachable
+                for edge_key in in_edges[(rr, cc)]:
+                    reach_in_edge_var = reach_vars_edge[edge_key]
+                    in_conj = self._solver.make_conj([node_open_var, reach_in_edge_var], True)
 
-            # start handling
-            start_and_in_vvs = in_vvs
+                    self._solver.cnstr_implies_disj(in_conj, True, [reach_node_var], True, None) # reach_in_edge_var -> reach_node_var
 
-            if self._tile_has_var(rr, cc, move_info.start_tile):
-                start_tile_var = self._tile_var(rr, cc, move_info.start_tile)
+                # not open means not reachable
+                self._solver.cnstr_implies_disj(node_open_var, False, [reach_node_var], False, None) # !node_open_var -> !reach_node_var
 
-                # start must be reachable
-                self._solver.cnstr_implies_disj(start_tile_var, True, [reach_node_var], True, None) # start_tile_var -> reach_node_var
+                # src handling
+                if self._tile_has_var(rr, cc, src_tile):
+                    src_tile_var = self._tile_var(rr, cc, src_tile)
 
-                # start has no in edges
-                for in_vv in in_vvs:
-                    self._solver.cnstr_implies_disj(start_tile_var, True, [in_vv], False, None) # ... start_tile_var -> A !in_edge
+                    # src must be reachable
+                    self._solver.cnstr_implies_disj(src_tile_var, True, [reach_node_var], True, None) # src_tile_var -> reach_node_var
 
-                start_and_in_vvs = [start_tile_var] + start_and_in_vvs
+                # dst handling
+                if self._tile_has_var(rr, cc, dst_tile):
+                    dst_tile_var = self._tile_var(rr, cc, dst_tile)
 
-            # unless it's the start, no in edges means not reachable
-            conj_start_and_in_vvs = self._solver.make_conj(start_and_in_vvs, False)
-            self._solver.cnstr_implies_disj(conj_start_and_in_vvs, True, [reach_node_var], False, None) # !start_tile_var & A !in_edge -> !reach_node_var
+                    # dst must be unreachable
+                    self._solver.cnstr_implies_disj(dst_tile_var, True, [reach_node_var], False, None) # dst_tile_var -> !reach_node_var
 
-            # goal handling
-            if self._tile_has_var(rr, cc, move_info.goal_tile):
-                goal_tile_var = self._tile_var(rr, cc, move_info.goal_tile)
+        else:
+            for rr, cc in nodes:
+                game = self._game_level[rr][cc]
+                src_tile = self._reach_junction_info[reach_connect_info.src].game_to_junction_tile[game]
+                dst_tile = self._reach_junction_info[reach_connect_info.dst].game_to_junction_tile[game]
+                move_info = reach_connect_info.game_to_move[game]
 
-                # goal must be reachable
-                self._solver.cnstr_implies_disj(goal_tile_var, True, [reach_node_var], True, None) # goal_tile_var -> reach_node_var
+                reach_node_var = reach_vars_node[(rr, cc)]
 
-                # goal has no out edges
-                for out_vv in out_vvs:
-                    self._solver.cnstr_implies_disj(goal_tile_var, True, [out_vv], False, None) # ... goal_tile_var -> A !in_edge
+                out_vvs = []
+                for edge_key in out_edges[(rr, cc)]:
+                    reach_out_edge_var = reach_vars_edge[edge_key]
+                    out_vvs.append(reach_out_edge_var)
 
-        self._reach_out_edges = out_edges
+                    fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+                    util_common.check((fr, fc) == (rr, cc), 'edge')
+
+                    self._solver.cnstr_implies_disj(reach_node_var, False, [reach_out_edge_var], False, None) # !reach_node_var -> !reach_out_edge_var
+
+                    for nor, noc in need_open_path + ((tr, tc),) + need_open_aux:
+                        open_out_var = open_vars[(nor, noc)]
+                        self._solver.cnstr_implies_disj(open_out_var, False, [reach_out_edge_var], False, None) # !open_out_var -> !reach_out_edge_var
+
+                    for ncr, ncc in need_closed_path + need_closed_aux:
+                        open_out_var = open_vars[(ncr, ncc)]
+                        self._solver.cnstr_implies_disj(open_out_var, True, [reach_out_edge_var], False, None) # open_out_var -> !reach_out_edge_var
+
+                in_vvs = []
+                for edge_key in in_edges[(rr, cc)]:
+                    reach_in_edge_var = reach_vars_edge[edge_key]
+                    in_vvs.append(reach_in_edge_var)
+
+                # at most 1 in edge
+                if len(in_vvs) > 0:
+                    self._solver.cnstr_count(in_vvs, True, 0, 1, None)
+
+                # at most 1 out edge
+                if len(out_vvs) > 0:
+                    self._solver.cnstr_count(out_vvs, True, 0, 1, None)
+
+                # src handling
+                src_and_in_vvs = in_vvs
+
+                if self._tile_has_var(rr, cc, src_tile):
+                    src_tile_var = self._tile_var(rr, cc, src_tile)
+
+                    # src must be reachable
+                    self._solver.cnstr_implies_disj(src_tile_var, True, [reach_node_var], True, None) # src_tile_var -> reach_node_var
+
+                    # src has no in edges
+                    for in_vv in in_vvs:
+                        self._solver.cnstr_implies_disj(src_tile_var, True, [in_vv], False, None) # ... src_tile_var -> A !in_edge
+
+                    src_and_in_vvs = [src_tile_var] + src_and_in_vvs
+
+                # unless it's the src, no in edges means not reachable
+                conj_src_and_in_vvs = self._solver.make_conj(src_and_in_vvs, False)
+                self._solver.cnstr_implies_disj(conj_src_and_in_vvs, True, [reach_node_var], False, None) # !src_tile_var & A !in_edge -> !reach_node_var
+
+                # dst handling
+                if self._tile_has_var(rr, cc, dst_tile):
+                    dst_tile_var = self._tile_var(rr, cc, dst_tile)
+
+                    # dst must be reachable
+                    self._solver.cnstr_implies_disj(dst_tile_var, True, [reach_node_var], True, None) # dst_tile_var -> reach_node_var
+
+                    # dst has no out edges
+                    for out_vv in out_vvs:
+                        self._solver.cnstr_implies_disj(dst_tile_var, True, [out_vv], False, None) # ... dst_tile_var -> A !in_edge
 
     def solve(self):
         if self._solver.solve():
@@ -467,15 +555,31 @@ class Generator:
     def get_result(self):
         res_info = util_common.ResultInfo()
 
-        res_info.objective = self._solver.get_objective()
+        res_info.solver_id = self._solver.get_solver_id_used()
+        res_info.solver_objective = self._solver.get_objective()
 
         res_info.extra_meta += self._extra_meta
 
-        res_info.reach_info = None
-        if self._reach_info:
-            res_info.reach_info = util_common.ResultReachInfo()
-            res_info.reach_info.path_edges, res_info.reach_info.path_tiles, path_edge_keys = self._get_reach_path()
-            res_info.reach_info.offpath_edges = self._get_reach_offpath_edges(path_edge_keys)
+        res_info.reach_info = []
+        for connect_index, connect_item in enumerate(self._reach_connect_item):
+            if not connect_item.connect_info.unreachable:
+                reach_info = util_common.ResultReachInfo()
+                reach_info.path_edges, reach_info.path_tiles, path_edge_keys = self._get_reach_path(connect_index)
+                reach_info.offpath_edges = self._get_reach_offpath_edges(connect_index, path_edge_keys)
+                res_info.reach_info.append(reach_info)
+
+        if False:
+            if self._reach_move_info is not None and self._reach_move_info.unreachable:
+                for ii in range(len(self._reach_move_info)):
+                    if self._reach_move_info[ii].unreachable:
+                        for rr in range(self._rows):
+                            row = ''
+                            for cc in range(self._cols):
+                                if self._solver.get_var(self._reach_vars_node[(rr, cc)]):
+                                    row = row + 'o'
+                                else:
+                                    row = row + '.'
+                            print(row)
 
         res_info.tile_level = util_common.make_grid(self._rows, self._cols, util_common.VOID_TILE)
         res_info.text_level = None
@@ -517,49 +621,54 @@ class Generator:
 
         return tiles
 
-    def _get_reach_path(self):
-        if not self._reach_info:
-            return None
+    def _get_reach_path(self, connect_index):
+        reach_connect_info = self._reach_connect_item[connect_index].connect_info
+        reach_vars_node = self._reach_connect_item[connect_index].vars_node
+        reach_vars_edge = self._reach_connect_item[connect_index].vars_edge
+        reach_out_edges = self._reach_connect_item[connect_index].out_edges
 
         node_path = []
         tile_path = []
         key_path = []
 
-        start_rc, goal_rc = None, None
+        src_rc, dst_rc = None, None
         for (rr, cc) in self._vars_rc_t:
             game = self._game_level[rr][cc]
-            move_info = self._reach_info.game_to_move[game]
+            src_tile = self._reach_junction_info[reach_connect_info.src].game_to_junction_tile[game]
+            dst_tile = self._reach_junction_info[reach_connect_info.dst].game_to_junction_tile[game]
 
-            if move_info.start_tile in self._vars_rc_t[(rr, cc)] and self._solver.get_var(self._tile_var(rr, cc, move_info.start_tile)):
-                start_rc = (rr, cc)
-            if move_info.goal_tile in self._vars_rc_t[(rr, cc)] and self._solver.get_var(self._tile_var(rr, cc, move_info.goal_tile)):
-                goal_rc = (rr, cc)
+            if src_tile in self._vars_rc_t[(rr, cc)] and self._solver.get_var(self._tile_var(rr, cc, src_tile)):
+                src_rc = (rr, cc)
+            if dst_tile in self._vars_rc_t[(rr, cc)] and self._solver.get_var(self._tile_var(rr, cc, dst_tile)):
+                dst_rc = (rr, cc)
 
-        util_common.check(start_rc is not None, 'no start')
-        util_common.check(goal_rc is not None, 'no goal')
+        util_common.check(src_rc is not None, 'no src')
+        util_common.check(dst_rc is not None, 'no dst')
 
-        tile_path.append(start_rc)
+        tile_path.append(src_rc)
 
-        current_node = start_rc
+        current_node = src_rc
 
         while current_node:
             rr, cc = current_node
 
-            current_reachable = self._solver.get_var(self._reach_vars_node[(rr, cc)])
+            current_reachable = self._solver.get_var(reach_vars_node[(rr, cc)])
             util_common.check(current_reachable, 'current node not reachable')
 
             next_node = None
-            for edge_key in self._reach_out_edges[(rr, cc)]:
-                fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed = edge_key
+            for edge_key in reach_out_edges[(rr, cc)]:
+                fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
                 util_common.check(fr == rr and fc == cc, 'edge')
 
-                out_reachable = self._solver.get_var(self._reach_vars_edge[edge_key])
+                out_reachable = self._solver.get_var(reach_vars_edge[edge_key])
                 if out_reachable:
                     util_common.check(next_node is None, 'multiple out edges')
-                    util_common.check(need_open_path[-1] == (tr, tc), 'path does not end at node')
 
+                    for nr, nc in need_closed_path:
+                        tile_path.append((nr, nc))
                     for nr, nc in need_open_path:
                         tile_path.append((nr, nc))
+                    tile_path.append((tr, tc))
 
                     if tc == pwtc:
                         node_path.append((fr, fc, tr, tc))
@@ -571,15 +680,15 @@ class Generator:
 
                     next_node = (tr, tc)
 
-            util_common.check(next_node is not None or current_node == goal_rc, 'path does not end at goal')
+            util_common.check(next_node is not None or current_node == dst_rc, 'path does not end at dst')
 
             current_node = next_node
 
         for (ra, ca), (rb, cb) in zip(tile_path, tile_path[1:]):
             game = self._game_level[ra][ca]
-            move_info = self._reach_info.game_to_move[game]
+            connect_info = reach_connect_info.game_to_move[game]
 
-            if not move_info.wrap_cols:
+            if not connect_info.wrap_cols:
                 util_common.check(abs(ra - rb) + abs(ca - cb) == 1, 'path tiles')
             else:
                 if ca > 1 + cb:
@@ -590,16 +699,15 @@ class Generator:
 
         return node_path, tile_path, key_path
 
-    def _get_reach_offpath_edges(self, path_edge_keys):
-        if not self._reach_info:
-            return None
+    def _get_reach_offpath_edges(self, connect_index, path_edge_keys):
+        reach_vars_edge = self._reach_connect_item[connect_index].vars_edge
 
         edges = {}
 
-        for edge_key in self._reach_vars_edge:
-            edge_reachable = self._solver.get_var(self._reach_vars_edge[edge_key])
+        for edge_key in reach_vars_edge:
+            edge_reachable = self._solver.get_var(reach_vars_edge[edge_key])
             if edge_reachable and edge_key not in path_edge_keys:
-                fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed = edge_key
+                fr, fc, tr, tc, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
                 if tc == pwtc:
                     edges[(fr, fc, tr, tc)] = None
                 else:

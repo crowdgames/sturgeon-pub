@@ -203,8 +203,11 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
         for resultfile_glob in resultfiles:
             for resultfile in glob.iglob(resultfile_glob):
                 with util_common.openz(resultfile, 'rb') as f:
+                    edges = None
                     result_info = pickle.load(f)
-                    edges = result_info.reach_info.path_edges if result_info.reach_info is not None else []
+                    if result_info.reach_info is not None:
+                        util_common.check(len(result_info.reach_info) == 1, 'only support for one path')
+                        edges = result_info.reach_info[0].path_edges
                     add_level(result_info.tile_level, edges, None)
 
     print('loaded', len(all_levels), 'levels')

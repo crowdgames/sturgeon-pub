@@ -1,3 +1,4 @@
+import heapq
 import util_common
 
 RANDOM_PATH_INSET = 1
@@ -59,8 +60,8 @@ def edge_path_from_lines(prefix, lines):
 
 def get_template_open_closed(move_template):
     template_open_closed = {}
-    for dest, need_open_path, need_open_aux, need_closed in move_template:
-        need_open_close = ([(0, 0)] + need_open_path + need_open_aux + [dest], need_closed)
+    for dest, need_open_path, need_open_aux, need_closed_path, need_closed_aux in move_template:
+        need_open_close = ([(0, 0)] + need_open_path + need_open_aux + [dest], need_closed_path + need_closed_aux, 1 + len(need_open_path) + len(need_closed_path))
         if dest not in template_open_closed:
             template_open_closed[dest] = []
         template_open_closed[dest].append(need_open_close)
@@ -74,7 +75,7 @@ def get_path_open_closed(path, template_open_closed):
         dr, dc = tr - fr, tc - fc
         open_sets, closed_sets = [], []
 
-        for dopen, dclosed in template_open_closed[(dr, dc)]:
+        for dopen, dclosed, dlen in template_open_closed[(dr, dc)]:
             open_set, closed_set = set(), set()
             for (rr, cc) in dopen:
                 open_set.add((fr + rr, fc + cc))
@@ -90,13 +91,30 @@ def get_path_open_closed(path, template_open_closed):
 
     return path_open, path_closed
 
-def get_level_open_closed(text_level, open_text):
+def get_level_src_dst(text_level, src_text, dst_text):
+    src_loc, dst_loc = None, None
+
+    for rr in range(len(text_level)):
+        for cc in range(len(text_level[rr])):
+            if text_level[rr][cc] == src_text:
+                util_common.check(src_loc is None, 'multiple src in level')
+                src_loc = (rr, cc)
+            elif text_level[rr][cc] == dst_text:
+                util_common.check(dst_loc is None, 'multiple dst in level')
+                dst_loc = (rr, cc)
+
+    util_common.check(src_loc is not None, 'no src in level')
+    util_common.check(dst_loc is not None, 'no dst in level')
+
+    return src_loc, dst_loc
+
+def get_level_open_closed(text_level, open_text, src_text, dst_text):
     are_open = {}
     are_closed = {}
 
-    util_common.check(util_common.START_TEXT not in open_text and util_common.GOAL_TEXT not in open_text, 'start/goal in open_text')
+    util_common.check(src_text not in open_text and dst_text not in open_text, 'src/dst in open_text')
 
-    open_start_goal_text = open_text + util_common.START_TEXT + util_common.GOAL_TEXT
+    open_start_goal_text = open_text + src_text + dst_text
 
     for rr in range(len(text_level)):
         for cc in range(len(text_level[rr])):
@@ -111,14 +129,14 @@ def get_nexts_from(pt, rows, cols, template_open_closed, are_open, are_closed, e
     lr, lc = pt
     nexts = {}
 
-    for dest, need_open_closeds in template_open_closed.items():
+    for dest, need_open_closed_len in template_open_closed.items():
         nr, nc = lr + dest[0], lc + dest[1]
         if nr < 0 or rows <= nr or nc < 0 or cols <= nc:
             continue
         if (nr, nc) in exclude:
             continue
 
-        for need_open, need_closed in need_open_closeds:
+        for need_open, need_closed, path_len in need_open_closed_len:
             need_missing = False
             for need_r, need_c in need_open:
                 need_r, need_c = lr + need_r, lc + need_c
@@ -135,7 +153,8 @@ def get_nexts_from(pt, rows, cols, template_open_closed, are_open, are_closed, e
             if need_missing:
                 continue
 
-            nexts[(nr, nc)] = None
+            util_common.check((nr, nc) not in nexts, 'duplicate next')
+            nexts[(nr, nc)] = path_len
 
     return nexts
 
@@ -195,6 +214,31 @@ def path_between(rng, start, end, rows, cols, inset, template_open_closed, are_o
             rng.shuffle(q)
 
     return found_path
+
+def path_between_dijkstra(start, end, rows, cols, template_open_closed, are_open, are_closed):
+    q = []
+    best_cost = {}
+
+    heapq.heappush(q, (0, (start,)))
+    best_cost[start] = 0.0
+
+    found_path = None
+    while len(q) > 0:
+        cost, path = heapq.heappop(q)
+
+        if path[-1] == end:
+            found_path = path
+            break
+
+        path_nexts = get_nexts_from(path[-1], rows, cols, template_open_closed, are_open, are_closed, path)
+
+        for n in path_nexts:
+            new_cost = cost + path_nexts[n]
+            if n not in best_cost or new_cost < best_cost[n]:
+                heapq.heappush(q, (new_cost, path + (n,)))
+                best_cost[n] = new_cost
+
+    return found_path, dict.fromkeys(best_cost)
 
 def shortest_path_between(start, end, rows, cols, template_open_closed, are_open, are_closed):
     return path_between(None, start, end, rows, cols, 0, template_open_closed, (are_open, are_closed))

@@ -1,4 +1,4 @@
-import argparse, pickle, pprint, sys
+import argparse, os, pickle, pprint, sys
 import util_common
 
 
@@ -348,7 +348,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create scheme from tile info and (optionally) tag level.')
     parser.add_argument('--outfile', required=True, type=str, help='Output scheme file.')
     parser.add_argument('--tilefile', required=True, type=str, help='Input tile file.')
-    parser.add_argument('--countdivs', type=int, nargs=2)
+    parser.add_argument('--count-divs', type=int, nargs=2)
     parser.add_argument('--pattern', type=str, nargs='+', help='Pattern template, from: ' + ','.join(PATTERN_DICT.keys()) + '.')
     parser.add_argument('--level-rotate', action='store_true', help='Rotate levels to create more patterns.')
     parser.add_argument('--quiet', action='store_true', help='Reduce output.')
@@ -368,6 +368,6 @@ if __name__ == '__main__':
     else:
         game_to_patterns_delta = None
 
-    scheme_info = tiles2scheme(tile_info, args.countdivs, game_to_patterns_delta, args.level_rotate)
+    scheme_info = tiles2scheme(tile_info, args.count_divs, game_to_patterns_delta, args.level_rotate)
     with util_common.openz(args.outfile, 'wb') as f:
         pickle.dump(scheme_info, f)

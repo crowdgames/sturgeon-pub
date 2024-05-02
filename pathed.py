@@ -127,12 +127,22 @@ class PathCanvas(tkinter.Canvas):
         tag_game_level = util_common.make_grid(rows, cols, util_common.DEFAULT_TEXT)
         solver = util_solvers.PySatSolverRC2()
 
-        reach_setup = util_common.ReachabilitySetup()
-        reach_setup.wrap_cols = False
-        reach_setup.open_text = util_common.OPEN_TEXT
-        reach_setup.game_to_move = { util_common.DEFAULT_TEXT: move_template }
-        reach_setup.goal_loc = util_reach.RGOAL_ALL
-        reach_setup.goal_params = []
+        reach_start_setup = util_common.ReachJunctionSetup()
+        reach_start_setup.text = util_common.START_TEXT
+        reach_start_setup.loc = util_reach.RPLOC_ALL
+        reach_start_setup.loc_params = []
+
+        reach_goal_setup = util_common.ReachJunctionSetup()
+        reach_goal_setup.text = util_common.GOAL_TEXT
+        reach_goal_setup.loc = util_reach.RPLOC_ALL
+        reach_goal_setup.loc_params = []
+
+        reach_connect_setup = util_common.ReachConnectSetup()
+        reach_connect_setup.src = util_common.START_TEXT
+        reach_connect_setup.dst = util_common.GOAL_TEXT
+        reach_connect_setup.game_to_move = { util_common.DEFAULT_TEXT: move_template }
+        reach_connect_setup.open_text = util_common.OPEN_TEXT
+        reach_connect_setup.wrap_cols = False
 
         custom_cnstrs = []
         if start_goal is not None:
@@ -140,7 +150,7 @@ class PathCanvas(tkinter.Canvas):
         if path_points is not None:
             custom_cnstrs.append(util_custom.OutPathConstraint(path_points, WEIGHT_PATH))
 
-        result_info = scheme2output.scheme2output(scheme_info, tag_game_level, tag_game_level, solver, seed, WEIGHT_PATTERN, WEIGHT_COUNTS, scheme2output.COUNTS_SCALE_HALF, reach_setup, None, custom_cnstrs, False)
+        result_info = scheme2output.scheme2output(scheme_info, tag_game_level, tag_game_level, solver, seed, WEIGHT_PATTERN, WEIGHT_COUNTS, scheme2output.COUNTS_SCALE_HALF, [reach_start_setup, reach_goal_setup], [reach_connect_setup], None, custom_cnstrs, False)
 
         if outfile is not None and result_info is not None:
             print('saving to', outfile)
@@ -168,15 +178,15 @@ class PathCanvas(tkinter.Canvas):
                     decode_result_info(result_info)
 
                     if result_info is not None:
-                        print(result_info.reach_info.path_edges)
+                        print(result_info.reach_info[0].path_edges)
 
                         if result_info.image_level is None:
                             self._gen_image = None
                         else:
                             self._gen_image = PIL.ImageTk.PhotoImage(result_info.image_level.resize((self._cols * CELL_SIZE, self._rows * CELL_SIZE), PIL.Image.Resampling.BILINEAR))
                         self._gen_text = result_info.text_level
-                        self._gen_path = util_path.point_path_from_edge_path(result_info.reach_info.path_edges)
-                        self._gen_objective = result_info.objective
+                        self._gen_path = util_path.point_path_from_edge_path(result_info.reach_info[0].path_edges)
+                        self._gen_objective = result_info.solver_objective
 
                     self.redraw_from_image()
                 self._gen_proc = None
@@ -386,7 +396,7 @@ class PathCanvas(tkinter.Canvas):
 
     def on_key_w(self, event):
         if self._gen_path is not None and len(self._gen_path) >= 2:
-            are_open, are_closed = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT)
+            are_open, are_closed = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT, util_common.START_TEXT, util_common.GOAL_TEXT)
             self._path = util_path.shortest_path_between(self._gen_path[0], self._gen_path[-1], self._rows, self._cols, self._template_open_closed, are_open, are_closed)
             self.new_manual_path(False)
 

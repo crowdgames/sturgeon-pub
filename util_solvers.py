@@ -1,44 +1,13 @@
 import json, multiprocessing, queue, random, sys
 import util_common
 
-try:
-    available_z3 = False
-    import z3
-    available_z3 = True
-except ImportError:
-    pass
-
-try:
-    available_cvc5 = False
-    import cvc5.pythonic
-    available_cvc5 = True
-except ImportError:
-    pass
-
-try:
-    available_clingo = False
-    import clingo
-    available_clingo = True
-except ImportError:
-    pass
-
-try:
-    available_pysat = False
-    import pysat.card
-    import pysat.formula
-    import pysat.examples.fm
-    import pysat.examples.rc2
-    import pysat.solvers
-    available_pysat = True
-except ImportError:
-    pass
-
-
 
 SOLVER_PRINT          = 'print'
 SOLVER_Z3_OPTIMIZE    = 'z3-opt'
 SOLVER_Z3_SOLVE       = 'z3-slv'
 SOLVER_CVC5           = 'cvc5'
+SOLVER_SCIPY          = 'scipy'
+SOLVER_CVXPY          = 'cvxpy'
 SOLVER_CLINGO_FE      = 'clingo-fe'
 SOLVER_CLINGO_BE      = 'clingo-be'
 SOLVER_PYSAT_FM       = 'pysat-fm'
@@ -46,7 +15,7 @@ SOLVER_PYSAT_RC2      = 'pysat-rc2'
 SOLVER_PYSAT_FM_BOOL  = 'pysat-fm-boolonly'
 SOLVER_PYSAT_RC2_BOOL = 'pysat-rc2-boolonly'
 SOLVER_PYSAT_MC       = 'pysat-minicard'
-SOLVER_LIST           = [SOLVER_PRINT, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC]
+SOLVER_LIST           = [SOLVER_PRINT, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_SCIPY, SOLVER_CVXPY, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC]
 SOLVER_NOTEST_LIST    = [SOLVER_PRINT]
 
 Z3_OPTION_SOLVE       = 'solve'
@@ -54,7 +23,80 @@ Z3_OPTION_OPTIMIZE    = 'optimize'
 
 PYSAT_OPTION_CARD     = 'card'
 PYSAT_OPTION_BOOLONLY = 'boolonly'
-PYSAT_ENCODING        = pysat.card.EncType.kmtotalizer
+
+
+
+def try_import_z3():
+    global z3
+    try:
+        import z3
+        return True
+    except ImportError:
+        z3 = None
+        del z3
+        return False
+
+def try_import_cvc5():
+    global cvc5
+    try:
+        import cvc5.pythonic
+        return True
+    except ImportError:
+        cvc5 = None
+        del cvc5
+        return False
+
+def try_import_scipy():
+    global numpy
+    global scipy
+    try:
+        import numpy
+        import scipy
+        return True
+    except ImportError:
+        numpy = None
+        del numpy
+        scipy = None
+        del scipy
+        return False
+
+def try_import_cvxpy():
+    global numpy
+    global cvxpy
+    try:
+        import numpy
+        import cvxpy
+        return True
+    except ImportError:
+        numpy = None
+        del numpy
+        scipy = None
+        del cvxpy
+        return False
+
+def try_import_clingo():
+    global clingo
+    try:
+        import clingo
+        return True
+    except ImportError:
+        clingo = None
+        del clingo
+        return False
+
+def try_import_pysat():
+    global pysat
+    try:
+        import pysat.card
+        import pysat.formula
+        import pysat.examples.fm
+        import pysat.examples.rc2
+        import pysat.solvers
+        return True
+    except ImportError:
+        pysat = None
+        del pysat
+        return False
 
 
 
@@ -67,6 +109,10 @@ def solver_id_to_solver(solver_id):
         return Z3SolverSolve()
     elif solver_id == SOLVER_CVC5:
         return CVC5Solver()
+    elif solver_id == SOLVER_SCIPY:
+        return SciPySolver()
+    elif solver_id == SOLVER_CVXPY:
+        return CvxPySolver()
     elif solver_id == SOLVER_CLINGO_FE:
         return ClingoFrontendSolver()
     elif solver_id == SOLVER_CLINGO_BE:
@@ -112,6 +158,9 @@ class Solver:
         util_common.check(False, 'unimplemented')
 
     def get_objective(self):
+        util_common.check(False, 'unimplemented')
+
+    def get_solver_id_used(self):
         util_common.check(False, 'unimplemented')
 
     def supports_weights(self):
@@ -197,6 +246,8 @@ class SolverImpl(Solver):
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
         if not self._supports_weights:
             util_common.check(weight is None, 'solver does not support weights')
+        else:
+            util_common.check(weight is None or type(weight) == int, 'weights must be integers')
 
         return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out), weight)
 
@@ -205,6 +256,8 @@ class SolverImpl(Solver):
 
         if not self._supports_weights:
             util_common.check(weight is None, 'solver does not support weights')
+        else:
+            util_common.check(weight is None or type(weight) == int, 'weights must be integers')
 
         return self._IMPL_cnstr_count(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj), lo, hi, weight)
 
@@ -216,6 +269,9 @@ class SolverImpl(Solver):
 
     def get_objective(self):
         return self._objective
+
+    def get_solver_id_used(self):
+        return self.get_id()
 
     def supports_weights(self):
         return self._supports_weights
@@ -250,6 +306,10 @@ class SolverImpl(Solver):
 
 
 class PortfolioSolver(Solver):
+    RES_SOLN   = 'soln'
+    RES_NOSOLN = 'nosoln'
+    RES_ERROR  = 'error'
+
     def __init__(self, solver_ids, timeout):
         super().__init__('portfolio:' + ';'.join(solver_ids))
 
@@ -262,6 +322,8 @@ class PortfolioSolver(Solver):
         self._result = None
         self._objective = None
 
+        self._solver_id_used = None
+
     def make_var(self):
         self._solver_var_conjs.append(_wrap_var(None))
         return len(self._solver_var_conjs) - 1
@@ -273,10 +335,13 @@ class PortfolioSolver(Solver):
         return len(self._solver_var_conjs) - 1
 
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
+        util_common.check(weight is None or type(weight) == int, 'weights must be integers')
+
         self._solver_commands.append(('cnstr_implies_disj', (in_vv, in_vv_setting, out_vvs, out_vv_settings, weight)))
 
     def cnstr_count(self, vvs, settings, lo, hi, weight):
         util_common.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
+        util_common.check(weight is None or type(weight) == int, 'weights must be integers')
 
         self._solver_commands.append(('cnstr_count', (vvs, settings, lo, hi, weight)))
 
@@ -296,12 +361,18 @@ class PortfolioSolver(Solver):
         for proc in procs:
             proc.kill()
 
-        if result is None:
-            return False
-        else:
-            index, self._result, self._objective = result
-            util_common.write_portfolio('portfolio using %d %s\n' % (index, self._solver_ids[index]))
+        if result[0] == PortfolioSolver.RES_SOLN:
+            index, self._result, self._objective = result[1]
+            self._solver_id_used = self._solver_ids[index]
+            util_common.write_portfolio('portfolio using %d %s\n' % (index, self._solver_id_used))
             return True
+        elif result[0] == PortfolioSolver.RES_NOSOLN:
+            return False
+        elif result[0] == PortfolioSolver.RES_ERROR:
+            err = result[1]
+            raise err
+        else:
+            util.check(False, 'unexpected result')
 
     def get_var(self, vv):
         return self._result[vv]
@@ -309,9 +380,12 @@ class PortfolioSolver(Solver):
     def get_objective(self):
         return self._objective
 
+    def get_solver_id_used(self):
+        return self._solver_id_used
+
     @staticmethod
     def run_solver(s_q, s_index, s_solver_id, s_solver_var_conjs, s_solver_commands):
-        s_ret = None
+        s_ret = (PortfolioSolver.RES_NOSOLN,)
 
         try:
             util_common.write_portfolio('portfolio starting %d %s\n' % (s_index, s_solver_id))
@@ -363,11 +437,13 @@ class PortfolioSolver(Solver):
                     if _is_var(s_var_conj):
                         s_vars_set[s_ind] = s_solver.get_var(translate_vars(s_ind))
 
-                s_ret = (s_index, s_vars_set, s_solver.get_objective())
+                s_ret = (PortfolioSolver.RES_SOLN, (s_index, s_vars_set, s_solver.get_objective()))
 
             util_common.write_portfolio('portfolio finishing %d %s\n' % (s_index, s_solver_id))
 
         except Exception as e:
+            s_ret = (PortfolioSolver.RES_ERROR, e)
+
             util_common.write_portfolio('portfolio error %d %s %s\n' % (s_index, s_solver_id, e))
 
         s_q.put(s_ret)
@@ -416,7 +492,7 @@ class PrintSolver(SolverImpl):
 
 class _Z3Solver(SolverImpl):
     def __init__(self, solver_id, solver_option):
-        util_common.check(available_z3, 'z3 not available')
+        util_common.check(try_import_z3(), 'z3 not available')
 
         util_common.check(solver_option in [Z3_OPTION_OPTIMIZE, Z3_OPTION_SOLVE], 'invalid option for solver: ' + solver_option)
 
@@ -623,7 +699,7 @@ class Z3SolverSolve(_Z3Solver):
 
 class CVC5Solver(SolverImpl):
     def __init__(self):
-        util_common.check(available_cvc5, 'cvc5 not available')
+        util_common.check(try_import_cvc5(), 'cvc5 not available')
 
         super().__init__(SOLVER_CVC5, False, False)
 
@@ -705,9 +781,214 @@ class CVC5Solver(SolverImpl):
 
 
 
+class _MilpSolver(SolverImpl):
+    def __init__(self, solver_id):
+        super().__init__(solver_id, True, False)
+
+        self._curr_id = 0
+        self._weights = []
+        self._constraints = []
+
+    def _help_new_var(self):
+        self._curr_id += 1
+        return self._curr_id
+
+    def _IMPL_negate_var_conj(self, ll):
+        return -ll
+
+    def _IMPL_make_var(self):
+        return self._help_new_var()
+
+    def _IMPL_make_conj(self, lls):
+        if len(lls) == 1:
+            return lls[0]
+        else:
+            vv = self._help_new_var()
+            n = len(lls)
+
+            coefs, inds, lo, hi = [], [], None, 0
+            coefs.append(n)
+            inds.append(abs(vv) - 1)
+            for ll in lls:
+                inds.append(abs(ll) - 1)
+                if ll > 0:
+                    coefs.append(-1)
+                elif ll < 0:
+                    coefs.append(1)
+                    hi += 1
+                else:
+                    util_common.check(False, 'no id 0')
+            self._constraints.append((coefs, inds, lo, hi))
+
+            coefs, inds, lo, hi = [], [], None, n - 1
+            coefs.append(-n)
+            inds.append(abs(vv) - 1)
+            for ll in lls:
+                inds.append(abs(ll) - 1)
+                if ll > 0:
+                    coefs.append(1)
+                elif ll < 0:
+                    coefs.append(-1)
+                    hi -= 1
+                else:
+                    util_common.check(False, 'no id 0')
+            self._constraints.append((coefs, inds, lo, hi))
+
+            return vv
+
+    def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
+        coefs, inds, lo, hi = [], [], None, 0
+
+        inds.append(abs(in_ll) - 1)
+        if in_ll > 0:
+            coefs.append(1)
+        elif in_ll < 0:
+            coefs.append(-1)
+            hi -= 1
+        else:
+            util_common.check(False, 'no id 0')
+
+        for ll in out_lls:
+            inds.append(abs(ll) - 1)
+            if ll > 0:
+                coefs.append(-1)
+            elif ll < 0:
+                coefs.append(1)
+                hi += 1
+            else:
+                util_common.check(False, 'no id 0')
+
+        if weight is not None:
+            weight_var = self._help_new_var()
+            self._weights.append((weight, abs(weight_var) - 1))
+            inds.append(abs(weight_var) - 1)
+            coefs.append(-1)
+
+        self._constraints.append((coefs, inds, lo, hi))
+
+    def _IMPL_cnstr_count(self, lls, lo, hi, weight):
+        if len(lls) > 0:
+            coefs, inds, lo, hi = [], [], lo, hi
+            for ll in lls:
+                inds.append(abs(ll) - 1)
+                if ll > 0:
+                    coefs.append(1)
+                elif ll < 0:
+                    coefs.append(-1)
+                    lo -= 1
+                    hi -= 1
+                else:
+                    util_common.check(False, 'no id 0')
+
+            if weight is not None:
+                weight_var1 = self._help_new_var()
+                self._weights.append((weight, abs(weight_var1) - 1))
+                weight_var2 = self._help_new_var()
+                self._weights.append((weight, abs(weight_var2) - 1))
+
+                self._constraints.append((coefs + [ len(lls)], inds + [abs(weight_var1) - 1], lo, None))
+                self._constraints.append((coefs + [-len(lls)], inds + [abs(weight_var2) - 1], None, hi))
+            else:
+                self._constraints.append((coefs, inds, lo, hi))
+
+    def _IMPL_solve(self):
+        soln = self._do_solve()
+
+        if soln is None:
+            return False
+
+        self._result, self._objective = soln
+
+        return True
+
+    def _IMPL_get_var(self, vv):
+        return self._result[vv - 1] > 0
+
+class SciPySolver(_MilpSolver):
+    def __init__(self):
+        util_common.check(try_import_scipy(), 'scipy not available')
+
+        super().__init__(SOLVER_SCIPY)
+
+    def _do_solve(self):
+        c = numpy.zeros(self._curr_id)
+        for coef, ind in self._weights:
+            c[ind] += coef
+
+        A = numpy.zeros((len(self._constraints), self._curr_id))
+        b_l = numpy.zeros(len(self._constraints))
+        b_u = numpy.zeros(len(self._constraints))
+        for ii, (coefs, inds, lo, hi) in enumerate(self._constraints):
+            for coef, ind in zip(coefs, inds):
+                A[ii][ind] += coef
+            if lo is None:
+                b_l[ii] = -numpy.inf
+            else:
+                b_l[ii] = lo
+            if hi is None:
+                b_u[ii] = numpy.inf
+            else:
+                b_u[ii] = hi
+        constraints = scipy.optimize.LinearConstraint(A, b_l, b_u)
+
+        integrality = numpy.ones(self._curr_id, dtype=numpy.uint8)
+        bounds = scipy.optimize.Bounds(numpy.zeros(self._curr_id), numpy.ones(self._curr_id))
+
+        res = scipy.optimize.milp(c=c, constraints=constraints, integrality=integrality, bounds=bounds)
+
+        if res.status != 0:
+            return None
+
+        util_common.check(int(res.fun) == res.fun, 'non-integer objective')
+
+        return (res.x > 0.5), int(res.fun)
+
+class CvxPySolver(_MilpSolver):
+    def __init__(self):
+        util_common.check(try_import_cvxpy(), 'cvxpy not available')
+
+        super().__init__(SOLVER_CVXPY)
+
+    def _do_solve(self):
+        x = cvxpy.Variable(self._curr_id, integer=True)
+
+        c = numpy.zeros(self._curr_id)
+        for coef, ind in self._weights:
+            c[ind] += coef
+
+        objective = cvxpy.Minimize(c @ x)
+
+        constraints = [0 <= x, x <= 1]
+        for coefs, inds, lo, hi in self._constraints:
+            expr = 0
+            for coef, ind in zip(coefs, inds):
+                expr += coef * x[ind]
+
+            if lo == hi:
+                util_common.check(lo is not None, 'both bounds None')
+                constraints.append(expr == lo)
+            else:
+                if lo is not None:
+                    constraints.append(expr >= lo)
+                if hi is not None:
+                    constraints.append(expr <= hi)
+
+        prob = cvxpy.Problem(objective, constraints)
+
+        res = prob.solve()
+
+        if prob.status != 'optimal':
+            return None
+
+        util_common.check(int(prob.value) == prob.value, 'non-integer objective')
+
+        return (x.value > 0.5), int(prob.value)
+
+
+
 class ClingoFrontendSolver(SolverImpl):
     def __init__(self):
-        util_common.check(available_clingo, 'clingo not available')
+        util_common.check(try_import_clingo(), 'clingo not available')
 
         super().__init__(SOLVER_CLINGO_FE, True, False)
 
@@ -717,8 +998,8 @@ class ClingoFrontendSolver(SolverImpl):
         self._soft_var_weights = {}
 
     def _ctl_init(self):
-        args = ['--rand-freq=0.2', '--seed=0']
-        self._ctl = clingo.Control(args)
+        ctl_args = ['--rand-freq=0.2', '--seed=0']
+        self._ctl = clingo.Control(ctl_args)
 
     def _ctl_add_rule(self, rule):
         self._ctl.add('base', [], rule)
@@ -739,14 +1020,14 @@ class ClingoFrontendSolver(SolverImpl):
 
         self._curr_id += 1
         soft_var = '%s(%d)' % (weight_func, self._curr_id)
-        self._ctl_add_rule('0{ %s }1.' % soft_var)
+        self._ctl_add_rule('0 { %s } 1.' % soft_var)
 
         return soft_var
 
     def _help_new_var(self):
         self._curr_id += 1
         new_var = 'var(%d)' % self._curr_id
-        self._ctl_add_rule('0{ %s }1.' % new_var)
+        self._ctl_add_rule('0 { %s } 1.' % new_var)
 
         return new_var
 
@@ -800,14 +1081,15 @@ class ClingoFrontendSolver(SolverImpl):
         else:
             lo_str = ''
             if lo > 0:
-                lo_str = str(lo)
+                lo_str = str(lo) + ' '
 
             hi_str = ''
             if hi < len(lls):
-                hi_str = str(hi)
+                hi_str = ' ' + str(hi)
 
             if lo_str != '' or hi_str != '':
-                self._ctl_add_rule('%s{ %s }%s%s.' % (lo_str, ';'.join(lls), hi_str, get_soft_var_body()))
+                lls = [str(ii) + ':' + ll for ii, ll in enumerate(lls)]
+                self._ctl_add_rule('%s#count{ %s }%s%s.' % (lo_str, ';'.join(lls), hi_str, get_soft_var_body()))
 
     def _IMPL_solve(self):
         def on_model(_m):
@@ -839,11 +1121,12 @@ class ClingoFrontendSolver(SolverImpl):
 
 class ClingoBackendSolver(SolverImpl):
     def __init__(self):
-        util_common.check(available_clingo, 'clingo not available')
+        util_common.check(try_import_clingo(), 'clingo not available')
 
         super().__init__(SOLVER_CLINGO_BE, True, False)
 
-        self._ctl = clingo.Control()
+        ctl_args = ['--rand-freq=0.2', '--seed=0']
+        self._ctl = clingo.Control(ctl_args)
 
         self._all_atoms = []
 
@@ -956,7 +1239,7 @@ class ClingoBackendSolver(SolverImpl):
 
 class PySatSolverMiniCard(SolverImpl):
     def __init__(self):
-        util_common.check(available_pysat, 'pysat not available')
+        util_common.check(try_import_pysat(), 'pysat not available')
 
         super().__init__(SOLVER_PYSAT_MC, False, False)
 
@@ -1023,6 +1306,9 @@ class PySatSolverMiniCard(SolverImpl):
         self._result = self._s.get_model()
         self._objective = 0
 
+        for ii, vv in enumerate(self._result):
+            util_common.check(abs(vv) - 1 == ii, 'result index')
+
         return True
 
     def _IMPL_get_var(self, vv):
@@ -1032,13 +1318,15 @@ class PySatSolverMiniCard(SolverImpl):
 
 class _PySatSolverWeighted(SolverImpl):
     def __init__(self, solver_id, solver_option):
-        util_common.check(available_pysat, 'pysat not available')
+        util_common.check(try_import_pysat(), 'pysat not available')
 
         util_common.check(solver_option in [PYSAT_OPTION_CARD, PYSAT_OPTION_BOOLONLY], 'invalid option for solver: ' + solver_option)
 
         super().__init__(solver_id, True, False)
 
         self._option = solver_option
+
+        self._pysat_encoding = pysat.card.EncType.kmtotalizer
 
         if self._option == PYSAT_OPTION_CARD:
             self._wcnf = pysat.formula.WCNFPlus()
@@ -1113,7 +1401,7 @@ class _PySatSolverWeighted(SolverImpl):
                     if weight is not None and len(label_var_cls) == 0:
                         label_var_cls = [self._next_var()]
 
-                    cnf = pysat.card.CardEnc.atleast(lits=lls, bound=lo, top_id=self._curr_id, encoding=PYSAT_ENCODING)
+                    cnf = pysat.card.CardEnc.atleast(lits=lls, bound=lo, top_id=self._curr_id, encoding=self._pysat_encoding)
                     for cls in cnf:
                         self._wcnf.append(cls + label_var_cls)
                         self._curr_id = max(self._curr_id, max(cls))
@@ -1122,7 +1410,7 @@ class _PySatSolverWeighted(SolverImpl):
                     if weight is not None and len(label_var_cls) == 0:
                         label_var_cls = [self._next_var()]
 
-                    cnf = pysat.card.CardEnc.atmost(lits=lls, bound=hi, top_id=self._curr_id, encoding=PYSAT_ENCODING)
+                    cnf = pysat.card.CardEnc.atmost(lits=lls, bound=hi, top_id=self._curr_id, encoding=self._pysat_encoding)
                     for cls in cnf:
                         self._wcnf.append(cls + label_var_cls)
                         self._curr_id = max(self._curr_id, max(cls))
@@ -1131,13 +1419,15 @@ class _PySatSolverWeighted(SolverImpl):
                     self._wcnf.append([-label_var], weight=weight)
 
     def _IMPL_solve(self):
-        model, cost = self._do_solve()
+        soln = self._do_solve()
 
-        if not model:
+        if soln is None:
             return False
 
-        self._result = model
-        self._objective = cost
+        self._result, self._objective = soln
+
+        for ii, vv in enumerate(self._result):
+            util_common.check(abs(vv) - 1 == ii, 'result index')
 
         return True
 
@@ -1153,7 +1443,7 @@ class _PySatSolverFM(_PySatSolverWeighted):
         if fm.compute():
             return fm.model, fm.cost
 
-        return None, None
+        return None
 
 class PySatSolverFM(_PySatSolverFM):
     def __init__(self):
@@ -1172,7 +1462,7 @@ class _PySatSolverRC2(_PySatSolverWeighted):
             for m in rc2.enumerate():
                 return list(m), rc2.cost
 
-        return None, None
+        return None
 
 class PySatSolverRC2(_PySatSolverRC2):
     def __init__(self):
