@@ -555,6 +555,8 @@ class Generator:
     def get_result(self):
         res_info = util_common.ResultInfo()
 
+        res_info.tileset = self._scheme_info.tileset
+
         res_info.solver_id = self._solver.get_solver_id_used()
         res_info.solver_objective = self._solver.get_objective()
 
@@ -567,19 +569,6 @@ class Generator:
                 reach_info.path_edges, reach_info.path_tiles, path_edge_keys = self._get_reach_path(connect_index)
                 reach_info.offpath_edges = self._get_reach_offpath_edges(connect_index, path_edge_keys)
                 res_info.reach_info.append(reach_info)
-
-        if False:
-            if self._reach_move_info is not None and self._reach_move_info.unreachable:
-                for ii in range(len(self._reach_move_info)):
-                    if self._reach_move_info[ii].unreachable:
-                        for rr in range(self._rows):
-                            row = ''
-                            for cc in range(self._cols):
-                                if self._solver.get_var(self._reach_vars_node[(rr, cc)]):
-                                    row = row + 'o'
-                                else:
-                                    row = row + '.'
-                            print(row)
 
         res_info.tile_level = util_common.make_grid(self._rows, self._cols, util_common.VOID_TILE)
         res_info.text_level = None
@@ -606,6 +595,39 @@ class Generator:
             res_info.image_level = util_common.tile_level_to_image_level(res_info.tile_level, self._scheme_info.tileset)
 
         return res_info
+
+    def print_reach_internal(self):
+        if len(self._reach_connect_item) == 0:
+            print('no reach connect')
+        else:
+            for connect_index, connect_item in enumerate(self._reach_connect_item):
+                src = connect_item.connect_info.src
+                dst = connect_item.connect_info.dst
+                unreachable = connect_item.connect_info.unreachable
+                if unreachable:
+                    path_tiles = None
+                else:
+                    _, path_tiles, _ = self._get_reach_path(connect_index)
+
+                print(src, 'to', dst, 'unreachable' if unreachable else 'reachable')
+
+                for rr in range(self._rows):
+                    row = ''
+                    for cc in range(self._cols):
+                        if unreachable:
+                            if self._solver.get_var(connect_item.vars_node[(rr, cc)]):
+                                row = row + 'o'
+                            else:
+                                row = row + '.'
+                        else:
+                            if self._solver.get_var(connect_item.vars_node[(rr, cc)]):
+                                if (rr, cc) in path_tiles:
+                                    row = row + '*'
+                                else:
+                                    row = row + 'o'
+                            else:
+                                row = row + '.'
+                    print(row)
 
     def _get_tiles_set(self):
         tiles = {}

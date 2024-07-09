@@ -37,14 +37,13 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
     use_text = None
     use_image = None
 
-    entry_size = None
     all_levels = []
 
     tind_to_text = {}
     text_to_tind = {}
     tind_to_image = {}
     image_to_tind = {}
-    tinds_to_tile = {}
+    tinds_to_tiles = {}
     tile_to_tinds = {}
 
     ntind = 0
@@ -60,6 +59,84 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
     pind_to_prop = {}
     prop_to_pind = {}
     all_pinds = []
+
+    def set_tileset(_tileset):
+        nonlocal tileset, use_text, use_image
+        nonlocal tind_to_text, text_to_tind, tind_to_image, image_to_tind, tinds_to_tiles, tile_to_tinds
+        nonlocal ntind, ntind_both, ntind_text, ntind_image
+
+        if tileset == None:
+            tileset = _tileset
+            use_text = (tileset.tile_to_text is not None) and (not image_only)
+            use_image = (tileset.tile_to_image is not None) and (not text_only)
+
+            tile_to_tinds = {}
+            for _tile in tileset.tile_ids:
+                tile_to_tinds[_tile] = []
+
+            _tile_to_image_key = {}
+            if use_image:
+                for _tile in tileset.tile_ids:
+                    _tile_to_image_key[_tile] = tuple(tileset.tile_to_image[_tile].getdata())
+
+            _text_uniq = {}
+            _image_key_uniq = {}
+
+            for _tile in tileset.tile_ids:
+                if use_text:
+                    _text = tileset.tile_to_text[_tile]
+                    if _text in _text_uniq:
+                        _text_uniq[_text] = False
+                    else:
+                        _text_uniq[_text] = True
+                if use_image:
+                    _image_key = _tile_to_image_key[_tile]
+                    if _image_key in _image_key_uniq:
+                        _image_key_uniq[_image_key] = False
+                    else:
+                        _image_key_uniq[_image_key] = True
+
+            for _tile in tileset.tile_ids:
+                if use_text and use_image:
+                    _text = tileset.tile_to_text[_tile]
+                    _image_key = _tile_to_image_key[_tile]
+
+                    if _text_uniq[_text] and _image_key_uniq[_image_key]:
+                        text_to_tind[_text] = ntind
+                        tind_to_text[ntind] = _text
+                        image_to_tind[_image_key] = ntind
+                        tind_to_image[ntind] = tileset.tile_to_image[_tile]
+                        tile_to_tinds[_tile].append(ntind)
+                        ntind += 1
+                        ntind_both += 1
+                        continue
+
+                if use_text:
+                    _text = tileset.tile_to_text[_tile]
+                    if _text not in text_to_tind:
+                        text_to_tind[_text] = ntind
+                        tind_to_text[ntind] = _text
+                        ntind += 1
+                        ntind_text += 1
+                    tile_to_tinds[_tile].append(text_to_tind[_text])
+
+                if use_image:
+                    _image_key = _tile_to_image_key[_tile]
+                    if _image_key not in image_to_tind:
+                        image_to_tind[_image_key] = ntind
+                        tind_to_image[ntind] = tileset.tile_to_image[_tile]
+                        ntind += 1
+                        ntind_image += 1
+                    tile_to_tinds[_tile].append(image_to_tind[_image_key])
+
+            for _tile, _tinds in tile_to_tinds.items():
+                _key = tuple(sorted(_tinds))
+                if _key not in tinds_to_tiles:
+                    tinds_to_tiles[_key] = ()
+                tinds_to_tiles[_key] = tuple(sorted(tinds_to_tiles[_key] + (_tile,)))
+
+        else:
+            util_common.check_tileset_match(tileset, _tileset)
 
     def add_level(_tile_level, _edges, _props):
         nonlocal rows, cols
@@ -118,93 +195,29 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
                 _level.append([_void_tind] * _cols)
         return True
 
-    for tilefile_glob in tilefiles:
-        for tilefile in glob.iglob(tilefile_glob):
-            with util_common.openz(tilefile, 'rb') as f:
-                tile_info = pickle.load(f)
+    if tilefiles is not None:
+        for tilefile_glob in tilefiles:
+            for tilefile in glob.iglob(tilefile_glob):
+                with util_common.openz(tilefile, 'rb') as f:
+                    tile_info = pickle.load(f)
 
-                if tileset == None:
-                    tileset = tile_info.tileset
-                    use_text = (tileset.tile_to_text is not None) and (not image_only)
-                    use_image = (tileset.tile_to_image is not None) and (not text_only)
+                    set_tileset(tile_info.tileset)
 
-                    tile_to_tinds = {}
-                    for tile in tileset.tile_ids:
-                        tile_to_tinds[tile] = []
-
-                    tile_to_image_key = {}
-                    if use_image:
-                        for tile in tileset.tile_ids:
-                            tile_to_image_key[tile] = tuple(tileset.tile_to_image[tile].getdata())
-
-                    text_uniq = {}
-                    image_key_uniq = {}
-
-                    for tile in tileset.tile_ids:
-                        if use_text:
-                            text = tileset.tile_to_text[tile]
-                            if text in text_uniq:
-                                text_uniq[text] = False
-                            else:
-                                text_uniq[text] = True
-                        if use_image:
-                            image_key = tile_to_image_key[tile]
-                            if image_key in image_key_uniq:
-                                image_key_uniq[image_key] = False
-                            else:
-                                image_key_uniq[image_key] = True
-
-                    for tile in tileset.tile_ids:
-                        if use_text and use_image:
-                            text = tileset.tile_to_text[tile]
-                            image_key = tile_to_image_key[tile]
-
-                            if text_uniq[text] and image_key_uniq[image_key]:
-                                text_to_tind[text] = ntind
-                                tind_to_text[ntind] = text
-                                image_to_tind[image_key] = ntind
-                                tind_to_image[ntind] = tileset.tile_to_image[tile]
-                                tile_to_tinds[tile].append(ntind)
-                                ntind += 1
-                                ntind_both += 1
-                                continue
-
-                        if use_text:
-                            text = tileset.tile_to_text[tile]
-                            if text not in text_to_tind:
-                                text_to_tind[text] = ntind
-                                tind_to_text[ntind] = text
-                                ntind += 1
-                                ntind_text += 1
-                            tile_to_tinds[tile].append(text_to_tind[text])
-
-                        if use_image:
-                            image_key = tile_to_image_key[tile]
-                            if image_key not in image_to_tind:
-                                image_to_tind[image_key] = ntind
-                                tind_to_image[ntind] = tileset.tile_to_image[tile]
-                                ntind += 1
-                                ntind_image += 1
-                            tile_to_tinds[tile].append(image_to_tind[image_key])
-
-                    for tile, tinds in tile_to_tinds.items():
-                        tinds_to_tile[tuple(sorted(tinds))] = tile
-
-                else:
-                    util_common.check_tileset_match(tileset, tile_info.tileset)
-
-                if tile_info.levels is not None:
-                    for tli in tile_info.levels:
-                        path = util_common.get_meta_path(tli.meta)
-                        properties = util_common.get_meta_properties(tli.meta)
-                        add_level(tli.tiles, path, properties)
+                    if tile_info.levels is not None:
+                        for tli in tile_info.levels:
+                            path = util_common.get_meta_path(tli.meta)
+                            properties = util_common.get_meta_properties(tli.meta)
+                            add_level(tli.tiles, path, properties)
 
     if resultfiles is not None:
         for resultfile_glob in resultfiles:
             for resultfile in glob.iglob(resultfile_glob):
                 with util_common.openz(resultfile, 'rb') as f:
-                    edges = None
                     result_info = pickle.load(f)
+
+                    set_tileset(result_info.tileset)
+
+                    edges = None
                     if result_info.reach_info is not None:
                         util_common.check(len(result_info.reach_info) == 1, 'only support for one path')
                         edges = result_info.reach_info[0].path_edges
@@ -242,7 +255,7 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
 
     ex.tind_to_text = tind_to_text
     ex.tind_to_image = tind_to_image
-    ex.tinds_to_tile = tinds_to_tile
+    ex.tinds_to_tiles = tinds_to_tiles
     ex.eind_to_edge = eind_to_edge
     ex.pind_to_prop = pind_to_prop
 
@@ -263,7 +276,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Convert levels to explore file.')
     parser.add_argument('--outfile', required=True, type=str, help='Explore file to write to.')
-    parser.add_argument('--tilefile', required=True, type=str, nargs='+', help='Input tile file(s).')
+    parser.add_argument('--tilefile', type=str, nargs='+', help='Input tile file(s).')
     parser.add_argument('--resultfile', type=str, nargs='+', help='Input result file(s).')
     parser.add_argument('--text-only', action='store_true', help='Only use tile edges.')
     parser.add_argument('--image-only', action='store_true', help='Only use image edges.')

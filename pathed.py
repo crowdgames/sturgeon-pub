@@ -58,14 +58,15 @@ class PathCanvas(tkinter.Canvas):
         self._reverse = False
 
         self._move_template = move_template
-        self._template_open_closed = util_path.get_template_open_closed(util_reach.get_move_template(self._move_template))
+        self._game_to_open_closed_template = { util_common.DEFAULT_TEXT: util_path.get_open_closed_template(util_reach.get_move_template(self._move_template)) }
+        self._game_locations = { (rr, cc): util_common.DEFAULT_TEXT for rr in range(self._rows) for cc in range(self._cols) }
 
         self._schemefile = schemefile
         self._outfolder = outfolder
 
+        self._path_nexts = None
         self._path_open = {}
         self._path_closed = {}
-        self._path_nexts = None
 
         self._working_draw = []
         self._gen_objective = None
@@ -89,17 +90,17 @@ class PathCanvas(tkinter.Canvas):
         self._gen_proc_termed = False
         self._gen_proc_q = None
 
-        self.bind_all("<BackSpace>", self.on_key_backspace)
-        self.bind_all("<KeyPress-=>", self.on_key_equal)
-        self.bind_all("<KeyPress-c>", self.on_key_c)
-        self.bind_all("<KeyPress-x>", self.on_key_x)
-        self.bind_all("<KeyPress-p>", self.on_key_p)
-        self.bind_all("<KeyPress-n>", self.on_key_n)
-        self.bind_all("<KeyPress-b>", self.on_key_b)
-        self.bind_all("<KeyPress-o>", self.on_key_o)
-        self.bind_all("<KeyPress-r>", self.on_key_r)
-        self.bind_all("<KeyPress-s>", self.on_key_s)
-        self.bind_all("<KeyPress-w>", self.on_key_w)
+        self.bind_all("<BackSpace>", self.on_key_backspace) # delete from end
+        self.bind_all("<KeyPress-=>", self.on_key_equal)    # delete from beginning
+        self.bind_all("<KeyPress-c>", self.on_key_c)        # copy generated path
+        self.bind_all("<KeyPress-x>", self.on_key_x)        # clear path
+        self.bind_all("<KeyPress-p>", self.on_key_p)        # toggle add to beginning/end
+        self.bind_all("<KeyPress-n>", self.on_key_n)        # next generated level
+        self.bind_all("<KeyPress-b>", self.on_key_b)        # previous generated level
+        self.bind_all("<KeyPress-o>", self.on_key_o)        # toggle show open/closed tiles
+        self.bind_all("<KeyPress-r>", self.on_key_r)        # random path
+        self.bind_all("<KeyPress-s>", self.on_key_s)        # shortest path between drawn beginning/end
+        self.bind_all("<KeyPress-w>", self.on_key_w)        # shortest path between generated beginning/end in level
         self.bind("<Motion>", self.on_mouse_motion)
         self.bind("<Leave>", self.on_mouse_leave)
         self.bind("<ButtonPress-1>", self.on_mouse_button)
@@ -340,7 +341,12 @@ class PathCanvas(tkinter.Canvas):
         self.redraw_from_grid()
 
     def recompute_nexts(self):
-        self._path_nexts, self._path_open, self._path_closed = util_path.get_nexts_open_closed_from(self._path, self._reverse, self._rows, self._cols, self._template_open_closed)
+        if len(self._path) == 0:
+            self._path_nexts = None
+            self._path_open = {}
+            self._path_closed = {}
+        else:
+            self._path_nexts, self._path_open, self._path_closed = util_path.get_nexts_open_closed_from(self._path, self._reverse, self._rows, self._cols, self._game_to_open_closed_template, self._game_locations)
         self.redraw_from_path()
 
     def new_manual_path(self, delay_proc):
@@ -386,18 +392,18 @@ class PathCanvas(tkinter.Canvas):
     def on_key_r(self, event):
         self._seed_rand_path += 1
         rng = random.Random(self._seed_rand_path)
-        self._path = util_path.random_path_by_search(rng, self._rows, self._cols, self._template_open_closed)
+        self._path = util_path.random_path_by_search(rng, self._rows, self._cols, self._game_to_open_closed_template, self._game_locations)
         self.new_manual_path(False)
 
     def on_key_s(self, event):
         if len(self._path) >= 2:
-            self._path = util_path.shortest_path_between(self._path[0], self._path[-1], self._rows, self._cols, self._template_open_closed, {}, {})
+            self._path = util_path.shortest_path_between(self._path[0], self._path[-1], self._rows, self._cols, self._game_to_open_closed_template, {}, {}, self._game_locations)
             self.new_manual_path(False)
 
     def on_key_w(self, event):
         if self._gen_path is not None and len(self._gen_path) >= 2:
-            are_open, are_closed = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT, util_common.START_TEXT, util_common.GOAL_TEXT)
-            self._path = util_path.shortest_path_between(self._gen_path[0], self._gen_path[-1], self._rows, self._cols, self._template_open_closed, are_open, are_closed)
+            open_locations, closed_locations = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT, util_common.START_TEXT, util_common.GOAL_TEXT)
+            self._path = util_path.shortest_path_between(self._gen_path[0], self._gen_path[-1], self._rows, self._cols, self._game_to_open_closed_template, open_locations, closed_locations, self._game_locations)
             self.new_manual_path(False)
 
     def on_mouse_motion(self, event):

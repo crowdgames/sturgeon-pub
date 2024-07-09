@@ -1,3 +1,4 @@
+import argparse
 import util_common
 
 
@@ -47,6 +48,26 @@ RPLOC_DICT = {
 }
 
 
+
+def parse_reach_subargs(name, subargs):
+    reach_parser = argparse.ArgumentParser(prog=name+' sub-argument', description='Reach connect sub-argument parsing.')
+    reach_parser.add_argument('--src', required=True, type=str, default=None, help='Source junction.')
+    reach_parser.add_argument('--dst', required=True, type=str, default=None, help='Destination junction.')
+    reach_parser.add_argument('--move', required=True, type=str, nargs='+', default=None, help='Use reachability move rules, from: ' + ','.join(RMOVE_LIST) + '.')
+    reach_parser.add_argument('--wrap-cols', action='store_true', help='Wrap columns in reachability.')
+    reach_parser.add_argument('--open-zelda', action='store_true', help='Use Zelda open tiles.')
+    reach_parser.add_argument('--unreachable', action='store_true', help='Generate levels with unreachable goals.')
+    reach_args = reach_parser.parse_args(subargs)
+
+    reach_connect_setup = util_common.ReachConnectSetup()
+    reach_connect_setup.src = reach_args.src
+    reach_connect_setup.dst = reach_args.dst
+    reach_connect_setup.game_to_move = util_common.arg_list_to_dict_options(reach_parser, name+' sub-argument --move', reach_args.move, RMOVE_LIST)
+    reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if reach_args.open_zelda else util_common.OPEN_TEXT
+    reach_connect_setup.wrap_cols = reach_args.wrap_cols
+    reach_connect_setup.unreachable = reach_args.unreachable
+
+    return reach_connect_setup
 
 def get_move_template(reach_move):
     move_template = []

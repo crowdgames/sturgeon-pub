@@ -24,8 +24,12 @@ def explore2summary(ex, summarize_levels, summarize_edges):
     print('index image: ', ''.join([(image_ids[id(ex.tind_to_image[tind])] if tind in ex.tind_to_image else ' ')  for tind in range(ex.ntind)]))
 
     tile_to_tinds = {}
-    for tinds, tile in ex.tinds_to_tile.items():
-        tile_to_tinds[tile] = tinds
+    has_ambiguous_tiles = False
+    for tinds, tiles in ex.tinds_to_tiles.items():
+        for tile in tiles:
+            tile_to_tinds[tile] = tinds
+        if len(tiles) != 1:
+            has_ambiguous_tiles = True
 
     tiles_strings = []
     for tile in ex.tileset.tile_ids:
@@ -38,6 +42,8 @@ def explore2summary(ex, summarize_levels, summarize_edges):
         tiles_strings.append(tile_string)
 
     print('tiles:', ' '.join(tiles_strings))
+
+    print('ambiguous tiles:', 'yes' if has_ambiguous_tiles else 'no')
 
     print('void tile:', 'yes' if ex.void_tind is not None else 'no')
 

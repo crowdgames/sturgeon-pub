@@ -85,38 +85,48 @@ def check_graph(gr, gtype):
         util_common.check(nx.is_directed_acyclic_graph(gr), 'not dag')
 
 def graph_node_cattrs(gr):
-    node_cattrs = {}
+    node_cattrs = None
 
     for node in gr.nodes:
+        this_node_cattrs = {}
+
         if gr.nodes[node][GATTR_LABEL] != '':
-            node_cattrs[CATTR_LABEL] = None
+            this_node_cattrs[CATTR_LABEL] = None
         if GATTR_POSITION in gr.nodes[node]:
             if len(gr.nodes[node][GATTR_POSITION]) == 2:
-                node_cattrs[CATTR_POSITION2] = None
+                this_node_cattrs[CATTR_POSITION2] = None
             elif len(gr.nodes[node][GATTR_POSITION]) == 3:
-                node_cattrs[CATTR_POSITION3] = None
+                this_node_cattrs[CATTR_POSITION3] = None
         if GATTR_CENTRAL in gr.nodes[node]:
-            node_cattrs[CATTR_CENTRAL] = None
+            this_node_cattrs[CATTR_CENTRAL] = None
 
-    return node_cattrs
+        util_common.check(node_cattrs is None or node_cattrs == this_node_cattrs, 'node_cattrs mismatch')
+        node_cattrs = this_node_cattrs
+
+    return ''.join(node_cattrs.keys())
 
 def graph_edge_cattrs(gr):
-    edge_cattrs = {}
+    edge_cattrs = None
 
     for edge in gr.edges:
+        this_edge_cattrs = {}
+
         if gr.edges[edge][GATTR_LABEL] != '':
-            edge_cattrs[CATTR_LABEL] = None
+            this_edge_cattrs[CATTR_LABEL] = None
         if GATTR_DELTA in gr.edges[edge]:
             if len(gr.edges[edge][GATTR_DELTA]) == 2:
-                edge_cattrs[CATTR_DELTA2] = None
+                this_edge_cattrs[CATTR_DELTA2] = None
             elif len(gr.edges[edge][GATTR_DELTA]) == 3:
-                edge_cattrs[CATTR_DELTA3] = None
+                this_edge_cattrs[CATTR_DELTA3] = None
         if GATTR_POLAR in gr.edges[edge]:
-            edge_cattrs[CATTR_POLAR] = None
+            this_edge_cattrs[CATTR_POLAR] = None
         if GATTR_CYCLE in gr.edges[edge]:
-            edge_cattrs[CATTR_CYCLE] = None
+            this_edge_cattrs[CATTR_CYCLE] = None
 
-    return edge_cattrs
+        util_common.check(edge_cattrs is None or edge_cattrs == this_edge_cattrs, 'edge_cattrs mismatch')
+        edge_cattrs = this_edge_cattrs
+
+    return ''.join(edge_cattrs.keys())
 
 def nodes_and_label_pos_central(gr):
     return [(node,
@@ -222,6 +232,8 @@ def read_graphs(filenames):
                     splt = splt[2:]
                     util_common.check(fra != til, 'no self edges')
                     util_common.check(not gr.has_edge(fra, til), f'no duplicate edges {filename} {fra} {til}')
+                    if not gtype_directed(grs.gtype):
+                        util_common.check(not gr.has_edge(til, fra), f'no duplicate undirected edges {filename} {fra} {til}')
                     gr.add_edge(fra, til)
                     gr.edges[(fra, til)][GATTR_LABEL] = ''
                     for cattr in edge_cattrs:
@@ -278,10 +290,10 @@ def write_graph(grs, out):
     node_cattrs = graph_node_cattrs(gr)
     edge_cattrs = graph_edge_cattrs(gr)
 
-    node_cattrs = CATTR_NONE if len(node_cattrs) == 0 else ''.join(node_cattrs.keys())
-    edge_cattrs = CATTR_NONE if len(edge_cattrs) == 0 else ''.join(edge_cattrs.keys())
+    write_node_cattrs = CATTR_NONE if node_cattrs == '' else node_cattrs
+    write_edge_cattrs = CATTR_NONE if edge_cattrs == '' else edge_cattrs
 
-    out.write(f't {grs.gtype} {node_cattrs} {edge_cattrs}\n')
+    out.write(f't {grs.gtype} {write_node_cattrs} {write_edge_cattrs}\n')
     for label, color in grs.colors.items():
         out.write(f'c {label} {color}\n')
     for node in gr.nodes:
@@ -332,19 +344,25 @@ def write_graph_dot(grs, no_etc, out):
 
         for node, label, pos, central in nodes_and_label_pos_central(gr):
             attrs = ''
-            if label == '':
+
+            if label is None:
                 attrs += f'label=""'
-            else:
-                attrs += f'label="{label}"'
+                attrs += f'style="invis"'
 
-            if len(label) > 1:
-                fontsize = max(6, 24 - 2.5 * (len(label) - 1))
-                attrs += f' fontsize="{fontsize}"'
-
-            if label in grs.colors:
-                attrs += f' style="filled" fillcolor="#{grs.colors[label]}"'
             else:
-                attrs += f' style="filled" fillcolor="#eeeeee"'
+                if label == '':
+                    attrs += f'label=""'
+                else:
+                    attrs += f'label="{label}"'
+
+                if len(label) > 1:
+                    fontsize = max(6, 24 - 2.5 * (len(label) - 1))
+                    attrs += f' fontsize="{fontsize}"'
+
+                if label in grs.colors:
+                    attrs += f' style="filled" fillcolor="#{grs.colors[label]}"'
+                else:
+                    attrs += f' style="filled" fillcolor="#eeeeee"'
 
             if pos is not None:
                 pos_str = ','.join([str(ee) for ee in pos])

@@ -15,12 +15,10 @@ START_TEXT       = '{'
 GOAL_TEXT        = '}'
 
 DEFAULT_TEXT     = ','
-PATH_TEXT        = 'p'
 
 VOID_TEXT        = ' '
 VOID_TILE        = -1
 
-SPECIAL_CHARS    = [PATH_TEXT]
 INDEX_CHARS      = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 
@@ -113,7 +111,7 @@ class ResultReachInfo:
         self.path_tiles = None
         self.offpath_edges = None
 
-class ExecutionStepInfo:
+class PlaythroughStepInfo:
     def __init__(self):
         self.name = None
         self.changes = None
@@ -124,13 +122,15 @@ class ExecutionStepInfo:
 
 class ResultInfo:
     def __init__(self):
+        self.tileset = None
+
         self.tile_level = None
         self.text_level = None
         self.image_level = None
 
         self.reach_info = None
 
-        self.execution_info = None
+        self.playthrough_info = None
 
         self.solver_id = None
         self.solver_objective = None
@@ -447,17 +447,17 @@ def get_meta_from_result(result_info):
 
     return meta
 
-def print_result_info(result_info, replace_path_tiles):
+def print_result_info(result_info):
     print('tile level')
     print_tile_level(result_info.tile_level)
 
     if result_info.text_level is not None:
         print('text level')
-        print_result_text_level(result_info, replace_path_tiles)
+        print_result_text_level(result_info)
 
-    if result_info.execution_info is not None:
-        print('execution')
-        for step_info in result_info.execution_info:
+    if result_info.playthrough_info is not None:
+        print('playthrough')
+        for step_info in result_info.playthrough_info:
             if step_info.first_term:
                 print('>>> TERM <<<')
                 print()
@@ -482,7 +482,7 @@ def save_result_info(result_info, prefix, compress=False, save_level=True, save_
             print('writing text level to', text_name)
 
             with openz(text_name, 'wt') as f:
-                print_result_text_level(result_info, False, outfile=f)
+                print_result_text_level(result_info, outfile=f)
 
         if result_info.image_level is not None:
             image_name = prefix + '.png'
@@ -490,19 +490,19 @@ def save_result_info(result_info, prefix, compress=False, save_level=True, save_
 
             result_info.image_level.save(image_name)
 
-        if result_info.execution_info is not None:
-            exec_folder = prefix + '_exec'
-            print('writing execution levels to', exec_folder)
-            if os.path.exists(exec_folder):
-                shutil.rmtree(exec_folder)
-            os.makedirs(exec_folder)
+        if result_info.playthrough_info is not None:
+            play_folder = prefix + '_play'
+            print('writing playthrough levels to', play_folder)
+            if os.path.exists(play_folder):
+                shutil.rmtree(play_folder)
+            os.makedirs(play_folder)
 
-            for ii, step_info in enumerate(result_info.execution_info):
+            for ii, step_info in enumerate(result_info.playthrough_info):
                 descr = ['term' if step_info.term else 'step']
                 if step_info.name:
                     descr.append(step_info.name)
 
-                step_prefix = exec_folder + ('/%02d_' % ii) + '_'.join(descr) + '_exec'
+                step_prefix = play_folder + ('/%02d_' % ii) + '_'.join(descr) + '_play'
 
                 meta = result_info.extra_meta
                 if len(step_info.changes) != 0:
@@ -557,29 +557,21 @@ def print_tile_level_json(tile_level, meta=None, outfile=None):
     json.dump(json_data, outfile)
     outfile.write('\n')
 
-def print_result_text_level(result_info, replace_path_tiles, outfile=None):
+def print_result_text_level(result_info, outfile=None):
     if outfile is None:
         outfile = sys.stdout
 
     meta = get_meta_from_result(result_info)
 
-    if replace_path_tiles and result_info.reach_info is not None:
-        path_tiles = result_info.reach_info.path_tiles
-    else:
-        path_tiles = None
+    print_text_level(result_info.text_level, meta=meta, outfile=outfile)
 
-    print_text_level(result_info.text_level, meta=meta, replace_path_tiles=path_tiles, outfile=outfile)
-
-def print_text_level(text_level, meta=None, replace_path_tiles=None, outfile=None):
+def print_text_level(text_level, meta=None, outfile=None):
     if outfile is None:
         outfile = sys.stdout
 
-    for rr, row in enumerate(text_level):
-        for cc, tile in enumerate(row):
-            if replace_path_tiles is not None and (rr, cc) in replace_path_tiles:
-                outfile.write(PATH_TEXT)
-            else:
-                outfile.write(tile)
+    for row in text_level:
+        for tile in row:
+            outfile.write(tile)
         outfile.write('\n')
 
     if meta is not None:
@@ -639,9 +631,6 @@ def read_text_level(infilename, include_meta=False):
                 if include_meta:
                     meta.append(json.loads(line[len(META_STR):]))
             else:
-                for special_char in SPECIAL_CHARS:
-                    check(special_char not in line, 'special char ' + special_char + ' in level.')
-
                 lvl.append([c for c in line])
 
         if include_meta:

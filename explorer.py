@@ -710,7 +710,7 @@ class ExplorerFrame(tkinter.Frame):
                 return
 
             if self._rem.nlevels != 1:
-                tkinter.messagebox.showwarning(message='Can only export when exactly one level.')
+                tkinter.messagebox.showwarning(message='Only exporting exactly one level supported.')
             else:
                 ind = self._rem.levels[0]
                 remaining = np.unpackbits(self._ex.level_data[ind], count=self._level_len, axis=0)
@@ -725,7 +725,11 @@ class ExplorerFrame(tkinter.Frame):
                     for cc in range(self._ex.cols):
                         tinds = tuple(np.nonzero(remaining_tiles[rr][cc])[0])
                         if tinds != (self._ex.void_tind,):
-                            tile_level[rr][cc] = self._ex.tinds_to_tile[tinds]
+                            tiles = self._ex.tinds_to_tiles[tinds]
+                            if len(tiles) != 1:
+                                tkinter.messagebox.showwarning(message='Exporting levels with ambiguous tiles not supported.')
+                                return
+                            tile_level[rr][cc] = tiles[0]
                 tile_level = util_common.trim_void_tile_level(tile_level)
 
                 meta = []

@@ -6,7 +6,8 @@ EX_MKJR_WALK      = 'mkjr-walk'
 EX_MKJR_WALK_THRU = 'mkjr-walk-thru'
 EX_MKJR_MAZE      = 'mkjr-maze'
 EX_MKJR_MAZE_COIN = 'mkjr-maze-coin'
-EX_SOKO           = 'soko'
+EX_SOKO2          = 'soko2'
+EX_SOKO3          = 'soko3'
 EX_DOKU           = 'doku'
 EX_LOCK           = 'lock'
 EX_SLIDE          = 'slide'
@@ -16,7 +17,7 @@ EX_VVV            = 'vvv'
 EX_LINK           = 'link'
 EX_MATCH          = 'match'
 
-EXAMPLES = [EX_MKJR_WALK, EX_MKJR_WALK_THRU, EX_MKJR_MAZE, EX_MKJR_MAZE_COIN, EX_SOKO, EX_DOKU, EX_LOCK, EX_SLIDE, EX_FILL, EX_PLAT, EX_VVV, EX_LINK, EX_MATCH]
+EXAMPLES = [EX_MKJR_WALK, EX_MKJR_WALK_THRU, EX_MKJR_MAZE, EX_MKJR_MAZE_COIN, EX_SOKO2, EX_SOKO3, EX_DOKU, EX_LOCK, EX_SLIDE, EX_FILL, EX_PLAT, EX_VVV, EX_LINK, EX_MATCH]
 
 
 
@@ -216,7 +217,7 @@ def get_example_info(mkiii_setup):
             fini_exact(ci, 'o', 1)
         ei.custom = _custom
 
-    elif mkiii_setup.example == EX_SOKO:
+    elif mkiii_setup.example in [EX_SOKO2, EX_SOKO3]:
         ei.states = 'X-@#oO'
         ei.rep_rules = [(RR_GRP_CHOICE, [(DIR_ALL, '@-', '-@'), (DIR_ALL, '@#-', '-@#'), (DIR_ALL, '@#o', '-@O')])]
         ei.rep_rule_order = RR_ORD_ONE
@@ -225,8 +226,15 @@ def get_example_info(mkiii_setup):
         def _custom(ci):
             # start
             init_exact(ci, '@', 1)
-            init_exact(ci, '#', 2)
-            init_exact(ci, 'o', 2)
+
+            if mkiii_setup.example == EX_SOKO2:
+                init_exact(ci, '#', 2)
+                init_exact(ci, 'o', 2)
+            elif mkiii_setup.example == EX_SOKO3:
+                init_exact(ci, '#', 3)
+                init_exact(ci, 'o', 3)
+            else:
+                util_common.check(False, 'mkiii_setup example' + mkiii_setup.example)
 
             # border
             for rr in range(ci.rows):
@@ -982,14 +990,14 @@ class GeneratorMKIII(util_generator.Generator):
 
     def get_result(self):
         result_info = super().get_result()
-        result_info.execution_info = self._get_execution()
+        result_info.playthrough_info = self._get_playthrough()
         return result_info
 
-    def _get_execution(self):
+    def _get_playthrough(self):
         steps = []
 
         for ll in range(self._layers):
-            step_info = util_common.ExecutionStepInfo()
+            step_info = util_common.PlaythroughStepInfo()
             steps.append(step_info)
 
             if not self._group_names:

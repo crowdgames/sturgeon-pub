@@ -10,7 +10,7 @@ if __name__ == '__main__':
     util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Convert a dot file to a graph file.')
-    parser.add_argument('--outfile', type=str, help='Output file.')
+    parser.add_argument('--outfile', required=True, type=str, help='Output file.')
     parser.add_argument('--dotfile', required=True, type=str, help='Input dot file.')
     parser.add_argument('--root', type=str, help='Root node label; produces dag, otherwise produces ugraph.')
     args = parser.parse_args()

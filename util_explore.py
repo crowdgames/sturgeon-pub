@@ -13,7 +13,7 @@ class ExploreInfo:
 
         self.tind_to_text = None
         self.tind_to_image = None
-        self.tinds_to_tile = None
+        self.tinds_to_tiles = None
         self.eind_to_edge = None
         self.pind_to_prop = None
 

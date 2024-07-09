@@ -58,24 +58,26 @@ def edge_path_from_lines(prefix, lines):
             return edge_path
     return None
 
-def get_template_open_closed(move_template):
-    template_open_closed = {}
+def get_open_closed_template(move_template):
+    open_closed_template = {}
     for dest, need_open_path, need_open_aux, need_closed_path, need_closed_aux in move_template:
         need_open_close = ([(0, 0)] + need_open_path + need_open_aux + [dest], need_closed_path + need_closed_aux, 1 + len(need_open_path) + len(need_closed_path))
-        if dest not in template_open_closed:
-            template_open_closed[dest] = []
-        template_open_closed[dest].append(need_open_close)
-    return template_open_closed
+        if dest not in open_closed_template:
+            open_closed_template[dest] = []
+        open_closed_template[dest].append(need_open_close)
+    return open_closed_template
 
-def get_path_open_closed(path, template_open_closed):
+def get_path_open_closed(path, game_to_open_closed_template, game_locations):
     path_open = {}
     path_closed = {}
 
     for (fr, fc, tr, tc) in edge_path_from_point_path(path):
+        open_closed_template = game_to_open_closed_template[game_locations[(fr, fc)]]
+
         dr, dc = tr - fr, tc - fc
         open_sets, closed_sets = [], []
 
-        for dopen, dclosed, dlen in template_open_closed[(dr, dc)]:
+        for dopen, dclosed, dlen in open_closed_template[(dr, dc)]:
             open_set, closed_set = set(), set()
             for (rr, cc) in dopen:
                 open_set.add((fr + rr, fc + cc))
@@ -109,8 +111,8 @@ def get_level_src_dst(text_level, src_text, dst_text):
     return src_loc, dst_loc
 
 def get_level_open_closed(text_level, open_text, src_text, dst_text):
-    are_open = {}
-    are_closed = {}
+    open_locations = {}
+    closed_locations = {}
 
     util_common.check(src_text not in open_text and dst_text not in open_text, 'src/dst in open_text')
 
@@ -119,17 +121,19 @@ def get_level_open_closed(text_level, open_text, src_text, dst_text):
     for rr in range(len(text_level)):
         for cc in range(len(text_level[rr])):
             if text_level[rr][cc] in open_start_goal_text:
-                are_open[(rr, cc)] = None
+                open_locations[(rr, cc)] = None
             else:
-                are_closed[(rr, cc)] = None
+                closed_locations[(rr, cc)] = None
 
-    return are_open, are_closed
+    return open_locations, closed_locations
 
-def get_nexts_from(pt, rows, cols, template_open_closed, are_open, are_closed, exclude):
+def get_nexts_from(pt, rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations, exclude):
     lr, lc = pt
     nexts = {}
 
-    for dest, need_open_closed_len in template_open_closed.items():
+    open_closed_template = game_to_open_closed_template[game_locations[pt]]
+
+    for dest, need_open_closed_len in open_closed_template.items():
         nr, nc = lr + dest[0], lc + dest[1]
         if nr < 0 or rows <= nr or nc < 0 or cols <= nc:
             continue
@@ -142,13 +146,13 @@ def get_nexts_from(pt, rows, cols, template_open_closed, are_open, are_closed, e
                 need_r, need_c = lr + need_r, lc + need_c
                 if need_r < 0 or rows <= need_r or need_c < 0 or cols <= need_c:
                     need_missing = True
-                if (need_r, need_c) in are_closed:
+                if (need_r, need_c) in closed_locations:
                     need_missing = True
             for need_r, need_c in need_closed:
                 need_r, need_c = lr + need_r, lc + need_c
                 if need_r < 0 or rows <= need_r or need_c < 0 or cols <= need_c:
                     need_missing = True
-                if (need_r, need_c) in are_open:
+                if (need_r, need_c) in open_locations:
                     need_missing = True
             if need_missing:
                 continue
@@ -158,13 +162,13 @@ def get_nexts_from(pt, rows, cols, template_open_closed, are_open, are_closed, e
 
     return nexts
 
-def get_nexts_open_closed_from(path, reverse, rows, cols, template_open_closed):
+def get_nexts_open_closed_from(path, reverse, rows, cols, game_to_open_closed_template, game_locations):
     path_nexts = {}
-    path_open, path_closed = get_path_open_closed(path, template_open_closed)
+    path_open, path_closed = get_path_open_closed(path, game_to_open_closed_template, game_locations)
 
     if len(path) > 0:
         if not reverse:
-            path_nexts = get_nexts_from(path[-1], rows, cols, template_open_closed, path_open, path_closed, path)
+            path_nexts = get_nexts_from(path[-1], rows, cols, game_to_open_closed_template, path_open, path_closed, game_locations, path)
         else:
             path_nexts = {}
             for rr in range(rows):
@@ -172,13 +176,18 @@ def get_nexts_open_closed_from(path, reverse, rows, cols, template_open_closed):
                     pt = (rr, cc)
                     if pt in path:
                         continue
-                    if path[0] not in get_nexts_from(pt, rows, cols, template_open_closed, path_open, path_closed, path[1:]):
+                    if path[0] not in get_nexts_from(pt, rows, cols, game_to_open_closed_template, path_open, path_closed, game_locations, path[1:]):
                         continue
                     path_nexts[pt] = None
 
     return path_nexts, path_open, path_closed
 
-def path_between(rng, start, end, rows, cols, inset, template_open_closed, are_open_closed):
+def path_between(rng, start, end, rows, cols, inset, game_to_open_closed_template, open_locations, closed_locations, game_locations):
+    recompute_open_closed_locations = False
+    if open_locations is None or closed_locations is None:
+        util_common.check(open_locations is None and closed_locations is None, 'open_locations and closed_locations must be set together')
+        recompute_open_closed_locations = True
+        
     q = []
     seen = {}
 
@@ -193,12 +202,10 @@ def path_between(rng, start, end, rows, cols, inset, template_open_closed, are_o
             found_path = path
             break
 
-        if are_open_closed is not None:
-            are_open, are_closed = are_open_closed
-        else:
-            are_open, are_closed = get_path_open_closed(path, template_open_closed)
+        if recompute_open_closed_locations:
+            open_locations, closed_locations = get_path_open_closed(path, game_to_open_closed_template, game_locations)
 
-        path_nexts = get_nexts_from(path[-1], rows, cols, template_open_closed, are_open, are_closed, path)
+        path_nexts = get_nexts_from(path[-1], rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations, path)
 
         for n in path_nexts:
             if n[0] < inset or n[0] >= rows - inset:
@@ -215,7 +222,7 @@ def path_between(rng, start, end, rows, cols, inset, template_open_closed, are_o
 
     return found_path
 
-def path_between_dijkstra(start, end, rows, cols, template_open_closed, are_open, are_closed):
+def path_between_dijkstra(start, end, rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations):
     q = []
     best_cost = {}
 
@@ -230,7 +237,7 @@ def path_between_dijkstra(start, end, rows, cols, template_open_closed, are_open
             found_path = path
             break
 
-        path_nexts = get_nexts_from(path[-1], rows, cols, template_open_closed, are_open, are_closed, path)
+        path_nexts = get_nexts_from(path[-1], rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations, path)
 
         for n in path_nexts:
             new_cost = cost + path_nexts[n]
@@ -240,17 +247,17 @@ def path_between_dijkstra(start, end, rows, cols, template_open_closed, are_open
 
     return found_path, dict.fromkeys(best_cost)
 
-def shortest_path_between(start, end, rows, cols, template_open_closed, are_open, are_closed):
-    return path_between(None, start, end, rows, cols, 0, template_open_closed, (are_open, are_closed))
+def shortest_path_between(start, end, rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations):
+    return path_between(None, start, end, rows, cols, 0, game_to_open_closed_template, open_locations, closed_locations, game_locations)
 
-def random_path_between(rng, start, end, rows, cols, inset, template_open_closed):
-    return path_between(rng, start, end, rows, cols, inset, template_open_closed, None)
+def random_path_between(rng, start, end, rows, cols, inset, game_to_open_closed_template, game_locations):
+    return path_between(rng, start, end, rows, cols, inset, game_to_open_closed_template, None, None, game_locations)
 
-def random_path_by_search(rng, rows, cols, template_open_closed):
+def random_path_by_search(rng, rows, cols, game_to_open_closed_template, game_locations):
     pts = []
     for rr in range(RANDOM_PATH_INSET, rows - RANDOM_PATH_INSET):
         for cc in range(RANDOM_PATH_INSET, cols - RANDOM_PATH_INSET):
             pts.append((rr, cc))
     start, end = rng.sample(pts, 2)
 
-    return random_path_between(rng, start, end, rows, cols, RANDOM_PATH_INSET, template_open_closed)
+    return random_path_between(rng, start, end, rows, cols, RANDOM_PATH_INSET, game_to_open_closed_template, game_locations)

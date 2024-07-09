@@ -26,21 +26,18 @@ def dict2json(d, encode_val=None):
 def tileset2json(ts, encode_image):
     ret = {}
     ret['tile_ids'] = list(ts.tile_ids.keys())
-    ret['tile_to_text'] = dict2json(ts.tile_to_text)
-    ret['tile_to_image'] = dict2json(ts.tile_to_image, encode_image)
+    ret['tile_to_text'] = dict2json(ts.tile_to_text) if ts.tile_to_text is not None else None
+    ret['tile_to_image'] = dict2json(ts.tile_to_image, encode_image) if ts.tile_to_image is not None else None
     ret['tile_image_size'] = ts.tile_image_size
     return ret
 
 def tileinfo2json(ti, encode_image):
     ret = {}
     ret['tileset'] = tileset2json(ti.tileset, encode_image)
-    if ti.levels is None:
-        ret['levels'] = None
-    else:
-        ret['levels'] = [{'tiles': tli.tiles, 'tags': tli.tags, 'games': tli.games, 'meta': tli.meta} for tli in ti.levels]
+    ret['levels'] = [{'tiles': tli.tiles, 'tags': tli.tags, 'games': tli.games, 'meta': tli.meta} for tli in ti.levels] if ti.levels is not None else None
     return ret
 
-def explore2json(ex, encode_image):
+def exploreinfo2json(ex, encode_image):
     ret = {}
     ret['rows'] = ex.rows
     ret['cols'] = ex.cols
@@ -51,7 +48,7 @@ def explore2json(ex, encode_image):
     ret['void_tind'] = ex.void_tind
     ret['tind_to_text'] = dict2json(ex.tind_to_text)
     ret['tind_to_image'] = dict2json(ex.tind_to_image, encode_image)
-    ret['tinds_to_tile'] = dict2json(ex.tinds_to_tile)
+    ret['tinds_to_tiles'] = dict2json(ex.tinds_to_tiles)
     ret['eind_to_edge'] = dict2json(ex.eind_to_edge)
     ret['pind_to_prop'] = dict2json(ex.pind_to_prop)
     ret['level_data'] = [base64.b64encode(level_data.tobytes()).decode('ascii') for level_data in ex.level_data]
@@ -82,17 +79,15 @@ def json2dict(j, decode_key=None, decode_val=None):
 def json2tileset(obj, decode_image):
     ts = util_common.TileSetInfo()
     ts.tile_ids = dict.fromkeys(obj['tile_ids'])
-    ts.tile_to_text = json2dict(obj['tile_to_text'])
-    ts.tile_to_image = json2dict(obj['tile_to_image'], decode_val=decode_image)
+    ts.tile_to_text = json2dict(obj['tile_to_text']) if obj['tile_to_text'] is not None else None
+    ts.tile_to_image = json2dict(obj['tile_to_image'], decode_val=decode_image) if obj['tile_to_image'] is not None else None
     ts.tile_image_size = obj['tile_image_size']
     return ts
 
 def json2tileinfo(obj, decode_image):
     ti = util_common.TileInfo()
     ti.tileset = json2tileset(obj['tileset'], decode_image)
-    if obj['levels'] is None:
-        ti.levels = None
-    else:
+    if obj['levels'] is not None:
         ti.levels = []
         for jtli in obj['levels']:
             tli = util_common.TileLevelInfo()
@@ -101,9 +96,11 @@ def json2tileinfo(obj, decode_image):
             tli.games = jtli['games']
             tli.meta = [json.loads(json.dumps(entry)) for entry in jtli['meta']]
             ti.levels.append(tli)
+    else:
+        ti.levels = None
     return ti
 
-def json2explore(obj, decode_image):
+def json2exploreinfo(obj, decode_image):
     ex = util_explore.ExploreInfo()
     ex.rows = obj['rows']
     ex.cols = obj['cols']
@@ -114,7 +111,7 @@ def json2explore(obj, decode_image):
     ex.void_tind = obj['void_tind']
     ex.tind_to_text = json2dict(obj['tind_to_text'])
     ex.tind_to_image = json2dict(obj['tind_to_image'], decode_val=decode_image)
-    ex.tinds_to_tile = json2dict(obj['tinds_to_tile'], decode_key=tuple)
+    ex.tinds_to_tiles = json2dict(obj['tinds_to_tiles'], decode_key=tuple, decode_val=tuple)
     ex.eind_to_edge = json2dict(obj['eind_to_edge'], decode_val=tuple)
     ex.pind_to_prop = json2dict(obj['pind_to_prop'])
     ex.level_data = np.array([np.frombuffer(base64.b64decode(level_data), dtype=np.uint8) for level_data in obj['level_data']])
@@ -128,42 +125,68 @@ if __name__ == '__main__':
     util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Convert files to/from json.')
-    parser.add_argument('--infile', required=True, type=str, help='Input file.')
     parser.add_argument('--outfile', required=True, type=str, help='Output file.')
+    parser.add_argument('--infile', required=True, type=str, help='Input file.')
     args = parser.parse_args()
 
-    if util_common.fileistype(args.infile, '.explore') and util_common.fileistype(args.outfile, '.jexplore'):
-        with util_common.openz(args.infile, 'rb') as f:
-            ex = pickle.load(f)
-        with util_common.openz(args.outfile, 'wt') as f:
-            json.dump(wrap2json(ex, explore2json), f)
-            f.write('\n')
+    FTYPE_EXPLORE = 'explore'
+    FTYPE_TILE    = 'tile'
+    FTYPE_TILESET = 'tileset'
 
-    elif util_common.fileistype(args.infile, '.jexplore') and util_common.fileistype(args.outfile, '.explore'):
-        with util_common.openz(args.infile, 'rt') as f:
-            ex = json2wrap(json.load(f), json2explore)
-        with util_common.openz(args.outfile, 'wb') as f:
-            pickle.dump(ex, f)
+    ftypes = {}
+    ftypes['.explore']  = FTYPE_EXPLORE
+    ftypes['.jexplore'] = FTYPE_EXPLORE
+    ftypes['.tile']     = FTYPE_TILE
+    ftypes['.jtile']    = FTYPE_TILE
+    ftypes['.tileset']  = FTYPE_TILESET
+    ftypes['.jtileset'] = FTYPE_TILESET
 
-    elif util_common.fileistype(args.infile, '.tile') and util_common.fileistype(args.outfile, '.jtile'):
-        with util_common.openz(args.infile, 'rb') as f:
-            ti = pickle.load(f)
-        with util_common.openz(args.outfile, 'wt') as f:
-            json.dump(wrap2json(ti, tileinfo2json), f)
-            f.write('\n')
+    inwrapjson = {}
+    inwrapjson['.jexplore'] = json2exploreinfo
+    inwrapjson['.jtile']    = json2tileinfo
+    inwrapjson['.jtileset'] = json2tileset
 
-    elif util_common.fileistype(args.infile, '.jtile') and util_common.fileistype(args.outfile, '.tile'):
-        with util_common.openz(args.infile, 'rt') as f:
-            ti = json2wrap(json.load(f), json2tileinfo)
-        with util_common.openz(args.outfile, 'wb') as f:
-            pickle.dump(ti, f)
+    outwrapjson = {}
+    outwrapjson['.jexplore'] = exploreinfo2json
+    outwrapjson['.jtile']    = tileinfo2json
+    outwrapjson['.jtileset'] = tileset2json
 
-    elif util_common.fileistype(args.infile, '.tile') and util_common.fileistype(args.outfile, '.jtileset'):
-        with util_common.openz(args.infile, 'rb') as f:
-            ti = pickle.load(f)
-        with util_common.openz(args.outfile, 'wt') as f:
-            json.dump(wrap2json(ti.tileset, tileset2json), f)
-            f.write('\n')
+    conversions = {}
+    conversions[(FTYPE_TILE, FTYPE_TILESET)] = lambda _tile_info: _tile_info.tileset
 
+    if args.infile == args.outfile:
+        util_common.check(False, 'files are the same')
+
+    inext, outext = None, None
+    for ext in ftypes:
+        if util_common.fileistype(args.infile, ext):
+            inext = ext
+        if util_common.fileistype(args.outfile, ext):
+            outext = ext
+    util_common.check(inext is not None and outext is not None, 'unrecognized extension')
+
+    inftype = ftypes[inext]
+    outftype = ftypes[outext]
+
+    if inftype == outftype:
+        convert = lambda _obj: _obj
     else:
-        util_common.check(False, 'unrecognized conversion')
+        util_common.check((inftype, outftype) in conversions, 'unrecognized conversion')
+        convert = conversions[(inftype, outftype)]
+
+    if inext not in inwrapjson:
+        with util_common.openz(args.infile, 'rb') as f:
+            obj = pickle.load(f)
+    else:
+        with util_common.openz(args.infile, 'rt') as f:
+            obj = json2wrap(json.load(f), inwrapjson[inext])
+
+    obj = convert(obj)
+
+    if outext not in outwrapjson:
+        with util_common.openz(args.outfile, 'wb') as f:
+            pickle.dump(obj, f)
+    else:
+        with util_common.openz(args.outfile, 'wt') as f:
+            json.dump(wrap2json(obj, outwrapjson[outext]), f)
+            f.write('\n')

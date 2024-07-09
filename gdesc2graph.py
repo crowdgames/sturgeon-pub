@@ -64,10 +64,10 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         util_common.check(s.supports_xforms(), 'has edge deltas but solver does not support transformations')
 
     # node labels
-    labels_plus_none = list(grd.node_labels) + [None]
+    node_labels_plus_none = list(grd.node_labels) + [None]
 
     vars_nodes_by_label = {}
-    for ll in labels_plus_none:
+    for ll in node_labels_plus_none:
         vars_nodes_by_label[ll] = []
 
     node_id_order = list(range(max_size))
@@ -78,7 +78,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
     vars_node_by_id = {}
     for ii in node_id_order:
         vars_node_by_id[ii] = {}
-        for ll in labels_plus_none:
+        for ll in node_labels_plus_none:
             vv = s.make_var()
             vars_nodes_by_label[ll].append(vv)
             vars_node_by_id[ii][ll] = vv
@@ -90,7 +90,9 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         vars_node_xform = {}
         vars_node_xform_list = []
         vars_node_missing_list = []
-        for ii in node_id_order:
+
+        node_id_order_zero_first = [0] + [node for node in node_id_order if node != 0]
+        for ii in node_id_order_zero_first:
             vars_node_xform[ii] = s.make_var_xform(use_edge_deltas if use_edge_deltas else 'x2')
             vars_node_xform_list.append(vars_node_xform[ii])
             vars_node_missing_list.append(vars_node_by_id[ii][None])

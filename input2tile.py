@@ -18,11 +18,11 @@ def get_tile_key(tile_text, tile_image):
 
 
 
-def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, paths, tile_image_size, no_levels, text_key_only, tile_output_folder):
+def input2tiles(tileset_input, text_levels, image_levels, tag_levels, games, paths, tile_image_size, no_levels, text_key_only, tile_output_folder):
     tile_key_to_tile_id = {}
 
-    if base_tile_info is not None:
-        ts = base_tile_info.tileset
+    if tileset_input is not None:
+        ts = tileset_input
 
         for tile in ts.tile_ids:
             tile_text = ts.tile_to_text[tile] if ts.tile_to_text is not None else None
@@ -84,10 +84,10 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
 
     for ii, (text_level_meta, image_level, tag_level, game, path) in enumerate(zip(text_levels, image_levels, tag_levels, games, paths)):
         if text_level_meta is not None:
-            text_level, text_meta = text_level_meta
+            text_level, meta = text_level_meta
             text_sz = (len(text_level), len(text_level[0]))
         else:
-            text_level, text_meta = None, None
+            text_level, meta = None, []
             text_sz = None
 
         if image_level is not None:
@@ -140,8 +140,8 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
                 else:
                     tile_key = get_tile_key(tile_text, tile_image if not text_key_only else None)
                     if tile_key not in tile_key_to_tile_id:
-                        if base_tile_info is not None:
-                            util_common.check(False, 'tile missing in base tile info')
+                        if tileset_input is not None:
+                            util_common.check(False, 'tile missing in input tileset')
 
                         tile_id = len(ts.tile_ids)
                         ts.tile_ids[tile_id] = None
@@ -178,9 +178,7 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
             game_level = util_common.make_grid(rows, cols, game)
 
         if path is not None:
-            if text_meta is None:
-                text_meta = []
-            text_meta.insert(0, util_common.meta_path(path))
+            meta.insert(0, util_common.meta_path(path))
 
         util_common.print_tile_level(tile_level)
         print()
@@ -194,7 +192,7 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
             tli.tiles = tile_level
             tli.tags = tag_level
             tli.games = game_level
-            tli.meta = text_meta
+            tli.meta = meta
             ti.levels.append(tli)
 
     if image_level and tile_output_folder:
@@ -219,9 +217,9 @@ def input2tiles(base_tile_info, text_levels, image_levels, tag_levels, games, pa
 if __name__ == '__main__':
     util_common.timer_start()
 
-    parser = argparse.ArgumentParser(description='Generate tiles from level and/or image.')
+    parser = argparse.ArgumentParser(description='Get tiles from level and/or image.')
     parser.add_argument('--outfile', required=True, type=str, help='Output tile file.')
-    parser.add_argument('--basefile', type=str, help='Input base files containing all tiles.')
+    parser.add_argument('--tilesetfile', type=str, help='Input tileset file to use, instead of finding tiles in levels.')
     parser.add_argument('--textfile', type=str, nargs='+', help='Input text file(s).')
     parser.add_argument('--imagefile', type=str, nargs='+', help='Input image file(s).')
     parser.add_argument('--tagfile', type=str, nargs='+', help='Input tag level file(s).')
@@ -230,7 +228,7 @@ if __name__ == '__main__':
     parser.add_argument('--tilesize', type=int, help='Size of tiles in image.')
     parser.add_argument('--savetileimages', action='store_true', help='Save tile images.')
     parser.add_argument('--text-key-only', action='store_true', help='Only use text when keying tiles.')
-    parser.add_argument('--no-levels', action='store_true', help='Don\'t store levels with tiles.')
+    parser.add_argument('--out-tileset', action='store_true', help='Output tileset only (without levels).')
     parser.add_argument('--quiet', action='store_true', help='Reduce output.')
     args = parser.parse_args()
 
@@ -243,11 +241,11 @@ if __name__ == '__main__':
     if args.imagefile and not (args.textfile or args.tilesize):
         parser.error('--imagefile requires --textfile or --tilesize')
 
-    if args.basefile is not None:
-        with util_common.openz(args.basefile, 'rb') as f:
-            base_tile_info = pickle.load(f)
+    if args.tilesetfile is not None:
+        with util_common.openz(args.tilesetfile, 'rb') as f:
+            tileset_input = pickle.load(f)
     else:
-        base_tile_info = None
+        tileset_input = None
 
     if args.textfile is not None:
         text_levels = [util_common.read_text_level(textfile, True) for textfile in args.textfile]
@@ -277,7 +275,10 @@ if __name__ == '__main__':
     else:
         paths = None
 
-    tile_info = input2tiles(base_tile_info, text_levels, image_levels, tag_levels, args.game, paths, args.tilesize,
-                            args.no_levels, args.text_key_only, TILE_OUTPUT_FOLDER if args.savetileimages else None)
+    tile_info = input2tiles(tileset_input, text_levels, image_levels, tag_levels, args.game, paths, args.tilesize,
+                            args.out_tileset, args.text_key_only, TILE_OUTPUT_FOLDER if args.savetileimages else None)
     with util_common.openz(args.outfile, 'wb') as f:
-        pickle.dump(tile_info, f)
+        if args.out_tileset:
+            pickle.dump(tile_info.tileset, f)
+        else:
+            pickle.dump(tile_info, f)

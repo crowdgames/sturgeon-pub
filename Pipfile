@@ -7,18 +7,28 @@ name = "pypi"
 python_version = "3.12"
 
 [packages]
-Pillow = "*"
-
 networkx = "*"
+numpy = "<2"
+Pillow = "*"
 pydot = "*"
 
-numpy = "*"
+[solvers-minimal]
+networkx = "*"
+numpy = "<2"
+Pillow = "*"
+pydot = "*"
 
-z3-solver = "==4.12.5.0"
+python-sat = "==0.1.8.dev12"
+
+[solvers-all]
+networkx = "*"
+numpy = "<2"
+Pillow = "*"
+pydot = "*"
+
 clingo = "==5.6.2"
-python-sat = {version="==0.1.8.dev12", extras=["aiger", "approxmc", "cryptosat", "pblib"]}
 cvc5 = "==1.1.1"
-scipy = "==1.11.4"
 cvxpy = "==1.4.1"
-
-[dev-packages]
+python-sat = {version="==0.1.8.dev12", extras=["aiger", "approxmc", "cryptosat", "pblib"]}
+scipy = "==1.11.4"
+z3-solver = "==4.12.5.0"

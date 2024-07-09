@@ -124,7 +124,8 @@ def local_subgraph(gr, node, nrad):
 
     if nrad in [NRAD_EDGE]:
         for snode in subgraph.nodes:
-            subgraph.nodes[snode][util_graph.GATTR_LABEL] = None
+            if snode != node:
+                subgraph.nodes[snode][util_graph.GATTR_LABEL] = None
 
     for snode in subgraph.nodes:
         subgraph.nodes[snode][util_graph.GATTR_CENTRAL] = (snode == node)
@@ -170,16 +171,6 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
     total_nodes = 0
     distinct_node_label_subgraphs = {}
 
-    if edge_deltas or edge_polars or rotate:
-        for gr in grs.graphs:
-            check_node_positions(gr)
-
-        if edge_deltas:
-            edge_deltas_from_node_positions(gr)
-
-        if edge_polars:
-            edge_polars_from_node_positions(gr)
-
     nm = nx.algorithms.isomorphism.categorical_node_match([util_graph.GATTR_LABEL, util_graph.GATTR_CENTRAL], [None, None])
     em = nx.algorithms.isomorphism.categorical_edge_match([util_graph.GATTR_LABEL, util_graph.GATTR_DELTA, util_graph.GATTR_POLAR, util_graph.GATTR_CYCLE], [None, None, None, None])
 
@@ -224,11 +215,14 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
 
         print(f'found {len(cycles)} distinct cycle')
 
+
+
     if rotate:
         all_graphs = []
         for gr in grs.graphs:
-            all_graphs.append(gr)
+            check_node_positions(gr)
 
+            all_graphs.append(gr)
             for rt in range(3):
                 gr = rotate_node_positions(gr)
                 all_graphs.append(gr)
@@ -236,7 +230,30 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
     else:
         all_graphs = grs.graphs
 
+
+
+    if edge_deltas:
+        for gr in all_graphs:
+            check_node_positions(gr)
+            edge_deltas_from_node_positions(gr)
+
+    if edge_polars:
+        for gr in all_graphs:
+            check_node_positions(gr)
+            edge_polars_from_node_positions(gr)
+
+
+
+    node_cattrs = None
+    edge_cattrs = None
+
     for gr in all_graphs:
+        util_common.check(node_cattrs is None or node_cattrs == util_graph.graph_node_cattrs(gr), 'node_cattrs mismatch')
+        node_cattrs = util_graph.graph_node_cattrs(gr)
+
+        util_common.check(edge_cattrs is None or edge_cattrs == util_graph.graph_edge_cattrs(gr), 'edge_cattrs mismatch')
+        edge_cattrs = util_graph.graph_edge_cattrs(gr)
+
         total_nodes += len(gr.nodes)
 
         for node, label, pos, central in util_graph.nodes_and_label_pos_central(gr):
@@ -253,6 +270,19 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
             grd.node_label_count[label] += 1
 
             sub = local_subgraph(gr, node, nrad)
+
+            util_common.check(node_cattrs == util_graph.graph_node_cattrs(sub).replace(util_graph.CATTR_CENTRAL, ''), 'subgraph node_cattrs mismatch')
+            util_common.check(edge_cattrs == util_graph.graph_edge_cattrs(sub), 'subgraph edge_cattrs mismatch')
+
+            util_common.check(sub.nodes[node][util_graph.GATTR_LABEL] is not None, 'node missing label')
+            util_common.check(sub.nodes[node][util_graph.GATTR_CENTRAL] is True, 'node missing central')
+            for snode in sub.nodes:
+                if snode != node:
+                    if nrad == NRAD_EDGE:
+                        util_common.check(sub.nodes[snode][util_graph.GATTR_LABEL] is None, 'node has label')
+                    else:
+                        util_common.check(sub.nodes[snode][util_graph.GATTR_LABEL] is not None, 'node missing label')
+                    util_common.check(sub.nodes[snode][util_graph.GATTR_CENTRAL] is False, 'node has central')
 
             is_distinct = True
             for other_sub, other_node in distinct_node_label_subgraphs[label]:

@@ -13,7 +13,7 @@ COUNTS_SCALE_ZERO     = (0.0, 1e10)
 
 
 
-def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, show_path_tiles):
+def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, print_reach_internal):
     si = scheme_info
 
     rows = len(tag_level)
@@ -77,7 +77,10 @@ def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_
     if gen.solve():
         util_common.timer_section('create output')
         result = gen.get_result()
-        util_common.print_result_info(result, False)
+        util_common.print_result_info(result)
+
+        if print_reach_internal:
+            gen.print_reach_internal()
 
     util_common.timer_section(None)
 
@@ -98,7 +101,7 @@ if __name__ == '__main__':
     parser.add_argument('--size', type=int, nargs=2, help='Level size (if no tag or game file provided.')
 
     parser.add_argument('--randomize', type=int, help='Randomize based on given number.')
-    parser.add_argument('--show-path-tiles', action='store_true', help='Show path in tiles.')
+    parser.add_argument('--print-reach-internal', action='store_true', help='Display some extra internal information about reachability.')
 
     parser.add_argument('--solver', type=str, nargs='+', choices=util_solvers.SOLVER_LIST, default=[util_solvers.SOLVER_PYSAT_RC2], help='Solver name, from: ' + ','.join(util_solvers.SOLVER_LIST) + '.')
     parser.add_argument('--solver-portfolio-timeout', type=int, help='Force use of portfolio with given timeout (even for single solver).')
@@ -218,26 +221,9 @@ if __name__ == '__main__':
             parser.error('cannot specify --reach-connect without --reach-junction (or --reach-start-goal)')
 
         for reach_connect in args.reach_connect:
-            reach_parser = argparse.ArgumentParser(prog='--reach-connect sub-argument', description='Reach connect sub-argument parsing.')
-            reach_parser.add_argument('--src', required=True, type=str, default=None, help='Source junction.')
-            reach_parser.add_argument('--dst', required=True, type=str, default=None, help='Destination junction.')
-            reach_parser.add_argument('--move', required=True, type=str, nargs='+', default=None, help='Use reachability move rules, from: ' + ','.join(util_reach.RMOVE_LIST) + '.')
-            reach_parser.add_argument('--wrap-cols', action='store_true', help='Wrap columns in reachability.')
-            reach_parser.add_argument('--open-zelda', action='store_true', help='Use Zelda open tiles.')
-            reach_parser.add_argument('--unreachable', action='store_true', help='Generate levels with unreachable goals.')
-            reach_args = reach_parser.parse_args(reach_connect.split())
-
-            reach_connect_setup = util_common.ReachConnectSetup()
-            reach_connect_setup.src = reach_args.src
-            reach_connect_setup.dst = reach_args.dst
-            reach_connect_setup.game_to_move = util_common.arg_list_to_dict_options(parser, '--reach move', reach_args.move, util_reach.RMOVE_LIST)
-            reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if reach_args.open_zelda else util_common.OPEN_TEXT
-            reach_connect_setup.wrap_cols = reach_args.wrap_cols
-            reach_connect_setup.unreachable = reach_args.unreachable
-
             if reach_connect_setups is None:
                 reach_connect_setups = []
-            reach_connect_setups.append(reach_connect_setup)
+            reach_connect_setups.append(util_reach.parse_reach_subargs('--reach-connect', reach_connect.split()))
 
 
 
@@ -282,7 +268,7 @@ if __name__ == '__main__':
     else:
         counts_scale = COUNTS_SCALE_HALF
 
-    result_info = scheme2output(scheme_info, tag_level, game_level, solver, args.randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, args.show_path_tiles)
+    result_info = scheme2output(scheme_info, tag_level, game_level, solver, args.randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, args.print_reach_internal)
     if result_info:
         util_common.save_result_info(result_info, args.outfile, args.out_compress, not args.out_level_none, not args.out_result_none, not args.out_tlvl_none)
         util_common.exit_solution_found()

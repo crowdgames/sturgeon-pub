@@ -70,7 +70,7 @@ def try_import_cvxpy():
     except ImportError:
         numpy = None
         del numpy
-        scipy = None
+        cvxpy = None
         del cvxpy
         return False
 
