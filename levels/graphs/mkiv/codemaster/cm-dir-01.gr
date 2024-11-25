@@ -1,0 +1,46 @@
+# Level 1
+
+t dgraph l l
+
+n m0 mO:_
+n m1 mO:_
+n m2 mO:_
+n m3 mE:_
+n m4 mO:_
+n m5 mO:mP0
+
+e m0 m1 mR:_
+e m0 m2 mG:_
+e m0 m4 mB:_
+e m1 m0 mR:_
+e m1 m2 mB:_
+e m1 m3 mG:_
+e m2 m0 mG:_
+e m2 m5 mR:_
+e m3 m1 mG:_
+e m3 m4 mR:_
+e m3 m5 mB:_
+e m4 m0 mB:_
+e m4 m3 mR:_
+e m4 m5 mG:_
+e m5 m2 mR:_
+e m5 m3 mB:_
+e m5 m4 mG:_
+
+n s0 sP:sP
+n s1 sR:_
+n s2 sG:_
+n s3 sR:_
+n s4 sG:_
+n s5 sE:_
+
+e s0 s1 sN:*
+e s1 s2 sN:*
+e s2 s3 sN:*
+e s3 s4 sN:*
+e s4 s5 sN:*
+
+n r r:_
+
+e r m0 map:_
+e r s0 scroll:_

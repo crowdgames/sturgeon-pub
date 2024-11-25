@@ -1,0 +1,44 @@
+# Level 23
+
+t dgraph l l
+
+n m0 mO:_
+n m1 mO:mC
+n m2 mO:mP0
+n m3 mO:mC
+n m4 mE:_
+n m5 mO:_
+
+e m0 m1 mRG:_
+e m0 m3 mB:_
+e m1 m0 mRG:_
+e m1 m2 mB:_
+e m2 m1 mB:_
+e m2 m4 mR:_
+e m2 m5 mG:_
+e m3 m0 mB:_
+e m3 m2 mR:_
+e m3 m4 mG:_
+e m4 m3 mG:_
+e m4 m5 mRB:_
+e m5 m2 mG:_
+e m5 m4 mRB:_
+
+n s0 sP:sP
+n s1 sB:_
+n s2 sR:_
+n s3 sG:_
+n s4 s2:_
+n s5 sE:_
+
+e s0 s1 sN:*
+e s1 s2 sN:*
+e s2 s3 sN:*
+e s3 s4 sN:*
+e s4 s5 sT:*
+e s4 s1 sF:*
+
+n r r:_
+
+e r m0 map:_
+e r s0 scroll:_

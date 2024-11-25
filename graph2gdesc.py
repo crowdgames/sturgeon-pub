@@ -172,7 +172,7 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
     distinct_node_label_subgraphs = {}
 
     nm = nx.algorithms.isomorphism.categorical_node_match([util_graph.GATTR_LABEL, util_graph.GATTR_CENTRAL], [None, None])
-    em = nx.algorithms.isomorphism.categorical_edge_match([util_graph.GATTR_LABEL, util_graph.GATTR_DELTA, util_graph.GATTR_POLAR, util_graph.GATTR_CYCLE], [None, None, None, None])
+    em = nx.algorithms.isomorphism.categorical_edge_match([util_graph.GATTR_LABEL, util_graph.GATTR_CENTRAL, util_graph.GATTR_DELTA, util_graph.GATTR_POLAR, util_graph.GATTR_CYCLE], [None, None, None, None, None])
 
     if cycle_label:
         cycles = []
@@ -256,17 +256,17 @@ def graph2gdesc(grs, nrad, cycle_label, edge_deltas, edge_polars, rotate):
 
         total_nodes += len(gr.nodes)
 
-        for node, label, pos, central in util_graph.nodes_and_label_pos_central(gr):
-            if label not in grd.node_labels:
+        for node, label, central, pos in util_graph.nodes_and_label_central_pos(gr):
+            if label not in grd.node_labels: # ignoring central and pos
                 grd.node_labels[label] = None
                 grd.node_label_count[label] = 0
                 distinct_node_label_subgraphs[label] = []
 
-        for fra, til, label, delta, polar, cycle in util_graph.edges_and_label_delta_polar_cycle(gr):
-            if (label, delta, polar, cycle) not in grd.edge_labels_etc:
+        for fra, til, label, central, delta, polar, cycle in util_graph.edges_and_label_central_delta_polar_cycle(gr):
+            if (label, delta, polar, cycle) not in grd.edge_labels_etc: # ignoring central
                 grd.edge_labels_etc[(label, delta, polar, cycle)] = None
 
-        for node, label, pos, central in util_graph.nodes_and_label_pos_central(gr):
+        for node, label, central, pos in util_graph.nodes_and_label_central_pos(gr):
             grd.node_label_count[label] += 1
 
             sub = local_subgraph(gr, node, nrad)

@@ -54,6 +54,7 @@ def parse_reach_subargs(name, subargs):
     reach_parser.add_argument('--src', required=True, type=str, default=None, help='Source junction.')
     reach_parser.add_argument('--dst', required=True, type=str, default=None, help='Destination junction.')
     reach_parser.add_argument('--move', required=True, type=str, nargs='+', default=None, help='Use reachability move rules, from: ' + ','.join(RMOVE_LIST) + '.')
+    reach_parser.add_argument('--wrap-rows', action='store_true', help='Wrap rows in reachability.')
     reach_parser.add_argument('--wrap-cols', action='store_true', help='Wrap columns in reachability.')
     reach_parser.add_argument('--open-zelda', action='store_true', help='Use Zelda open tiles.')
     reach_parser.add_argument('--unreachable', action='store_true', help='Generate levels with unreachable goals.')
@@ -62,10 +63,11 @@ def parse_reach_subargs(name, subargs):
     reach_connect_setup = util_common.ReachConnectSetup()
     reach_connect_setup.src = reach_args.src
     reach_connect_setup.dst = reach_args.dst
-    reach_connect_setup.game_to_move = util_common.arg_list_to_dict_options(reach_parser, name+' sub-argument --move', reach_args.move, RMOVE_LIST)
-    reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if reach_args.open_zelda else util_common.OPEN_TEXT
-    reach_connect_setup.wrap_cols = reach_args.wrap_cols
     reach_connect_setup.unreachable = reach_args.unreachable
+    reach_connect_setup.game_to_reach_move = util_common.arg_list_to_dict_options(reach_parser, name+' sub-argument --move', reach_args.move, RMOVE_LIST)
+    reach_connect_setup.wrap_rows = reach_args.wrap_rows
+    reach_connect_setup.wrap_cols = reach_args.wrap_cols
+    reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if reach_args.open_zelda else util_common.OPEN_TEXT
 
     return reach_connect_setup
 
@@ -160,18 +162,17 @@ def get_move_template(reach_move):
         # jump
         jump_arcs = [
             [(-1,  0), (-2,  0), (-3,  0), (-4,  0), (-4,  1)],
-            [(-1,  0), (-2,  0), (-3,  0), (-4,  0), (-4, -1)],
             [(-1,  0), (-1,  1), (-2,  1), (-2,  2), (-3,  2), (-3,  3), (-4,  3), (-4,  4)],
-            [(-1,  0), (-1, -1), (-2, -1), (-2, -2), (-3, -2), (-3, -3), (-4, -3), (-4, -4)],
         ]
         for jump_arc in jump_arcs:
-            for ii in range(len(jump_arc)):
-                dest = jump_arc[ii]
-                need_open_path = [jrc for jrc in jump_arc[:ii]]
-                need_open_aux = []
-                need_closed_path = []
-                need_closed_aux = [(1, 0)]
-                move_template.append((dest, need_open_path, need_open_aux, need_closed_path, need_closed_aux))
+            for dc in [1, -1]:
+                for ii in range(len(jump_arc)):
+                    dest = (jump_arc[ii][0], dc * jump_arc[ii][1])
+                    need_open_path = [(jrr, dc * jcc) for jrr, jcc in jump_arc[:ii]]
+                    need_open_aux = []
+                    need_closed_path = []
+                    need_closed_aux = [(1, 0)]
+                    move_template.append((dest, need_open_path, need_open_aux, need_closed_path, need_closed_aux))
 
         if reach_move == RMOVE_PLATFORM_HIGHJUMP:
             HIGHJUMP_HEIGHT = 8
@@ -190,6 +191,19 @@ def get_move_template(reach_move):
             move_template_uniq.append(arc)
 
     return move_template_uniq
+
+def get_move_info(reach_move, wrap_rows, wrap_cols):
+    move_info = util_common.MoveInfo()
+    move_info.move_template = get_move_template(reach_move)
+    move_info.wrap_rows = wrap_rows
+    move_info.wrap_cols = wrap_cols
+    return move_info
+
+def get_game_to_move_info(reach_connect_setup):
+    game_to_move_info = {}
+    for game, reach_move in reach_connect_setup.game_to_reach_move.items():
+        game_to_move_info[game] = get_move_info(reach_move, reach_connect_setup.wrap_rows, reach_connect_setup.wrap_cols)
+    return game_to_move_info
 
 
 
@@ -352,22 +366,22 @@ def get_reach_connect_info(reach_connect_setup, rows, cols, scheme_info):
     reach_connect_info.src = reach_connect_setup.src
     reach_connect_info.dst = reach_connect_setup.dst
 
-    reach_connect_info.game_to_move = {}
     reach_connect_info.unreachable = reach_connect_setup.unreachable
 
-    for game, reach_move in reach_connect_setup.game_to_move.items():
-        game_move = util_common.GameMoveInfo()
-        game_move.open_tiles = []
-        game_move.wrap_cols = reach_connect_setup.wrap_cols
-        game_move.move_template = get_move_template(reach_move)
+    reach_connect_info.game_to_move_info = get_game_to_move_info(reach_connect_setup)
 
-        reach_connect_info.game_to_move[game] = game_move
+    reach_connect_info.game_to_open_tiles = {}
+
+    for game in reach_connect_setup.game_to_reach_move:
+        game_open_tiles = []
 
         for tag, tiles in scheme_info.game_to_tag_to_tiles[game].items():
             for tile in tiles:
                 text = scheme_info.tileset.tile_to_text[tile]
                 if text in reach_connect_setup.open_text:
-                    game_move.open_tiles.append(tile)
-        util_common.check(len(game_move.open_tiles) > 0, 'no tiles with open text')
+                    game_open_tiles.append(tile)
+        util_common.check(len(game_open_tiles) > 0, 'no tiles with open text')
+
+        reach_connect_info.game_to_open_tiles[game] = game_open_tiles
 
     return reach_connect_info

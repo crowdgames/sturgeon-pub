@@ -37,11 +37,12 @@ def str_to_result(s):
     with util_common.openz(s, 'rb') as f:
         return pickle.load(f)
 
-def str_to_points(s):
+def str_to_path(s):
     ret = []
-    for pt in s.split(','):
-        a, b = pt.split()
-        ret.append((int(a), int(b)))
+    for edge_str in s.split(','):
+        edge = tuple([int(elem) for elem in edge_str.split()])
+        util_common.check(len(edge) == 4, f'wrong edge length: {edge}')
+        ret.append(edge)
     return ret
 
 def arg_cvt(args, cvts):
@@ -67,8 +68,14 @@ def args_to_custom(cust, args):
         return OutTextLevelRangeConstraint(out_text_level, lo, hi, weight)
 
     elif cust == CUST_TEXT_COUNT:
-        rlo, clo, rhi, chi, tlo, thi, out_texts, weight = arg_cvt(args, (int, int, int, int, int, int, str, str_to_weight))
-        return OutTextCountConstraint(rlo, clo, rhi, chi, tlo, thi, out_texts, weight)
+        util_common.check(len(args) >= 5 + 3 and (len(args) - 3) % 5 == 0, 'argument length')
+        regions = []
+        while len(args) >= 5:
+            rlo, clo, rhi, chi, out_texts = arg_cvt(args[:5], (int, int, int, int, str))
+            regions.append((rlo, clo, rhi, chi, out_texts))
+            args = args[5:]
+        tlo, thi, weight = arg_cvt(args, (int, int, str_to_weight))
+        return OutTextCountConstraint(regions, tlo, thi, weight)
 
     elif cust == CUST_TEXT_EXCLUDE:
         out_texts, weight = arg_cvt(args, (str, str_to_weight))
@@ -79,7 +86,7 @@ def args_to_custom(cust, args):
         return OutTextMaximizeConstraint(rlo, clo, rhi, chi, out_texts, weight)
 
     elif cust == CUST_PATH:
-        path_points, weight = arg_cvt(args, (str_to_points, str_to_weight))
+        path_points, weight = arg_cvt(args, (str_to_path, str_to_weight))
         return OutPathConstraint(path_points, weight)
 
     elif cust == CUST_PATH_ENDS:
@@ -107,8 +114,8 @@ class CustomConstraint:
         pass
 
 class OutPathConstraint(CustomConstraint):
-    def __init__(self, path_points, weight):
-        self._path_points = path_points
+    def __init__(self, path, weight):
+        self._path = path
         self._weight = weight
 
     def add(self, gen):
@@ -121,28 +128,35 @@ class OutPathConstraint(CustomConstraint):
                 continue
 
             path_cache = {}
-            for (fr, fc), (tr, tc) in zip(self._path_points, self._path_points[1:]):
-                util_common.check(0 <= tc and tc < gen.get_cols(), 'wrapping not supported')
-                path_cache[(fr, fc, tr, tc, tc)] = None
+            for edge in self._path:
+                if len(edge) == 4:
+                    fr, fc, tr, tc = edge
+                    pwtr = tr
+                    pwtc = tc
+                elif len(edge) == 6:
+                    fr, fc, tr, tc, pwtr, pwtc = edge
+                else:
+                    util_common.check(False, 'edge length')
+
+                path_cache[(fr, fc, tr, tc, pwtr, pwtc)] = None
 
             reach_edges = gen.reachability_edges(connect_index)
             util_common.check(reach_edges is not None, 'reach_edges')
 
             for rr in range(gen.get_rows()):
                 for cc in range(gen.get_cols()):
-                    gen.add_constraint_start(rr, cc, (rr, cc) == self._path_points[0], self._weight)
-                    gen.add_constraint_goal(rr, cc, (rr, cc) == self._path_points[-1], self._weight)
+                    gen.add_constraint_start(rr, cc, (rr, cc) == tuple(self._path[0][0:2]), self._weight)
+                    gen.add_constraint_goal(rr, cc, (rr, cc) == tuple(self._path[-1][2:4]), self._weight)
 
-            for cfr, cfc, ctr, ctc, cpwtc in reach_edges:
-                on_path = (cfr, cfc, ctr, ctc, cpwtc) in path_cache
-                gen.add_constraint_reach_edge(connect_index, cfr, cfc, ctr, ctc, cpwtc, on_path, self._weight)
+            for cfr, cfc, ctr, ctc, cpwtr, cpwtc in reach_edges:
+                on_path = (cfr, cfc, ctr, ctc, cpwtr, cpwtc) in path_cache
+                gen.add_constraint_reach_edge(connect_index, cfr, cfc, ctr, ctc, cpwtr, cpwtc, on_path, self._weight)
                 if on_path:
-                    del path_cache[(cfr, cfc, ctr, ctc, cpwtc)]
+                    del path_cache[(cfr, cfc, ctr, ctc, cpwtr, cpwtc)]
 
             util_common.check(len(path_cache) == 0, 'not all path edges used')
 
-            path_edges = [(a, b, c, d) for (a, b), (c, d) in zip(self._path_points, self._path_points[1:])]
-            gen.append_extra_meta([util_common.meta_path('custom-path', path_edges)])
+            gen.append_extra_meta([util_common.meta_path('custom-path', self._path)])
 
 class OutPathEndsConstraint(CustomConstraint):
     def __init__(self, sr, sc, gr, gc, weight):
@@ -180,7 +194,7 @@ class OutPathFwdConstraint(CustomConstraint):
             reach_edges = gen.reachability_edges(connect_index)
             util_common.check(reach_edges is not None, 'reach_edges')
 
-            for cfr, cfc, ctr, ctc, cpwtc in reach_edges:
+            for cfr, cfc, ctr, ctc, cpwtr, cpwtc in reach_edges:
                 if self._direction == util_reach.RSGLOC_L_R:
                     exclude = (ctc <= cfc)
                 elif self._direction == util_reach.RSGLOC_B_T:
@@ -189,7 +203,7 @@ class OutPathFwdConstraint(CustomConstraint):
                     util_common.check(False, 'direction')
 
                 if exclude:
-                    gen.add_constraint_reach_edge(connect_index, cfr, cfc, ctr, ctc, cpwtc, False, self._weight)
+                    gen.add_constraint_reach_edge(connect_index, cfr, cfc, ctr, ctc, cpwtr, cpwtc, False, self._weight)
 
 class OutResultConstraint(CustomConstraint):
     def __init__(self, out_result, which, rlo, clo, rhi, chi, roff, coff, weight):
@@ -255,7 +269,8 @@ class OutResultConstraint(CustomConstraint):
             path_cache = {}
             path_start_found, path_start = False, self._out_result.reach_info[connect_index].path_tiles[0]
             path_goal_found, path_goal = False, self._out_result.reach_info[connect_index].path_tiles[-1]
-            for (fr, fc, tr, pwtc) in path_edges:
+            for (fr, fc, pwtr, pwtc) in path_edges:
+                tr = pwtr % len(self._out_result.tile_level)
                 tc = pwtc % len(self._out_result.tile_level[0])
 
                 f_in = self._rlo <= fr and fr < self._rhi and self._clo <= fc and fc < self._chi
@@ -271,8 +286,12 @@ class OutResultConstraint(CustomConstraint):
                     cfc = fc + cinto
                     ctr = tr + rinto
                     ctc = tc + cinto
+                    cpwtr = pwtr + rinto
                     cpwtc = pwtc + cinto
-                    path_cache[(cfr, cfc, ctr, ctc, cpwtc)] = None
+                    path_cache[(cfr, cfc, ctr, ctc, cpwtr, cpwtc)] = None
+                elif fr < 0 or fr >= len(self._out_result.tile_level):
+                    # skip duplicate path edges coming in after a wrap
+                    continue
                 elif fc < 0 or fc >= len(self._out_result.tile_level[0]):
                     # skip duplicate path edges coming in after a wrap
                     continue
@@ -287,11 +306,11 @@ class OutResultConstraint(CustomConstraint):
             reach_edges = gen.reachability_edges(connect_index)
             util_common.check(reach_edges is not None, 'reach_edges')
 
-            for cfr, cfc, ctr, ctc, cpwtc in reach_edges:
-                on_path = (cfr, cfc, ctr, ctc, cpwtc) in path_cache
+            for cfr, cfc, ctr, ctc, cpwtr, cpwtc in reach_edges:
+                on_path = (cfr, cfc, ctr, ctc, cpwtr, cpwtc) in path_cache
                 add_cnstr = on_path or path_all
                 if add_cnstr:
-                    gen.add_constraint_reach_edge(connect_index, cfr, cfc, ctr, ctc, cpwtc, on_path, self._weight)
+                    gen.add_constraint_reach_edge(connect_index, cfr, cfc, ctr, ctc, cpwtr, cpwtc, on_path, self._weight)
 
             for rr in range(self._rlo, self._rhi):
                 for cc in range(self._clo, self._chi):
@@ -393,25 +412,24 @@ class OutTextLevelRangeConstraint(CustomConstraint):
         gen.add_constraint_tile_counts(rcts, len(rcts) - self._hi, len(rcts) - self._lo, self._weight)
 
 class OutTextCountConstraint(CustomConstraint):
-    def __init__(self, rlo, clo, rhi, chi, tlo, thi, out_texts, weight):
-        self._rlo = rlo
-        self._clo = clo
-        self._rhi = rhi
-        self._chi = chi
+    def __init__(self, regions, tlo, thi, weight):
+        self._regions = regions
         self._tlo = tlo
         self._thi = thi
-        self._out_texts = out_texts
         self._weight = weight
 
     def add(self, gen):
         print('add custom out text count constraint', self._weight)
 
-        possible_tiles = [tile for tile, text in gen.get_scheme_info().tileset.tile_to_text.items() if text in self._out_texts]
-
         rcts = []
-        for rr in range(self._rlo, self._rhi):
-            for cc in range(self._clo, self._chi):
-                rcts.append((rr, cc, possible_tiles))
+
+        for rlo, clo, rhi, chi, out_texts in self._regions:
+            possible_tiles = [tile for tile, text in gen.get_scheme_info().tileset.tile_to_text.items() if text in out_texts]
+
+            for rr in range(rlo, rhi):
+                for cc in range(clo, chi):
+                    rcts.append((rr, cc, possible_tiles))
+
         gen.add_constraint_tile_counts(rcts, self._tlo, self._thi, self._weight)
 
 class OutTextExcludeConstraint(CustomConstraint):

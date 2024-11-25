@@ -12,9 +12,11 @@ python tile2scheme.py --outfile work/mario-1-1_t_ring.scheme --tilefile work/mar
 
 python scheme2output.py --outfile work/mario-1-1-cst-maxgap   --schemefile work/mario-1-1_t_ring.scheme --size 14 24                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 4 --custom text-max 13 0 14 24 - soft
 
-python scheme2output.py --outfile work/mario-1-1-cst-3q       --schemefile work/mario-1-1_t_ring.scheme --size 14 24                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 4 --custom text-count 0 0 14 24 3 3 Q hard
+python scheme2output.py --outfile work/mario-1-1-cst-3q       --schemefile work/mario-1-1_t_ring.scheme --size 14 24                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 4 --custom text-count 0 0 14 24 Q 3 3 hard
 
-python scheme2output.py --outfile work/mario-1-1-cst-tallpipe --schemefile work/mario-1-1_t_ring.scheme --size 14 24                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 4 --custom text-count 2 0 3 24 1 1 '<' hard
+python scheme2output.py --outfile work/mario-1-1-cst-tallpipe --schemefile work/mario-1-1_t_ring.scheme --size 14 24                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 4 --custom text-count 2 0 3 24 '<' 1 1 hard
+
+python scheme2output.py --outfile work/mario-1-1-cst-3pipe    --schemefile work/mario-1-1_t_ring.scheme --size 14 24                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 4 --custom text-count 6 0 7 24 '<' 0 2 hard --custom text-count 8 0 9 24 '<' 0 2 hard --custom text-count 6 0 7 24 '<' 8 0 9 24 '<' 3 3 hard --custom text-count 0 0 6 24 '<' 7 0 8 24 '<' 9 0 14 24 '<' 0 0 hard
 
 python scheme2output.py --outfile work/mario-1-1-cst-infill   --schemefile work/mario-1-1_t_ring.scheme --size 14 32                                     --pattern-soft --count-soft --reach-move platform --reach-start-goal l-r 4 --custom text-level levels/vglc/mario-1-1-cst-infill.lvl hard
 
@@ -26,7 +28,7 @@ python scheme2output.py --outfile work/mario-1-1-cst-repair   --schemefile work/
 
 python scheme2output.py --outfile work/mario-1-1-cst-short    --schemefile work/mario-1-1_t_ring.scheme --size 14 24                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 4 --custom path-short l-r 2 soft
 
-python scheme2output.py --outfile work/mario-1-1-path         --schemefile work/mario-1-1_t_ring.scheme --size 14 10                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal all --custom path "12 2, 12 3, 12 4, 8 4, 9 5, 10 6, 11 7" hard
+python scheme2output.py --outfile work/mario-1-1-path         --schemefile work/mario-1-1_t_ring.scheme --size 14 10                                     --pattern-hard --count-soft --reach-move platform --reach-start-goal all --custom path "12 2 12 3, 12 3 12 4, 12 4 8 4, 8 4 9 5, 9 5 10 6, 10 6 11 7" hard
 
 
 python scheme2output.py --outfile work/mario-1-1-14x30 --schemefile work/mario-1-1_t_ring.scheme --size 14 30 --pattern-hard --count-soft --reach-move platform --reach-start-goal l-r 8

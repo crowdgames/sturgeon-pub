@@ -104,6 +104,7 @@ if __name__ == '__main__':
     parser.add_argument('--print-reach-internal', action='store_true', help='Display some extra internal information about reachability.')
 
     parser.add_argument('--solver', type=str, nargs='+', choices=util_solvers.SOLVER_LIST, default=[util_solvers.SOLVER_PYSAT_RC2], help='Solver name, from: ' + ','.join(util_solvers.SOLVER_LIST) + '.')
+    parser.add_argument('--solver-file', type=str, help='Filename to use, for solvers that read/write files.')
     parser.add_argument('--solver-portfolio-timeout', type=int, help='Force use of portfolio with given timeout (even for single solver).')
 
     group = parser.add_mutually_exclusive_group(required=False)
@@ -123,6 +124,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--reach-start-goal', type=str, nargs='+', default=None, help='Use reachability start and goals, from: ' + ','.join(util_reach.RSGLOC_LIST) + ', plus params.')
     parser.add_argument('--reach-move', type=str, nargs='+', default=None, help='Use reachability move rules, from: ' + ','.join(util_reach.RMOVE_LIST) + '.')
+    parser.add_argument('--reach-wrap-rows', action='store_true', help='Wrap rows in reachability.')
     parser.add_argument('--reach-wrap-cols', action='store_true', help='Wrap columns in reachability.')
     parser.add_argument('--reach-open-zelda', action='store_true', help='Use Zelda open tiles.')
     parser.add_argument('--reach-unreachable', action='store_true', help='Generate levels with unreachable goals.')
@@ -148,6 +150,10 @@ if __name__ == '__main__':
         solver = util_solvers.solver_id_to_solver(args.solver[0])
     else:
         solver = util_solvers.PortfolioSolver(args.solver, args.solver_portfolio_timeout)
+
+    if args.solver_file:
+        util_common.check(util_solvers.solver_takes_filename(solver), 'solver cannot use filename')
+        solver.set_filename(args.solver_file)
 
     with util_common.openz(args.schemefile, 'rb') as f:
         scheme_info = pickle.load(f)
@@ -200,10 +206,11 @@ if __name__ == '__main__':
         reach_connect_setup = util_common.ReachConnectSetup()
         reach_connect_setup.src = util_common.START_TEXT
         reach_connect_setup.dst = util_common.GOAL_TEXT
-        reach_connect_setup.game_to_move = util_common.arg_list_to_dict_options(parser, '--reach-move', args.reach_move, util_reach.RMOVE_LIST)
-        reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if args.reach_open_zelda else util_common.OPEN_TEXT
-        reach_connect_setup.wrap_cols = args.reach_wrap_cols
         reach_connect_setup.unreachable = args.reach_unreachable
+        reach_connect_setup.game_to_reach_move = util_common.arg_list_to_dict_options(parser, '--reach-move', args.reach_move, util_reach.RMOVE_LIST)
+        reach_connect_setup.wrap_rows = args.reach_wrap_rows
+        reach_connect_setup.wrap_cols = args.reach_wrap_cols
+        reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if args.reach_open_zelda else util_common.OPEN_TEXT
 
         if reach_connect_setups is None:
             reach_connect_setups = []
@@ -211,6 +218,8 @@ if __name__ == '__main__':
     else:
         if args.reach_open_zelda:
             parser.error('cannot specify --reach-open-zelda without --reach-move')
+        if args.reach_wrap_rows:
+            parser.error('cannot specify --reach-wrap-rows without --reach-move')
         if args.reach_wrap_cols:
             parser.error('cannot specify --reach-wrap-cols without --reach-move')
         if args.reach_unreachable:

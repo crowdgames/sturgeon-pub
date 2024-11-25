@@ -70,7 +70,7 @@ if __name__ == '__main__':
             ogr.colors = ogrs.colors
             ogr.graphs = [gr]
             print()
-            util_graph.write_graph(ogr, sys.stdout)
+            util_graph.write_graph_gr(ogr, sys.stdout)
 
     else:
         util_graph.write_graph_to_file(ogrs, args.outfile)

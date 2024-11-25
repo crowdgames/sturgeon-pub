@@ -25,7 +25,8 @@ GTYPE_UTREE      = 'utree'
 GTYPE_DTREE      = 'dtree'
 GTYPE_DAG        = 'dag'
 GTYPE_UGRAPH     = 'ugraph'
-GTYPE_LIST       = [GTYPE_UTREE, GTYPE_DTREE, GTYPE_DAG, GTYPE_UGRAPH]
+GTYPE_DGRAPH     = 'dgraph'
+GTYPE_LIST       = [GTYPE_UTREE, GTYPE_DTREE, GTYPE_DAG, GTYPE_UGRAPH, GTYPE_DGRAPH]
 
 LABEL_GRID_EAST  = 'e'
 LABEL_GRID_SOUTH = 's'
@@ -52,12 +53,32 @@ class GraphDesc:
         self.node_label_count = {}
         self.node_label_subgraphs = {}
 
+class GraphPlaythroughStepInfo:
+    def __init__(self):
+        self.graphs = None
+        self.term = None
+        self.first_term = None
+
+class GraphResultInfo:
+    def __init__(self):
+        self.graphs = None
+
+        self.playthrough_info = None
+
 
 
 def gtype_directed(gtype):
-    if gtype in [GTYPE_DTREE, GTYPE_DAG]:
+    if gtype in [GTYPE_DTREE, GTYPE_DAG, GTYPE_DGRAPH]:
         return True
     elif gtype in [GTYPE_UTREE, GTYPE_UGRAPH]:
+        return False
+    else:
+        util_common.check(False, 'Unknown gtype ' + str(gtype))
+
+def gtype_directed_cyclic(gtype):
+    if gtype in [GTYPE_DGRAPH]:
+        return True
+    elif gtype in [GTYPE_UTREE, GTYPE_UGRAPH, GTYPE_DTREE, GTYPE_DAG]:
         return False
     else:
         util_common.check(False, 'Unknown gtype ' + str(gtype))
@@ -65,7 +86,7 @@ def gtype_directed(gtype):
 def gtype_tree(gtype):
     if gtype in [GTYPE_UTREE, GTYPE_DTREE]:
         return True
-    elif gtype in [GTYPE_DAG, GTYPE_UGRAPH]:
+    elif gtype in [GTYPE_DAG, GTYPE_UGRAPH, GTYPE_DGRAPH]:
         return False
     else:
         util_common.check(False, 'Unknown gtype ' + str(gtype))
@@ -81,7 +102,7 @@ def check_graph(gr, gtype):
     if gtype_tree(gtype):
         util_common.check(nx.is_tree(gr), 'not a tree')
 
-    if gtype_directed(gtype):
+    if gtype_directed(gtype) and not gtype_directed_cyclic(gtype):
         util_common.check(nx.is_directed_acyclic_graph(gr), 'not dag')
 
 def graph_node_cattrs(gr):
@@ -92,13 +113,13 @@ def graph_node_cattrs(gr):
 
         if gr.nodes[node][GATTR_LABEL] != '':
             this_node_cattrs[CATTR_LABEL] = None
+        if GATTR_CENTRAL in gr.nodes[node]:
+            this_node_cattrs[CATTR_CENTRAL] = None
         if GATTR_POSITION in gr.nodes[node]:
             if len(gr.nodes[node][GATTR_POSITION]) == 2:
                 this_node_cattrs[CATTR_POSITION2] = None
             elif len(gr.nodes[node][GATTR_POSITION]) == 3:
                 this_node_cattrs[CATTR_POSITION3] = None
-        if GATTR_CENTRAL in gr.nodes[node]:
-            this_node_cattrs[CATTR_CENTRAL] = None
 
         util_common.check(node_cattrs is None or node_cattrs == this_node_cattrs, 'node_cattrs mismatch')
         node_cattrs = this_node_cattrs
@@ -113,6 +134,8 @@ def graph_edge_cattrs(gr):
 
         if gr.edges[edge][GATTR_LABEL] != '':
             this_edge_cattrs[CATTR_LABEL] = None
+        if GATTR_CENTRAL in gr.edges[edge]:
+            this_edge_cattrs[CATTR_CENTRAL] = None
         if GATTR_DELTA in gr.edges[edge]:
             if len(gr.edges[edge][GATTR_DELTA]) == 2:
                 this_edge_cattrs[CATTR_DELTA2] = None
@@ -128,16 +151,17 @@ def graph_edge_cattrs(gr):
 
     return ''.join(edge_cattrs.keys())
 
-def nodes_and_label_pos_central(gr):
+def nodes_and_label_central_pos(gr):
     return [(node,
              gr.nodes[node][GATTR_LABEL],
-             gr.nodes[node][GATTR_POSITION] if GATTR_POSITION in gr.nodes[node] else None,
-             gr.nodes[node][GATTR_CENTRAL] if GATTR_CENTRAL in gr.nodes[node] else None)
+             gr.nodes[node][GATTR_CENTRAL] if GATTR_CENTRAL in gr.nodes[node] else None,
+             gr.nodes[node][GATTR_POSITION] if GATTR_POSITION in gr.nodes[node] else None)
             for node in gr.nodes]
 
-def edges_and_label_delta_polar_cycle(gr):
+def edges_and_label_central_delta_polar_cycle(gr):
     return [(edge[0], edge[1],
              gr.edges[edge][GATTR_LABEL],
+             gr.edges[edge][GATTR_CENTRAL] if GATTR_CENTRAL in gr.edges[edge] else None,
              gr.edges[edge][GATTR_DELTA] if GATTR_DELTA in gr.edges[edge] else None,
              gr.edges[edge][GATTR_POLAR] if GATTR_POLAR in gr.edges[edge] else None,
              gr.edges[edge][GATTR_CYCLE] if GATTR_CYCLE in gr.edges[edge] else None)
@@ -208,6 +232,10 @@ def read_graphs(filenames):
                             util_common.check(len(splt) >= 1, 'splt len')
                             gr.nodes[node][GATTR_LABEL] = splt[0]
                             splt = splt[1:]
+                        elif cattr == CATTR_CENTRAL:
+                            util_common.check(len(splt) >= 1, 'splt len')
+                            gr.nodes[node][GATTR_CENTRAL] = (splt[0] == 'T')
+                            splt = splt[1:]
                         elif cattr == CATTR_POSITION2:
                             util_common.check(len(splt) >= 2, 'splt len')
                             pos = (float(splt[0]), float(splt[1]))
@@ -218,10 +246,6 @@ def read_graphs(filenames):
                             pos = (float(splt[0]), float(splt[1]), float(splt[2]))
                             gr.nodes[node][GATTR_POSITION] = pos
                             splt = splt[3:]
-                        elif cattr == CATTR_CENTRAL:
-                            util_common.check(len(splt) >= 1, 'splt len')
-                            gr.nodes[node][GATTR_CENTRAL] = (splt[0] == 'T')
-                            splt = splt[1:]
                         else:
                             util_common.check(False, 'unrecognized')
                     util_common.check(len(splt) == 0, 'unused')
@@ -240,6 +264,10 @@ def read_graphs(filenames):
                         if cattr == CATTR_LABEL:
                             util_common.check(len(splt) >= 1, 'splt len')
                             gr.edges[(fra, til)][GATTR_LABEL] = splt[0]
+                            splt = splt[1:]
+                        elif cattr == CATTR_CENTRAL:
+                            util_common.check(len(splt) >= 1, 'splt len')
+                            gr.edges[(fra, til)][GATTR_CENTRAL] = (splt[0] == 'T')
                             splt = splt[1:]
                         elif cattr == CATTR_DELTA2:
                             util_common.check(len(splt) >= 2, 'splt len')
@@ -283,7 +311,15 @@ def read_graphs(filenames):
 
     return grs
 
-def write_graph(grs, out):
+def fmtpos(ff):
+    MAX_DECIMALS = 3
+    for rr in range(MAX_DECIMALS):
+        rounded = int(ff) if rr == 0 else round(ff, rr)
+        if abs(rounded - ff) < (0.1 ** (MAX_DECIMALS + 1)):
+            return str(rounded)
+    return str(round(ff, MAX_DECIMALS))
+
+def write_graph_gr(grs, out):
     util_common.check(len(grs.graphs) == 1, 'can only write single graph')
     gr = grs.graphs[0]
 
@@ -302,12 +338,12 @@ def write_graph(grs, out):
         for cattr in node_cattrs:
             if cattr == CATTR_LABEL:
                 line += f' {cattrs[GATTR_LABEL]}'
-            elif cattr == CATTR_POSITION2:
-                line += f' {cattrs[GATTR_POSITION][0]} {cattrs[GATTR_POSITION][1]}'
-            elif cattr == CATTR_POSITION3:
-                line += f' {cattrs[GATTR_POSITION][0]} {cattrs[GATTR_POSITION][1]} {cattrs[GATTR_POSITION][2]}'
             elif cattr == CATTR_CENTRAL:
                 line += f' {"T" if cattrs[GATTR_CENTRAL] else "F"}'
+            elif cattr == CATTR_POSITION2:
+                line += f' {fmtpos(cattrs[GATTR_POSITION][0])} {fmtpos(cattrs[GATTR_POSITION][1])}'
+            elif cattr == CATTR_POSITION3:
+                line += f' {fmtpos(cattrs[GATTR_POSITION][0])} {fmtpos(cattrs[GATTR_POSITION][1])} {fmtpos(cattrs[GATTR_POSITION][2])}'
         out.write(f'{line}\n')
     for fra, til in gr.edges:
         line = f'e {fra} {til}'
@@ -315,17 +351,19 @@ def write_graph(grs, out):
         for cattr in edge_cattrs:
             if cattr == CATTR_LABEL:
                 line += f' {cattrs[GATTR_LABEL]}'
+            elif cattr == CATTR_CENTRAL:
+                line += f' {"T" if cattrs[GATTR_CENTRAL] else "F"}'
             elif cattr == CATTR_DELTA2:
-                line += f' {cattrs[GATTR_DELTA][0]} {cattrs[GATTR_DELTA][1]}'
+                line += f' {fmtpos(cattrs[GATTR_DELTA][0])} {fmtpos(cattrs[GATTR_DELTA][1])}'
             elif cattr == CATTR_DELTA3:
-                line += f' {cattrs[GATTR_DELTA][0]} {cattrs[GATTR_DELTA][1]} {cattrs[GATTR_DELTA][2]}'
+                line += f' {fmtpos(cattrs[GATTR_DELTA][0])} {fmtpos(cattrs[GATTR_DELTA][1])} {fmtpos(cattrs[GATTR_DELTA][2])}'
             elif cattr == CATTR_POLAR:
-                line += f' {cattrs[GATTR_POLAR][0]} {cattrs[GATTR_POLAR][1]} {"T" if cattrs[GATTR_POLAR][2] else "F"}'
+                line += f' {fmtpos(cattrs[GATTR_POLAR][0])} {fmtpos(cattrs[GATTR_POLAR][1])} {"T" if cattrs[GATTR_POLAR][2] else "F"}'
             elif cattr == CATTR_CYCLE:
                 line += f' {cattrs[GATTR_CYCLE]}'
         out.write(f'{line}\n')
 
-def write_graph_dot(grs, no_etc, out):
+def write_graph_dot(grs, no_etc, use_clusters, scale, out):
     if gtype_directed(grs.gtype):
         dtype = 'digraph'
         dedge = '->'
@@ -333,85 +371,114 @@ def write_graph_dot(grs, no_etc, out):
         dtype = 'graph'
         dedge = '--'
 
+    size = scale * 0.5
+
+    fontsize = 16
+    fontsize_per = 2.0
+    fontsize_min = 5
+
+    fontsize_etc = 7
+
     out.write(f'{dtype} G {{\n')
-    out.write(f'  node [shape="circle" fontsize="24" width="0.5" height="0.5" fixedsize="true"]\n')
-    out.write(f'  edge [fontsize="20"]\n')
+    out.write(f'  graph [fontname="Courier New" margin="0"]\n')
+    out.write(f'  node [fontname="Courier New" fontsize="{fontsize}" shape="circle" width="{size}" height="{size}" fixedsize="true"]\n')
+    out.write(f'  edge [fontname="Courier New" fontsize="{fontsize}"]\n')
     for gg, gr in enumerate(grs.graphs):
+        if use_clusters:
+            out.write(f'  subgraph cluster_{gg} {{\n')
+            out.write(f'  margin="10";\n')
+
         if len(grs.graphs) > 1:
             nodeprefix = f'{gg}-'
         else:
             nodeprefix = ''
 
-        for node, label, pos, central in nodes_and_label_pos_central(gr):
+        for node, label, central, pos in nodes_and_label_central_pos(gr):
             attrs = ''
 
             if label is None:
-                attrs += f'label=""'
-                attrs += f'style="invis"'
+                attrs += f' label=""'
+                attrs += f' style="invis"'
 
             else:
                 if label == '':
-                    attrs += f'label=""'
+                    attrs += f' label=""'
                 else:
-                    attrs += f'label="{label}"'
+                    attrs += f' label="{label}"'
 
                 if len(label) > 1:
-                    fontsize = max(6, 24 - 2.5 * (len(label) - 1))
-                    attrs += f' fontsize="{fontsize}"'
+                    fontsize_disp = max(fontsize_min, fontsize - fontsize_per * (len(label) - 1))
+                    attrs += f' fontsize="{fontsize_disp}"'
 
                 if label in grs.colors:
                     attrs += f' style="filled" fillcolor="#{grs.colors[label]}"'
                 else:
                     attrs += f' style="filled" fillcolor="#eeeeee"'
 
-            if pos is not None:
-                pos_str = ','.join([str(ee) for ee in pos])
-                attrs += f' pos="{pos_str}!"'
-
             if central is not None:
                 if central:
-                    attrs += f' shape="doublecircle"'
+                    attrs += f' penwidth="4"'
 
-            out.write(f'  "{nodeprefix}{node}" [{attrs}]\n')
+            if pos is not None:
+                pos_str = ','.join([fmtpos(ee) for ee in pos])
+                attrs += f' pos="{pos_str}!"'
 
-        for fra, til, label, delta, polar, cycle in edges_and_label_delta_polar_cycle(gr):
+            out.write(f'  "{nodeprefix}{node}" [{attrs.strip()}]\n')
+
+        for fra, til, label, central, delta, polar, cycle in edges_and_label_central_delta_polar_cycle(gr):
             attrs = ''
             dot_label = ''
 
             if label != '':
-                fontsize = max(6, 24 - 2.5 * (len(label) - 1))
-                dot_label += f'<FONT POINT-SIZE="{fontsize}">{label}</FONT>'
+                fontsize_disp = max(fontsize_min, fontsize - fontsize_per * (len(label) - 1))
+                dot_label += f'<FONT POINT-SIZE="{fontsize_disp}">{label}</FONT>'
+
+            if central is not None:
+                if central:
+                    attrs += f' penwidth="4"'
 
             if not no_etc:
                 if delta is not None:
-                    delta_str = ','.join([str(ee) for ee in delta])
+                    delta_str = ','.join([fmtpos(ee) for ee in delta])
                     attrs += f' delta="{delta_str}"'
-                    dot_label += f'<BR/><FONT POINT-SIZE="10">delta:{delta_str}</FONT>'
+                    dot_label += f'<BR/><FONT POINT-SIZE="2"><BR/></FONT><FONT POINT-SIZE="{fontsize_etc}">({delta_str})</FONT>'
 
                 if polar is not None:
-                    polar_str = f'{polar[0]},{polar[1]},{"T" if polar[2] else "F"}'
+                    polar_str = f'{fmtpos(polar[0])},{fmtpos(polar[1])},{"T" if polar[2] else "F"}'
                     attrs += f' polar="{polar_str}"'
-                    dot_label += f'<BR/><FONT POINT-SIZE="10">polar:{polar_str}</FONT>'
+                    dot_label += f'<BR/><FONT POINT-SIZE="2"><BR/></FONT><FONT POINT-SIZE="{fontsize_etc}">p({polar_str})</FONT>'
 
                 if cycle is not None:
                     cycle_str = f'{cycle}'
                     attrs += f' cycle="{cycle_str}"'
-                    dot_label += f'<BR/><FONT POINT-SIZE="10">cycle:{cycle_str}</FONT>'
+                    dot_label += f'<BR/><FONT POINT-SIZE="2"><BR/></FONT><FONT POINT-SIZE="{fontsize_etc}">c({cycle_str})</FONT>'
 
-            attrs += f'label=<{dot_label}>'
+            attrs += f' label=<{dot_label}>'
 
-            out.write(f'  "{nodeprefix}{fra}" {dedge} "{nodeprefix}{til}" [{attrs}]\n')
-    out.write('}\n')
+            out.write(f'  "{nodeprefix}{fra}" {dedge} "{nodeprefix}{til}" [{attrs.strip()}]\n')
+        if use_clusters:
+            out.write(f'  }}\n')
+    out.write(f'}}\n')
 
 def write_graph_to_file(grs, filename):
     if filename is None:
-        write_graph(grs, sys.stdout)
+        write_graph_gr(grs, sys.stdout)
     else:
         with util_common.openz(filename, 'wt') as outfile:
             if util_common.fileistype(filename, '.dot'):
-                write_graph_dot(grs, False, outfile)
+                write_graph_dot(grs, False, False, 1.0, outfile)
             else:
-                write_graph(grs, outfile)
+                write_graph_gr(grs, outfile)
+
+def save_graph_gr_dot(grs, no_dot, prefix):
+    write_graph_to_file(grs, prefix + '.gr')
+    if not no_dot:
+        write_graph_to_file(grs, prefix + '.dot')
+
+def save_graph_result_info(result_info, no_dot, prefix):
+    save_graph_gr_dot(result_info.graphs, no_dot, prefix)
+
+
 
 def get_root_node(gr):
     util_common.check(gr.is_directed(), 'graph not directed')
@@ -419,8 +486,14 @@ def get_root_node(gr):
     util_common.check(len(roots) == 1, 'graph does not have 1 root')
     return roots[0]
 
-def layout_grid(gr):
-    root = get_root_node(gr)
+def get_root_nodes(gr):
+    util_common.check(gr.is_directed(), 'graph not directed')
+    roots = [nn for nn, dd in gr.in_degree() if dd == 0]
+    return roots
+
+def layout_grid(gr, east_label, south_label):
+    roots = get_root_nodes(gr)
+    root = roots[0]
 
     used_pos = {}
 
@@ -431,25 +504,26 @@ def layout_grid(gr):
     while len(queue) != 0:
         node = queue[0]
         queue = queue[1:]
+        in_edges = gr.in_edges(node)
         out_edges = gr.out_edges(node)
 
         pos = gr.nodes[node][GATTR_POSITION]
 
-        for out_edge in out_edges:
-            out_node = out_edge[1]
-            if gr.edges[out_edge][GATTR_LABEL] == LABEL_GRID_EAST:
-                out_pos = (pos[0] + 1, pos[1])
-            elif gr.edges[out_edge][GATTR_LABEL] == LABEL_GRID_SOUTH:
-                out_pos = (pos[0], pos[1] - 1)
+        for edge, flip, ind in [(e, -1, 0) for e in in_edges] + [(e, 1, 1) for e in out_edges]:
+            next_node = edge[ind]
+            if gr.edges[edge][GATTR_LABEL] == east_label:
+                next_pos = (pos[0] + 1 * flip, pos[1])
+            elif gr.edges[edge][GATTR_LABEL] == south_label:
+                next_pos = (pos[0], pos[1] - 1 * flip)
             else:
                 util_common.check(False, 'grid edge label')
 
-            if GATTR_POSITION in gr.nodes[out_node]:
-                util_common.check(gr.nodes[out_node][GATTR_POSITION] == out_pos, 'different positions found')
+            if GATTR_POSITION in gr.nodes[next_node]:
+                util_common.check(gr.nodes[next_node][GATTR_POSITION] == next_pos, 'different positions found')
 
             else:
-                util_common.check(out_pos not in used_pos, 'duplicate pos')
-                gr.nodes[out_node][GATTR_POSITION] = out_pos
-                used_pos[out_pos] = out_node
+                util_common.check(next_pos not in used_pos, 'duplicate pos')
+                gr.nodes[next_node][GATTR_POSITION] = next_pos
+                used_pos[next_pos] = next_node
 
-                queue.append(out_node)
+                queue.append(next_node)

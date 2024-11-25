@@ -1,5 +1,6 @@
-import atexit, bz2, copy, gzip, json, os, pickle, shutil, subprocess, sys, time
+import atexit, base64, bz2, copy, gzip, io, json, os, pickle, shutil, subprocess, sys, time
 import PIL.Image
+import webcolors
 
 
 
@@ -81,10 +82,13 @@ class ReachConnectSetup:
     def __init__(self):
         self.src = None
         self.dst = None
-        self.game_to_move = None
-        self.open_text = None
-        self.wrap_cols = None
         self.unreachable = None
+
+        self.game_to_reach_move = None
+        self.wrap_rows = None
+        self.wrap_cols = None
+
+        self.open_text = None
 
 class ReachJunctionInfo:
     def __init__(self):
@@ -92,18 +96,21 @@ class ReachJunctionInfo:
         self.rcs = None
         self.game_to_junction_tile = None
 
-class GameMoveInfo:
+class MoveInfo:
     def __init__(self):
         self.move_template = None
-        self.open_tiles = None
+        self.wrap_rows = None
         self.wrap_cols = None
 
 class ReachConnectInfo:
     def __init__(self):
         self.src = None
         self.dst = None
-        self.game_to_move = None
         self.unreachable = None
+
+        self.game_to_move_info = None
+
+        self.game_to_open_tiles = None
 
 class ResultReachInfo:
     def __init__(self):
@@ -258,6 +265,27 @@ def arg_list_to_dict_options(parser, name, arg_list, val_options):
 
     return arg_list_to_dict(parser, name, arg_list, check_option)
 
+def load_color_cfg(filename):
+    color_cfg = {}
+
+    with open(filename, 'rt') as f:
+        cfg = json.load(f)
+
+    if 'tile' in cfg:
+        for text, colorname in cfg['tile'].items():
+            try:
+                color_cfg[text] = tuple(webcolors.name_to_rgb(colorname, 'css3'))
+            except ValueError:
+                pass
+
+    return color_cfg
+
+def color_to_normal(color):
+    return (color[0] / 255, color[1] / 255, color[2] / 255)
+
+def color_to_hex(color):
+    return '#%02x%02x%02x' % (int(color[0]), int(color[1]), int(color[2]))
+
 def check_tileset_match(ts0, ts1):
     check(ts0.tile_ids == ts1.tile_ids, 'tileset mismatch')
     check(ts0.tile_image_size == ts1.tile_image_size, 'tileset mismatch')
@@ -306,6 +334,25 @@ def fresh_image(image):
     image_data = PIL.Image.new(image.mode, image.size)
     image_data.putdata(image.getdata())
     return image_data
+
+def image_to_bytes_io(image):
+    bytes_io = io.BytesIO()
+    fresh_image(image).save(bytes_io, 'png')
+    bytes_io.flush()
+    bytes_io.seek(0)
+    return bytes_io
+
+def image_to_bytes(image):
+    return image_to_bytes_io(image).read()
+
+def image_to_b64ascii(image):
+    return base64.b64encode(image_to_bytes(image)).decode('ascii')
+
+def image_from_bytes(fr):
+    return fresh_image(PIL.Image.open(io.BytesIO(fr)))
+
+def image_from_b64ascii(fr):
+    return image_from_bytes(base64.b64decode(fr))
 
 def trim_void_tile_level(tile_level):
     rows, cols = len(tile_level), len(tile_level[0])
@@ -637,3 +684,67 @@ def read_text_level(infilename, include_meta=False):
             return lvl, meta
         else:
             return lvl
+
+
+
+def get_path_edge(fr, fc, tr, tc, pwtr, pwtc):
+    if (tr, tc) == (pwtr, pwtc):
+        return (fr, fc, tr, tc)
+    else:
+        return (fr, fc, tr, tc, pwtr, pwtc)
+
+def get_edge_keys_from(pt, rows, cols, move_info, all_locations, open_locations, closed_locations, exclude):
+    rr, cc = pt
+    edge_keys = []
+
+    all_locations = set(all_locations)
+    open_locations = set(open_locations)
+    closed_locations = set(closed_locations)
+    exclude = set(exclude)
+
+    for move in move_info.move_template:
+        dest_delta, need_open_path_delta, need_open_aux_delta, need_closed_path_delta, need_closed_aux_delta = move
+
+        def inst_deltas(_deltas, _exclude_these):
+            _inst = ()
+            for _dr, _dc in _deltas:
+                _nr = rr + _dr
+                _nc = cc + _dc
+                if move_info.wrap_rows: _nr = _nr % rows
+                if move_info.wrap_cols: _nc = _nc % cols
+                if (_nr, _nc) not in all_locations:
+                    return None
+                if (_nr, _nc) in _exclude_these:
+                    return None
+                _inst = _inst + ((_nr, _nc),)
+            return _inst
+
+        need_open_path = inst_deltas(need_open_path_delta, closed_locations)
+        if need_open_path is None:
+            continue
+
+        need_open_aux = inst_deltas(need_open_aux_delta, closed_locations)
+        if need_open_aux is None:
+            continue
+
+        need_closed_path = inst_deltas(need_closed_path_delta, open_locations)
+        if need_closed_path is None:
+            continue
+
+        need_closed_aux = inst_deltas(need_closed_aux_delta, open_locations)
+        if need_closed_aux is None:
+            continue
+
+        dest = inst_deltas([dest_delta], set.union(closed_locations, exclude))
+        if dest is None:
+            continue
+
+        tr, tc = dest[0]
+
+        pwtr = rr + dest_delta[0]
+        pwtc = cc + dest_delta[1]
+
+        edge_key = (rr, cc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux)
+        edge_keys.append(edge_key)
+
+    return edge_keys

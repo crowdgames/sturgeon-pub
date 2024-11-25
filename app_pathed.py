@@ -29,11 +29,7 @@ def encode_result_info(result_info, want_image):
     if not want_image:
         result_info.image_level = None
     elif result_info.image_level is not None:
-        bytes_io = io.BytesIO()
-        result_info.image_level.convert('RGB').save(bytes_io, 'png')
-        bytes_io.flush()
-        bytes_io.seek(0)
-        result_info.image_level = bytes_io.read()
+        result_info.image_level = util_common.image_to_bytes(result_info.image_level.convert('RGB'))
 
     return result_info
 
@@ -42,12 +38,12 @@ def decode_result_info(result_info):
         return None
 
     if result_info.image_level is not None:
-        result_info.image_level = PIL.Image.open(io.BytesIO(result_info.image_level))
+        result_info.image_level = util_common.image_from_bytes(result_info.image_level)
 
     return result_info
 
 class PathCanvas(tkinter.Canvas):
-    def __init__(self, root, rows, cols, move_template, schemefile, outfolder):
+    def __init__(self, root, rows, cols, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
         super().__init__(root, width=cols*CELL_SIZE+2*INSET-FRAME, height=rows*CELL_SIZE+2*INSET-FRAME)
 
         self._rows = rows
@@ -57,9 +53,11 @@ class PathCanvas(tkinter.Canvas):
         self._seed_rand_path = 0
         self._reverse = False
 
-        self._move_template = move_template
-        self._game_to_open_closed_template = { util_common.DEFAULT_TEXT: util_path.get_open_closed_template(util_reach.get_move_template(self._move_template)) }
+        self._reach_move = reach_move
+        self._reach_wrap_rows = reach_wrap_rows
+        self._reach_wrap_cols = reach_wrap_cols
         self._game_locations = { (rr, cc): util_common.DEFAULT_TEXT for rr in range(self._rows) for cc in range(self._cols) }
+        self._game_to_move_info = { util_common.DEFAULT_TEXT: util_reach.get_move_info(self._reach_move, self._reach_wrap_rows, self._reach_wrap_cols) }
 
         self._schemefile = schemefile
         self._outfolder = outfolder
@@ -75,8 +73,8 @@ class PathCanvas(tkinter.Canvas):
         self._draw_open_closed = False
         self._mouse_draw = []
 
-        self._path = []
-        self._gen_path = []
+        self._path_or_point = None
+        self._gen_path = None
         self._path_draw = []
 
         self._grid_draw = []
@@ -115,7 +113,7 @@ class PathCanvas(tkinter.Canvas):
             self._gen_proc_wanted = time.time() + delay
 
     @staticmethod
-    def gen_proc_body(q, rows, cols, seed, start_goal, path_points, move_template, schemefile, want_image, outfile):
+    def gen_proc_body(q, rows, cols, seed, start_goal, path, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, want_image, outfile):
         util_common.timer_start(False)
 
         if outfile is not None:
@@ -141,17 +139,31 @@ class PathCanvas(tkinter.Canvas):
         reach_connect_setup = util_common.ReachConnectSetup()
         reach_connect_setup.src = util_common.START_TEXT
         reach_connect_setup.dst = util_common.GOAL_TEXT
-        reach_connect_setup.game_to_move = { util_common.DEFAULT_TEXT: move_template }
+        reach_connect_setup.unreachable = False
+        reach_connect_setup.game_to_reach_move = { util_common.DEFAULT_TEXT: reach_move }
+        reach_connect_setup.wrap_rows = reach_wrap_rows
+        reach_connect_setup.wrap_cols = reach_wrap_cols
         reach_connect_setup.open_text = util_common.OPEN_TEXT
-        reach_connect_setup.wrap_cols = False
 
         custom_cnstrs = []
         if start_goal is not None:
             custom_cnstrs.append(util_custom.OutPathEndsConstraint(start_goal[0], start_goal[1], start_goal[2], start_goal[3], WEIGHT_PATH))
-        if path_points is not None:
-            custom_cnstrs.append(util_custom.OutPathConstraint(path_points, WEIGHT_PATH))
+        if path is not None:
+            custom_cnstrs.append(util_custom.OutPathConstraint(path, WEIGHT_PATH))
 
-        result_info = scheme2output.scheme2output(scheme_info, tag_game_level, tag_game_level, solver, seed, WEIGHT_PATTERN, WEIGHT_COUNTS, scheme2output.COUNTS_SCALE_HALF, [reach_start_setup, reach_goal_setup], [reach_connect_setup], None, custom_cnstrs, False)
+        if scheme_info.pattern_info is not None:
+            pattern_weight = WEIGHT_PATTERN
+        else:
+            pattern_weight = 0
+
+        if scheme_info.count_info is not None:
+            count_weight = WEIGHT_COUNTS
+            count_scale = scheme2output.COUNTS_SCALE_HALF
+        else:
+            count_weight = 0
+            count_scale = None
+
+        result_info = scheme2output.scheme2output(scheme_info, tag_game_level, tag_game_level, solver, seed, pattern_weight, count_weight, count_scale, [reach_start_setup, reach_goal_setup], [reach_connect_setup], None, custom_cnstrs, False)
 
         if outfile is not None and result_info is not None:
             print('saving to', outfile)
@@ -179,14 +191,12 @@ class PathCanvas(tkinter.Canvas):
                     decode_result_info(result_info)
 
                     if result_info is not None:
-                        print(result_info.reach_info[0].path_edges)
-
                         if result_info.image_level is None:
                             self._gen_image = None
                         else:
                             self._gen_image = PIL.ImageTk.PhotoImage(result_info.image_level.resize((self._cols * CELL_SIZE, self._rows * CELL_SIZE), PIL.Image.Resampling.BILINEAR))
                         self._gen_text = result_info.text_level
-                        self._gen_path = util_path.point_path_from_edge_path(result_info.reach_info[0].path_edges)
+                        self._gen_path = result_info.reach_info[0].path_edges
                         self._gen_objective = result_info.solver_objective
 
                     self.redraw_from_image()
@@ -203,22 +213,22 @@ class PathCanvas(tkinter.Canvas):
                 self._gen_proc_wanted = None
                 self._gen_proc_termed = False
 
-                if len(self._path) > 0:
+                if PathCanvas.is_edge_path(self._path_or_point):
                     print('starting proc')
 
                     if self._outfolder is None:
                         outfile = None
                     else:
-                        outfile = os.path.join(self._outfolder, hashlib.md5(str(self._path).encode('utf-8')).hexdigest() + ('_%04d' % self._seed_gen))
+                        outfile = os.path.join(self._outfolder, hashlib.md5(str(self._path_or_point).encode('utf-8')).hexdigest() + ('_%04d' % self._seed_gen))
 
                     self._gen_proc_q = multiprocessing.Queue()
-                    self._gen_proc = multiprocessing.Process(target=self.gen_proc_body, args=(self._gen_proc_q, self._rows, self._cols, self._seed_gen, None, self._path, self._move_template, self._schemefile, True, outfile))
+                    self._gen_proc = multiprocessing.Process(target=PathCanvas.gen_proc_body, args=(self._gen_proc_q, self._rows, self._cols, self._seed_gen, None, self._path_or_point, self._reach_move, self._reach_wrap_rows, self._reach_wrap_cols, self._schemefile, True, outfile))
                     self._gen_proc.start()
                 else:
                     print('empty path')
                     self._gen_image = None
                     self._gen_text = None
-                    self._gen_path = []
+                    self._gen_path = None
                     self._gen_objective = None
                     self.redraw_from_image()
 
@@ -230,7 +240,7 @@ class PathCanvas(tkinter.Canvas):
             self.delete(draw)
         self._working_draw = []
 
-        if self._gen_path != self._path:
+        if self._gen_path != self._path_or_point:
             self._working_draw.append(self.create_line(tocvs(0.65), tocvs(0.65), tocvs(1.35), tocvs(1.35), fill='purple', width=3))
             self._working_draw.append(self.create_line(tocvs(1.35), tocvs(0.65), tocvs(0.65), tocvs(1.35), fill='purple', width=3))
 
@@ -252,7 +262,7 @@ class PathCanvas(tkinter.Canvas):
 
         self.redraw_from_working()
 
-    def _do_draw_path(self, points, larger, color, dash):
+    def _do_draw_path(self, path, larger, color, dash):
         if larger:
             outline_color = color
             width = 3
@@ -260,14 +270,28 @@ class PathCanvas(tkinter.Canvas):
             outline_color = ''
             width = 2
 
-        if len(points) > 1:
-            draw_line = []
-            for pr, pc in points:
-                draw_line.append(tocvs(pc + 0.5))
-                draw_line.append(tocvs(pr + 0.5))
-            self._path_draw.append(self.create_line(*draw_line, fill=color, width=width, dash=dash))
+        if PathCanvas.is_edge_path(path):
+            path_unwrapped, path_orig_from, path_was_unwrapped = util_path.unwrap_edge_path(path)
 
-            for (pr0, pc0, pr1, pc1) in util_path.edge_path_from_point_path(points):
+            draw_lines = []
+            prev_pt = None
+            for (pr0, pc0, pr1, pc1) in path_unwrapped:
+                if prev_pt != (pr0, pc0):
+                    if prev_pt is not None:
+                        draw_lines[-1].append(tocvs(prev_pt[1] + 0.5))
+                        draw_lines[-1].append(tocvs(prev_pt[0] + 0.5))
+                    draw_lines.append([])
+                    draw_lines[-1].append(tocvs(pc0 + 0.5))
+                    draw_lines[-1].append(tocvs(pr0 + 0.5))
+                draw_lines[-1].append(tocvs(pc1 + 0.5))
+                draw_lines[-1].append(tocvs(pr1 + 0.5))
+                prev_pt = (pr1, pc1)
+            for draw_line in draw_lines:
+                self._path_draw.append(self.create_line(*draw_line, fill=color, width=width, dash=dash))
+
+            for (pr0, pc0, pr1, pc1), was_unwrapped in zip(path_unwrapped, path_was_unwrapped):
+                if was_unwrapped == util_path.UNWRAP_PRE:
+                    continue
                 pr0 += 0.5
                 pc0 += 0.5
                 pr1 += 0.5
@@ -288,10 +312,11 @@ class PathCanvas(tkinter.Canvas):
                 self._path_draw.append(self.create_polygon([tocvs(tca), tocvs(tra), tocvs(tcb), tocvs(trb), tocvs(tcc), tocvs(trc)], fill=color, outline=outline_color, width=width))
 
         draw_ends = []
-        if len(points) > 0:
-            draw_ends.append(points[0])
-        if len(points) > 1:
-            draw_ends.append(points[-1])
+        if PathCanvas.is_single_point_path(path):
+            draw_ends.append(path)
+        elif PathCanvas.is_edge_path(path):
+            draw_ends.append(util_path.path_begin_point(path))
+            draw_ends.append(util_path.path_end_point(path))
         for pr, pc in draw_ends:
             sz = 0.15
             self._path_draw.append(self.create_oval(tocvs(pc + (0.5 - sz)), tocvs(pr + (0.5 - sz)), tocvs(pc + (0.5 + sz)), tocvs(pr + (0.5 + sz)), fill=color, outline=outline_color, width=width))
@@ -308,7 +333,7 @@ class PathCanvas(tkinter.Canvas):
                 self._path_draw.append(self.create_rectangle(tocvs(nc + 0.25), tocvs(nr + 0.25), tocvs(nc + 0.75), tocvs(nr + 0.75), outline='blue', width=2))
 
         self._do_draw_path(self._gen_path, True, 'red', None)
-        self._do_draw_path(self._path, False, 'pink', (3, 3))
+        self._do_draw_path(self._path_or_point, False, 'pink', (3, 3))
 
         if self._path_nexts is not None:
             for nr, nc in self._path_nexts:
@@ -341,31 +366,65 @@ class PathCanvas(tkinter.Canvas):
         self.redraw_from_grid()
 
     def recompute_nexts(self):
-        if len(self._path) == 0:
+        if self._path_or_point is None:
             self._path_nexts = None
             self._path_open = {}
             self._path_closed = {}
         else:
-            self._path_nexts, self._path_open, self._path_closed = util_path.get_nexts_open_closed_from(self._path, self._reverse, self._rows, self._cols, self._game_to_open_closed_template, self._game_locations)
+            if PathCanvas.is_single_point_path(self._path_or_point):
+                pt = self._path_or_point
+                path = []
+            else:
+                if self._reverse:
+                    pt = util_path.path_begin_point(self._path_or_point)
+                else:
+                    pt = util_path.path_end_point(self._path_or_point)
+                path = self._path_or_point
+
+            self._path_nexts, self._path_open, self._path_closed = util_path.get_nexts_open_closed_from(pt, path, self._reverse, self._rows, self._cols, self._game_to_move_info, self._game_locations)
         self.redraw_from_path()
 
     def new_manual_path(self, delay_proc):
         self.recompute_nexts()
         self.restart_gen_proc(PATH_DELAY_SEC if delay_proc else 0.0)
 
+    @staticmethod
+    def is_empty_path(path):
+        return path is None
+
+    @staticmethod
+    def is_single_point_path(path):
+        return type(path) == tuple
+
+    @staticmethod
+    def is_edge_path(path):
+        return type(path) == list
+
     def on_key_backspace(self, event):
-        if len(self._path) > 0:
-            self._path = self._path[:-1]
+        if PathCanvas.is_single_point_path(self._path_or_point):
+            self._path_or_point = None
+            self.new_manual_path(True)
+        elif PathCanvas.is_edge_path(self._path_or_point):
+            if len(self._path_or_point) == 1:
+                self._path_or_point = tuple(self._path_or_point[0][0:2])
+            else:
+                self._path_or_point = self._path_or_point[:-1]
             self.new_manual_path(True)
 
     def on_key_equal(self, event):
-        if len(self._path) > 0:
-            self._path = self._path[1:]
+        if PathCanvas.is_single_point_path(self._path_or_point):
+            self._path_or_point = None
+            self.new_manual_path(True)
+        elif PathCanvas.is_edge_path(self._path_or_point):
+            if len(self._path_or_point) == 1:
+                self._path_or_point = tuple(self._path_or_point[0][2:4])
+            else:
+                self._path_or_point = self._path_or_point[1:]
             self.new_manual_path(True)
 
     def on_key_x(self, event):
         if self._schemefile:
-            self._path = []
+            self._path_or_point = None
             self.new_manual_path(True)
 
     def on_key_p(self, event):
@@ -374,7 +433,7 @@ class PathCanvas(tkinter.Canvas):
 
     def on_key_c(self, event):
         if self._schemefile:
-            self._path = self._gen_path
+            self._path_or_point = self._gen_path
             self.new_manual_path(True)
 
     def on_key_b(self, event):
@@ -392,18 +451,22 @@ class PathCanvas(tkinter.Canvas):
     def on_key_r(self, event):
         self._seed_rand_path += 1
         rng = random.Random(self._seed_rand_path)
-        self._path = util_path.random_path_by_search(rng, self._rows, self._cols, self._game_to_open_closed_template, self._game_locations)
+        self._path_or_point, reachable = util_path.random_path_by_search(rng, self._rows, self._cols, self._game_to_move_info, self._game_locations)
         self.new_manual_path(False)
 
     def on_key_s(self, event):
-        if len(self._path) >= 2:
-            self._path = util_path.shortest_path_between(self._path[0], self._path[-1], self._rows, self._cols, self._game_to_open_closed_template, {}, {}, self._game_locations)
+        if PathCanvas.is_edge_path(self._path_or_point):
+            begin = util_path.path_begin_point(self._path_or_point)
+            end = util_path.path_end_point(self._path_or_point)
+            self._path_or_point, reachable = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, None, None)
             self.new_manual_path(False)
 
     def on_key_w(self, event):
-        if self._gen_path is not None and len(self._gen_path) >= 2:
+        if PathCanvas.is_edge_path(self._gen_path):
+            begin = util_path.path_begin_point(self._gen_path)
+            end = util_path.path_end_point(self._gen_path)
             open_locations, closed_locations = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT, util_common.START_TEXT, util_common.GOAL_TEXT)
-            self._path = util_path.shortest_path_between(self._gen_path[0], self._gen_path[-1], self._rows, self._cols, self._game_to_open_closed_template, open_locations, closed_locations, self._game_locations)
+            self._path_or_point, reachable = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, open_locations, closed_locations)
             self.new_manual_path(False)
 
     def on_mouse_motion(self, event):
@@ -421,19 +484,33 @@ class PathCanvas(tkinter.Canvas):
     def on_mouse_button(self, event):
         if self._mouse is not None:
             if self._path_nexts is None or self._mouse in self._path_nexts:
-                if not self._reverse:
-                    self._path.append(self._mouse)
+                pt = self._mouse
+                if PathCanvas.is_empty_path(self._path_or_point):
+                    self._path_or_point = pt
                 else:
-                    self._path.insert(0, self._mouse)
+                    if self._reverse:
+                        if PathCanvas.is_single_point_path(self._path_or_point):
+                            pt_begin = self._path_or_point
+                            self._path_or_point = []
+                        else:
+                            pt_begin = util_path.path_begin_point(self._path_or_point)
+                        self._path_or_point.insert(0, self._path_nexts[self._mouse][0])
+                    else:
+                        if PathCanvas.is_single_point_path(self._path_or_point):
+                            pt_end = self._path_or_point
+                            self._path_or_point = []
+                        else:
+                            pt_end = util_path.path_end_point(self._path_or_point)
+                        self._path_or_point.append(self._path_nexts[self._mouse][0])
                 self.new_manual_path(True)
 
 
 
-def pathed(rows, cols, reach_move, schemefile, outfolder):
+def pathed(rows, cols, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
     root = tkinter.Tk()
     root.title('pathed')
 
-    PathCanvas(root, rows, cols, reach_move, schemefile, outfolder)
+    PathCanvas(root, rows, cols, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder)
 
     root.mainloop()
 
@@ -444,9 +521,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--size', required=True, type=int, nargs=2, help='Level size.')
     parser.add_argument('--reach-move', required=True, type=str, help='Use reachability move rules, from: ' + ','.join(util_reach.RMOVE_LIST) + '.')
+    parser.add_argument('--reach-wrap-rows', action='store_true', help='Wrap rows in reachability.')
+    parser.add_argument('--reach-wrap-cols', action='store_true', help='Wrap columns in reachability.')
     parser.add_argument('--schemefile', type=str, help='Input scheme file.')
     parser.add_argument('--outfolder', type=str, help='Output folder.')
 
     args = parser.parse_args()
 
-    pathed(args.size[0], args.size[1], args.reach_move, args.schemefile, args.outfolder)
+    pathed(args.size[0], args.size[1], args.reach_move, args.reach_wrap_rows, args.reach_wrap_cols, args.schemefile, args.outfolder)

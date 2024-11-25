@@ -1,0 +1,51 @@
+t ugraph l l
+
+n 0a _:0
+n 0b _:0
+n 0c _:0
+n 1a _:1
+n 1b _:1
+n 1c _:1
+n 2a _:2
+n 2b _:2
+n 2c _:2
+n 3a _:3
+n 3b _:3
+n 3c _:3
+n 4a _:4
+n 4b _:4
+n 4c _:4
+n 5a _:5
+n 5b _:5
+n 5c _:5
+n 6a _:6
+n 6b _:6
+n 6c _:6
+
+e 0a 0b _:_
+e 0b 0c _:_
+e 0c 0a _:_
+e 0a 1b _:_
+e 1a 1b _:_
+e 1b 1c _:_
+e 1c 1a _:_
+e 1a 2b _:_
+e 2a 2b _:_
+e 2b 2c _:_
+e 2c 2a _:_
+e 2a 3b _:_
+e 3a 3b _:_
+e 3b 3c _:_
+e 3c 3a _:_
+e 3a 4b _:_
+e 4a 4b _:_
+e 4b 4c _:_
+e 4c 4a _:_
+e 4a 5b _:_
+e 5a 5b _:_
+e 5b 5c _:_
+e 5c 5a _:_
+e 5a 6b _:_
+e 6a 6b _:_
+e 6b 6c _:_
+e 6c 6a _:_

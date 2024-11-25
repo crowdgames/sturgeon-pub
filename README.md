@@ -6,25 +6,27 @@ Sturgeon is a system for constraint-based level generation.
 
 ## Setup
 
-You will need Python 3.12 and pipenv.  To install pipenv, if needed:
-```
-pip3 install pipenv
-```
+* You will need Python 3.12 and pipenv on your system.  To install pipenv, if needed:
+  ```
+  pip3 install pipenv
+  ```
 
-To set up the environment with only the default PySAT-based solvers:
-```
-pipenv install --categories solvers-minimal
-```
+* Pipenv is used to set up an environment.  This only needs to be done once (in any root folder for this project):
 
-Or, to set up the environment with all solvers:
-```
-pipenv install --categories solvers-all
-```
+  * Either set up the environment with only the default PySAT-based solvers:
+    ```
+    pipenv install --categories solvers-minimal
+    ```
 
-To start up the environment:
-```
-pipenv shell
-```
+  * Or, set up the environment with all solvers:
+    ```
+    pipenv install --categories solvers-all
+    ```
+
+* Any commands will need to be run in this environment.  Each time a shell is needed, start a shell in the environment with:
+  ```
+  pipenv shell
+  ```
 
 
 
@@ -36,9 +38,12 @@ For example usage (within pipenv), see:
 * `examples_custom.sh` - custom contraints, such as tile counts, level repair, and level extension
 * `examples_junction.sh` - junctions for adding multiple reachable and unreachable paths
 * `examples_blend.sh` - blending different games, using tiles and reachabiity from multiple games in one level
-* `examples_mkiii.sh` - MKIII rewrite rules for generating playthroughs
+* `examples_mkiii.sh` - MKIII tile rewrite rules for generating playthroughs
 * `examples_graph.sh` - graph generation
+* `examples_mkiv.sh` - MKIV graph label rewrite rules for generating playthroughs
 * `examples_explore.sh` - setup and use of level explorer application
+* `examples_file.sh` - file conversion utilities
+* `examples_external.sh` - use of external solver executables
 
 
 
@@ -46,7 +51,7 @@ For example usage (within pipenv), see:
 
 Tiles:
 * `input2tile.py` - get tileset and tile levels from example levels, produce tile file
-* `tile2scheme.py` - get patterns from tile file, produce scheme file
+* `tile2scheme.py` - get patterns and counts from tile file, produce scheme file
 * `scheme2output.py` - generate levels using a scheme file
 
 Tile Utilities:
@@ -74,6 +79,8 @@ Graph Utilities:
 * `pdb2graph.py` - convert pdb to graph file
 * `graph2pdb.py` - convert graph file to pdb
 * `tile2graph.py` - convert tile file to graph file
+* `mkiv2dot.py` - create dot file of MKIV rules
+* `dot2pdf.py` - convert potentially multiple dot files to single pdf
 
 
 
@@ -110,3 +117,5 @@ Graph Utilities:
 * Seth Cooper, Faisal Abutarab, Emily Halina and Nathan Sturtevant. 2023. "Visual exploration of tile level datasets." Proceedings of the Experimental AI in Games Workshop. https://ceur-ws.org/Vol-3626/short3.pdf
 
 * Seth Cooper and Mahsa Bazzaz. 2024. "Literally unplayable: on constraint-based generation of uncompletable levels." Proceedings of the 15th Workshop on Procedural Content Generation. https://doi.org/10.1145/3649921.3659844
+
+* Seth Cooper and Mahsa Bazzaz. 2024. "Sturgeon-MKIV: Constraint-Based Level and Playthrough Generation with Graph Label Rewrite Rules." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 20(1), 13-24. https://doi.org/10.1609/aiide.v20i1.31862

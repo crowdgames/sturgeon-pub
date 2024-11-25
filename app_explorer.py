@@ -23,8 +23,9 @@ PATH_EDIT       =     2
 TILE_TEXT       =     0
 TILE_IMAGE      =     1
 
-COLOR_BACK      = '#F0F0F0'
-COLOR_GRID      = 'gray'
+COLOR_GRID      = util_common.color_to_hex(util_explore.COLOR_BACK)
+COLOR_CELL      = util_common.color_to_hex(util_explore.COLOR_CELL)
+
 COLOR_EDGE      = 'orange'
 COLOR_OVER      = 'purple'
 COLOR_INACTIVE  = 'darkgray'
@@ -52,13 +53,14 @@ class RemainingInfo:
 
 
 class ExplorerFrame(tkinter.Frame):
-    def __init__(self, root, explorer_info, cell_size, text_disp, image_disp):
+    def __init__(self, root, explorer_info, cell_size, text_colors, text_disp, image_disp):
         super().__init__(root)
 
         if TIME_RECOMPUTE is not None:
             self._times = []
 
         self._cell_size = cell_size
+        self._text_colors = text_colors
 
         self._ex = explorer_info
         self._nlevels = len(self._ex.level_data)
@@ -150,7 +152,16 @@ class ExplorerFrame(tkinter.Frame):
         self._tind_image = np.array(list(self._ex.tind_to_image) + void_list)
 
         self._tind_to_image = {}
-        self._avg_color = 'lightgray'
+
+        self._avg_text_color = None
+        self._avg_image_color = None
+
+        if len(self._ex.tind_to_text) > 0:
+            if text_colors and len(text_colors) > 0:
+                avg_color = np.sum(list(text_colors.values()), axis=0) / len(text_colors)
+            else:
+                avg_color = np.array([0.0, 0.0, 0.0])
+            self._avg_text_color = util_common.color_to_hex(avg_color)
 
         if len(self._ex.tind_to_image) > 0:
             image_sizes = math.ceil(math.sqrt(len(self._ex.tind_to_image)))
@@ -180,7 +191,7 @@ class ExplorerFrame(tkinter.Frame):
                     img_sum += np.sum(arr, axis=0)
                 img_count += len(arr)
             avg_color = ((img_sum / img_count + 240) / 2).astype(np.uint8)
-            self._avg_color = '#%02x%02x%02x' % (avg_color[0], avg_color[1], avg_color[2])
+            self._avg_image_color = util_common.color_to_hex(avg_color)
 
         self._mouse_evt = None
         self._mouse = None
@@ -448,6 +459,10 @@ class ExplorerFrame(tkinter.Frame):
                                    x0, y0,
                                    fill=fill, outline='', joinstyle=tkinter.ROUND, smooth=1)
 
+    def create_void_slash(self, x0, y0, x1, y1, fill):
+        void_poly = util_explore.get_void_poly(x0, y0, x1 - x0, y1 - y0, True, True)
+        return self._cvs.create_polygon(*void_poly, fill=fill, outline='', joinstyle=tkinter.BEVEL, smooth=0)
+
     def create_arrow(self, x0, y0, x1, y1, fill, width, dash):
         if dash is not None:
             return self._cvs.create_line(x0, y0, x1, y1, fill=fill, width=width, arrow='last', dash=dash)
@@ -461,6 +476,7 @@ class ExplorerFrame(tkinter.Frame):
         to = self._cell_size / (2 * sqrt)
         font = ('Courier', str(int(self._cell_size / sqrt)))
         ind = 0
+
         for index in indices:
             ox = (ind % sqrt) / sqrt * self._cell_size
             oy = (ind // sqrt) / sqrt * self._cell_size
@@ -469,10 +485,17 @@ class ExplorerFrame(tkinter.Frame):
                 image = self._tind_to_image[sqrt][index]
                 draw_list.append(self._cvs.create_image(self.tocvsx(cc) + ox, self.tocvsy(rr) + oy, anchor=tkinter.NW, image=image))
             else:
+                cx = self.tocvsx(cc) + ox
+                cy = self.tocvsx(rr) + oy
                 if index == self._ex.void_tind:
-                    draw_list.append(self._cvs.create_text(self.tocvsx(cc) + ox + to, self.tocvsy(rr) + oy + to, text='/', fill='#a04040', font=font, anchor=tkinter.CENTER))
+                    fg_color, bg_color = util_explore.get_text_fg_bg_color_hex(None, {None:util_explore.COLOR_VOID})
+                    draw_list.append(self._cvs.create_rectangle(cx, cy, cx + to * 2, cy + to * 2, fill=bg_color, outline=''))
+                    draw_list.append(self.create_void_slash(cx, cy, cx + 2 * to, cy + 2 * to, fg_color))
                 else:
-                    draw_list.append(self._cvs.create_text(self.tocvsx(cc) + ox + to, self.tocvsy(rr) + oy + to, text=self._ex.tind_to_text[index], font=font, anchor=tkinter.CENTER))
+                    text = self._ex.tind_to_text[index]
+                    fg_color, bg_color = util_explore.get_text_fg_bg_color_hex(text, self._text_colors)
+                    draw_list.append(self._cvs.create_rectangle(cx, cy, cx + to * 2, cy + to * 2, fill=bg_color, outline=''))
+                    draw_list.append(self._cvs.create_text(cx + to, cy + to, text=text, fill=fg_color, font=font, anchor=tkinter.CENTER))
 
     def create_tiles_from(self, draw_list, disp):
         indices_rc, indices_sqrt_rc, indices_disp = self.rem_indices(disp)
@@ -485,9 +508,9 @@ class ExplorerFrame(tkinter.Frame):
                     self.create_tiles_from_cell(draw_list, disp, rr, cc)
                 else:
                     if disp == TILE_IMAGE:
-                        clr = self._avg_color
+                        clr = self._avg_image_color
                     else:
-                        clr = 'lightgray'
+                        clr = self._avg_text_color
                     draw_list.append(self.create_rrect(self.tocvsx(cc + 0.1), self.tocvsy(rr + 0.1), self.tocvsx(cc + 0.9), self.tocvsy(rr + 0.9), 0.4 * self._cell_size, clr))
 
     def redraw_from_working(self):
@@ -533,11 +556,13 @@ class ExplorerFrame(tkinter.Frame):
                             self._draw_mouse.append(self.create_arrow(self.tocvsx(c0 + 0.5), self.tocvsy(r0 + 0.5), self.tocvsx(c1 + 0.5), self.tocvsy(r1 + 0.5), COLOR_EDGE, 3, None))
                     else:
                         if sqrt > MAX_SQRT:
-                            tile_cids = []
                             disp = self._displays[md]
+
+                            tile_cids = []
+                            tile_cids.append(self._cvs.create_rectangle(self.tocvsx(mc), self.tocvsy(mr), self.tocvsx(mc + 1), self.tocvsy(mr + 1), fill=COLOR_CELL, outline=''))
                             self.create_tiles_from_cell(tile_cids, disp, mr, mc)
-                            tile_cids.append(self._cvs.create_rectangle(self.tocvsx(mc), self.tocvsy(mr), self.tocvsx(mc + 1), self.tocvsy(mr + 1), fill=COLOR_BACK, outline=''))
-                            for cid in tile_cids:
+
+                            for cid in reversed(tile_cids):
                                 self._cvs.tag_raise(cid, self._draw_back[-1])
                             self._draw_mouse += tile_cids
 
@@ -644,7 +669,7 @@ class ExplorerFrame(tkinter.Frame):
             for dd, disp in enumerate(self._displays):
                 self._xoffset, self._yoffset = dd * self._display_dx, dd * self._display_dy
 
-                self._draw_back.append(self._cvs.create_rectangle(self.tocvsx(0), self.tocvsy(0), self.tocvsx(self._ex.cols), self.tocvsy(self._ex.rows), fill=COLOR_BACK, outline=''))
+                self._draw_back.append(self._cvs.create_rectangle(self.tocvsx(0), self.tocvsy(0), self.tocvsx(self._ex.cols), self.tocvsy(self._ex.rows), fill=COLOR_CELL, outline=''))
 
                 self.create_tiles_from(self._draw_back, disp)
 
@@ -903,7 +928,7 @@ class ExplorerFrame(tkinter.Frame):
 
 
 
-def explorer(explorer_info, cell_size, text_disp, image_disp):
+def explorer(explorer_info, cell_size, text_colors, text_disp, image_disp):
     root = tkinter.Tk()
     root.title('explorer')
 
@@ -913,7 +938,7 @@ def explorer(explorer_info, cell_size, text_disp, image_disp):
     if len(explorer_info.tind_to_image) > 0:
         print('has image')
 
-    ExplorerFrame(root, explorer_info, cell_size, text_disp, image_disp)
+    ExplorerFrame(root, explorer_info, cell_size, text_colors, text_disp, image_disp)
 
     root.mainloop()
 
@@ -924,11 +949,16 @@ if __name__ == '__main__':
 
     parser.add_argument('--explorefile', required=True, type=str, help='Explore file to run, or write to.')
     parser.add_argument('--cell-size', type=int, help='Size of cells.', default=CELL_SIZE_DEF)
+    parser.add_argument('--cfgfile', type=str, help='Config file.')
     parser.add_argument('--text', action='store_true', help='Try text display.')
     parser.add_argument('--image', action='store_true', help='Try image display.')
     parser.add_argument('--test', action='store_true', help='Only test loading.')
 
     args = parser.parse_args()
+
+    text_colors = None
+    if args.cfgfile is not None:
+        text_colors = util_common.load_color_cfg(args.cfgfile)
 
     print('loading...')
     start_time = time.time()
@@ -942,4 +972,4 @@ if __name__ == '__main__':
     print(msg)
 
     if not args.test:
-        explorer(explore_info, args.cell_size, args.text, args.image)
+        explorer(explore_info, args.cell_size, text_colors, args.text, args.image)

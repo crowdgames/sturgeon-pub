@@ -21,6 +21,19 @@ python input2tile.py --outfile work/cave_ti.tile --textfile levels/kenney/cave.l
 python tile2scheme.py --outfile work/cave_ti.scheme --tilefile work/cave_ti.tile --count-divs 1 1 --pattern nbr-plus
 python scheme2output.py --outfile work/cave_ti --schemefile work/cave_ti.scheme --size 15 15 --pattern-hard --count-soft --reach-start-goal br-tl 5 --reach-move maze
 
+# wrap-maze
+python input2tile.py --outfile work/wrap-maze_ti.tile --textfile levels/kenney/wrap-maze.lvl --imagefile levels/kenney/wrap-maze.png
+python tile2scheme.py --outfile work/wrap-maze_ti.scheme --tilefile work/wrap-maze_ti.tile --pattern ring
+python scheme2output.py --outfile work/wrap-maze_ti --schemefile work/wrap-maze_ti.scheme --size 9 6 --pattern-hard --reach-start-goal all --reach-move maze --reach-wrap-rows --reach-wrap-cols
+! python scheme2output.py --outfile work/wrap-maze_ti --schemefile work/wrap-maze_ti.scheme --size 9 6 --pattern-hard --reach-start-goal all --reach-move maze --reach-wrap-rows
+! python scheme2output.py --outfile work/wrap-maze_ti --schemefile work/wrap-maze_ti.scheme --size 9 6 --pattern-hard --reach-start-goal all --reach-move maze --reach-wrap-cols
+! python scheme2output.py --outfile work/wrap-maze_ti --schemefile work/wrap-maze_ti.scheme --size 9 6 --pattern-hard --reach-start-goal all --reach-move maze
+
+# platform
+python input2tile.py --outfile work/platform_ti.tile --textfile levels/kenney/platform-generic.lvl --imagefile levels/kenney/platform.png
+python tile2scheme.py --outfile work/platform_ti.scheme --tilefile work/platform_ti.tile --count-divs 1 1 --pattern ring
+python scheme2output.py --outfile work/platform_ti --schemefile work/platform_ti.scheme --size 12 21 --pattern-hard --count-soft --reach-start-goal l-r 5 --reach-move platform
+
 # tomb
 python input2tile.py --outfile work/tomb-1_ti.tile --textfile levels/manual/tomb-1.lvl --imagefile levels/manual/tomb-1.png
 python tile2scheme.py --outfile work/tomb-1_ti.scheme --tilefile work/tomb-1_ti.tile --pattern nbr-plus

@@ -1,4 +1,4 @@
-import util_common, util_generator
+import util_common, util_generator, util_solvers
 
 
 
@@ -868,13 +868,13 @@ class GeneratorMKIII(util_generator.Generator):
             util_common.check(False, 'rep_rule_order')
 
         for ll in range(self._layers - 1):
-            # keep track of change vars
-            layer_change_vars_rcs = []
-
             # terminal stays set
             if self._vars_term is not None:
                 if ll > 0:
                     self._solver.cnstr_implies_disj(self._vars_term[ll], True, [self._vars_term[ll + 1]], True, None)
+
+            # keep track of change vars
+            layer_change_vars_rcs = []
 
             # keep track of possible changes at this layer
             all_changes_rc = {}
@@ -1033,14 +1033,7 @@ class GeneratorMKIII(util_generator.Generator):
             for rr in range(self._rows):
                 level_row = []
                 for cc in range(self._cols):
-                    use_ss = None
-                    for ss in self._states:
-                        vv = self._vars_lrct[(ll, rr, cc, ss)]
-                        if self._solver.get_var(vv):
-                            util_common.check(use_ss is None, 'multiple states set')
-                            use_ss = ss
-                    util_common.check(use_ss is not None, 'no state set')
-                    level_row.append(use_ss)
+                    level_row.append(util_solvers.get_one_set(self._solver, {ss: self._vars_lrct[(ll, rr, cc, ss)] for ss in self._states}))
                 text_level.append(level_row)
             step_info.text_level = text_level
 

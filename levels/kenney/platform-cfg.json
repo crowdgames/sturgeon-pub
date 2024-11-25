@@ -1,0 +1,17 @@
+{
+    "tile": {
+        "-": "cornflowerblue",
+        "X": "brown",
+        "Y": "darkgreen",
+        "L": "darkgreen",
+        "R": "darkgreen",
+        "{": "darkgrey",
+        "}": "darkgrey",
+        "Q": "orange",
+        "S": "saddlebrown",
+        "<": "lightgreen",
+        ">": "lightgreen",
+        "[": "lightgreen",
+        "]": "lightgreen"
+    }
+}

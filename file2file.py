@@ -5,17 +5,10 @@ import PIL.Image
 
 
 
-def image2base64(image):
-    bytes_io = io.BytesIO()
-    util_common.fresh_image(image).save(bytes_io, 'png')
-    bytes_io.flush()
-    bytes_io.seek(0)
-    return base64.b64encode(bytes_io.read()).decode('ascii')
-
 def image2iid(image, iid_dict, image_list):
     if id(image) not in iid_dict:
         iid_dict[id(image)] = len(image_list)
-        image_list.append(image2base64(image))
+        image_list.append(util_common.image_to_b64ascii(image))
     return iid_dict[id(image)]
 
 def dict2json(d, encode_val=None):
@@ -62,9 +55,6 @@ def wrap2json(what, encode):
     ret['image'] = image_list
     ret['data'] = data
     return ret
-
-def base642image(st):
-    return util_common.fresh_image(PIL.Image.open(io.BytesIO(base64.b64decode(st))))
 
 def iid2image(iid, image_list):
     return image_list[iid]
@@ -118,7 +108,7 @@ def json2exploreinfo(obj, decode_image):
     return ex
 
 def json2wrap(obj, decode):
-    image_list = [base642image(img) for img in obj['image']]
+    image_list = [util_common.image_from_b64ascii(img) for img in obj['image']]
     return decode(obj['data'], lambda x: iid2image(x, image_list))
 
 if __name__ == '__main__':

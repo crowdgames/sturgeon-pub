@@ -1,5 +1,5 @@
 import argparse, itertools, json, math, pickle, random, sys, time
-import util_common, util_graph, util_solvers
+import util_common, util_graph, util_mkiv, util_solvers
 import networkx as nx
 
 
@@ -8,16 +8,33 @@ CONNECT_REACH  = 'reach'
 CONNECT_LAYER  = 'layer'
 CONNECT_LIST   = [CONNECT_REACH, CONNECT_LAYER]
 
-EDGEOPT_TRI    = 'tri'
-EDGEOPT_BAND   = 'band'
-EDGEOPT_STRIPE = 'stripe'
-EDGEOPT_GRID   = 'grid'
-EDGEOPT_RECT   = 'rect'
-EDGEOPT_LIST   = [EDGEOPT_TRI, EDGEOPT_BAND, EDGEOPT_STRIPE, EDGEOPT_GRID, EDGEOPT_RECT]
+EDGEOPT_TRI         = 'tri'
+EDGEOPT_BAND        = 'band'
+EDGEOPT_STRIPE      = 'stripe'
+EDGEOPT_GRID        = 'grid'
+EDGEOPT_RECT        = 'rect'
+EDGEOPT_DBAND       = 'dband'
+EDGEOPT_CODEMASTER  = 'codemaster'
+EDGEOPT_LIST        = [EDGEOPT_TRI, EDGEOPT_BAND, EDGEOPT_STRIPE, EDGEOPT_GRID, EDGEOPT_RECT, EDGEOPT_DBAND, EDGEOPT_CODEMASTER]
 
-def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, label_max, label_count, forbid_cycle, require_cycle, connect, randomize):
+def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, label_max, label_count, forbid_cycle, require_cycle, connect, mkiv_setup, randomize):
     # set up solver vars
     util_common.timer_section('set up')
+
+    if edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT]:
+        edge_labels = {}
+        for label, delta, polar, cycle in grd.edge_labels_etc:
+            edge_labels[label] = None
+
+        if len(edge_labels) != 2:
+            util_common.check(False, 'grid edge labels')
+
+        if util_graph.LABEL_GRID_EAST in edge_labels and util_graph.LABEL_GRID_SOUTH in edge_labels:
+            east_label = util_graph.LABEL_GRID_EAST
+            south_label = util_graph.LABEL_GRID_SOUTH
+        elif util_mkiv.make_label(util_graph.LABEL_GRID_EAST, '_') in edge_labels and util_mkiv.make_label(util_graph.LABEL_GRID_SOUTH, '_') in edge_labels:
+            east_label = util_mkiv.make_label(util_graph.LABEL_GRID_EAST, '_')
+            south_label = util_mkiv.make_label(util_graph.LABEL_GRID_SOUTH, '_')
 
     if label_min:
         for ll in label_min:
@@ -26,16 +43,24 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         for ll in label_max:
             util_common.check(ll == util_common.DEFAULT_TEXT or ll in grd.node_labels, 'no label_max')
 
-    if edgeopt == EDGEOPT_TRI:
-        util_common.check(len(edgeopt_params) == 0, 'edgeopt_params')
-    elif edgeopt == EDGEOPT_BAND:
-        util_common.check(len(edgeopt_params) == 1, 'edgeopt_params')
-    elif edgeopt == EDGEOPT_STRIPE:
-        util_common.check(len(edgeopt_params) >= 1, 'edgeopt_params')
-    elif edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT]:
-        util_common.check(len(edgeopt_params) == 1, 'edgeopt_params')
+    if util_graph.gtype_directed_cyclic(grd.gtype):
+        if edgeopt == EDGEOPT_DBAND:
+            util_common.check(len(edgeopt_params) == 1, 'edgeopt_params')
+        elif edgeopt == EDGEOPT_CODEMASTER:
+            util_common.check(len(edgeopt_params) == 2, 'edgeopt_params')
+        else:
+            util_common.check(False, 'edgeopt cannot be used with this graph type')
     else:
-        util_common.check(False, 'edgeopt')
+        if edgeopt == EDGEOPT_TRI:
+            util_common.check(len(edgeopt_params) == 0, 'edgeopt_params')
+        elif edgeopt == EDGEOPT_BAND:
+            util_common.check(len(edgeopt_params) == 1, 'edgeopt_params')
+        elif edgeopt == EDGEOPT_STRIPE:
+            util_common.check(len(edgeopt_params) >= 1, 'edgeopt_params')
+        elif edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT]:
+            util_common.check(len(edgeopt_params) == 1, 'edgeopt_params')
+        else:
+            util_common.check(False, 'edgeopt cannot be used with this graph type')
 
     use_edge_deltas = None
     use_edge_polars = None
@@ -115,8 +140,13 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
     for ll in edge_labels_etc_plus_none:
         vars_edges_by_label_etc[ll] = []
 
+    PRINT_EDGES = False
+
     vars_edge_by_id_by_label_etc = {}
     for ii in node_id_order:
+        if PRINT_EDGES:
+            sys.stdout.write(f'{ii} ->')
+
         if edgeopt == EDGEOPT_TRI:
             jjs = range(ii + 1, max_size)
         elif edgeopt == EDGEOPT_BAND:
@@ -131,24 +161,56 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                 jjs.append(ii + 1)
             if (ii + grid_stride) < max_size:
                 jjs.append(ii + grid_stride)
+        elif edgeopt == EDGEOPT_DBAND:
+            band_size = edgeopt_params[0]
+            jjs = list(range(ii + 1, min(ii + band_size + 1, max_size))) + list(range(ii - 1, max(ii - band_size - 1, -1), -1))
+        elif edgeopt == EDGEOPT_CODEMASTER:
+            map_count = edgeopt_params[0]
+            scroll_count = edgeopt_params[1]
+            util_common.check(1 + map_count + scroll_count == max_size, 'incorrect number of map and scroll nodes')
+            jjs = util_mkiv.get_codemaster_edges(ii, map_count, scroll_count)
         else:
             util_common.check(False, 'edgeopt')
 
         for jj in jjs:
-            vars_edge_by_id_by_label_etc[(ii, jj)] = {}
+            util_common.check(0 <= jj and jj < max_size, 'out of bounds edge')
+
+            if PRINT_EDGES:
+                sys.stdout.write(f' {jj}')
+                if type(jjs) == dict:
+                    jj_str = ' '.join(jjs[jj])
+                    sys.stdout.write(f'[{jj_str}]')
+
+            ii_jj = (ii, jj)
+
+            vars_edge_by_id_by_label_etc[ii_jj] = {}
             for label_etc in edge_labels_etc_plus_none:
                 vv = s.make_var()
-                vars_edge_by_id_by_label_etc[(ii, jj)][label_etc] = vv
+                vars_edge_by_id_by_label_etc[ii_jj][label_etc] = vv
                 vars_edges_by_label_etc[label_etc].append(vv)
-            s.cnstr_count(list(vars_edge_by_id_by_label_etc[(ii, jj)].values()), True, 1, 1, None)
+            s.cnstr_count(list(vars_edge_by_id_by_label_etc[ii_jj].values()), True, 1, 1, None)
+
+            if type(jjs) == dict:
+                allowed_labels = jjs[jj]
+                for label_etc in vars_edge_by_id_by_label_etc[ii_jj]:
+                    if label_etc is None:
+                        continue
+                    label, delta, polar, cycle = label_etc
+                    if label not in allowed_labels:
+                        s.cnstr_count([vars_edge_by_id_by_label_etc[ii_jj][label_etc]], True, 0, 0, None)
 
             if edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT]:
                 if jj == ii + 1:
-                    edge = edge_with_label(vars_edge_by_id_by_label_etc[(ii, jj)], util_graph.LABEL_GRID_SOUTH)
-                    s.cnstr_count([vars_edge_by_id_by_label_etc[(ii, jj)][None], edge], True, 1, 1, None)
+                    edge = edge_with_label(vars_edge_by_id_by_label_etc[ii_jj], south_label)
+                    s.cnstr_count([vars_edge_by_id_by_label_etc[ii_jj][None], edge], True, 1, 1, None)
                 elif jj == ii + grid_stride:
-                    edge = edge_with_label(vars_edge_by_id_by_label_etc[(ii, jj)], util_graph.LABEL_GRID_EAST)
-                    s.cnstr_count([vars_edge_by_id_by_label_etc[(ii, jj)][None], edge], True, 1, 1, None)
+                    edge = edge_with_label(vars_edge_by_id_by_label_etc[ii_jj], east_label)
+                    s.cnstr_count([vars_edge_by_id_by_label_etc[ii_jj][None], edge], True, 1, 1, None)
+
+        if PRINT_EDGES:
+            sys.stdout.write('\n')
+    if PRINT_EDGES:
+        sys.exit(-1)
 
     # cycles
     if forbid_cycle or require_cycle:
@@ -301,10 +363,10 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             if ea not in vars_edge_by_id_by_label_etc or eb not in vars_edge_by_id_by_label_etc or ec not in vars_edge_by_id_by_label_etc or ed not in vars_edge_by_id_by_label_etc:
                 continue
 
-            eav = edge_with_label(vars_edge_by_id_by_label_etc[ea], util_graph.LABEL_GRID_EAST)
-            ebv = edge_with_label(vars_edge_by_id_by_label_etc[eb], util_graph.LABEL_GRID_SOUTH)
-            ecv = edge_with_label(vars_edge_by_id_by_label_etc[ec], util_graph.LABEL_GRID_SOUTH)
-            edv = edge_with_label(vars_edge_by_id_by_label_etc[ed], util_graph.LABEL_GRID_EAST)
+            eav = edge_with_label(vars_edge_by_id_by_label_etc[ea], east_label)
+            ebv = edge_with_label(vars_edge_by_id_by_label_etc[eb], south_label)
+            ecv = edge_with_label(vars_edge_by_id_by_label_etc[ec], south_label)
+            edv = edge_with_label(vars_edge_by_id_by_label_etc[ed], east_label)
 
             s.cnstr_implies_disj(s.make_conj([ebv, ecv, edv], [True, True, True]), True, [eav], True, None)
             s.cnstr_implies_disj(s.make_conj([eav, ecv, edv], [True, True, True]), True, [ebv], True, None)
@@ -316,14 +378,16 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
 
     for ii in node_id_order:
         nbr_edges = {}
-        possible_nbr_nodes = []
+        possible_nbr_nodes = {}
         for jj in node_id_order:
             if ii == jj:
                 continue
-            ei, ej = min(ii, jj), max(ii, jj)
-            if (ei, ej) in vars_edge_by_id_by_label_etc:
-                nbr_edges[(ei, ej)] = None
-                possible_nbr_nodes.append(jj)
+            if (ii, jj) in vars_edge_by_id_by_label_etc:
+                nbr_edges[(ii, jj)] = None
+                possible_nbr_nodes[jj] = None
+            if (jj, ii) in vars_edge_by_id_by_label_etc:
+                nbr_edges[(jj, ii)] = None
+                possible_nbr_nodes[jj] = None
 
         # missing node has no edges; using conj seems to work better than multiple individual implies
         s.cnstr_implies_disj(vars_node_by_id[ii][None], True, [s.make_conj([vars_edge_by_id_by_label_etc[edge][None] for edge in nbr_edges], [True] * len(nbr_edges))], True, None)
@@ -355,11 +419,14 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                         til = subnode_id_mapping[til]
 
                         if util_graph.gtype_directed(grd.gtype):
-                            if fra >= til:
-                                any_missing_edges = True
-                                break
+                            if util_graph.gtype_directed_cyclic(grd.gtype):
+                                util_common.check(use_edge_deltas is None, 'directed cyclic edge delta')
+                                util_common.check(use_edge_polars is None, 'directed cyclic edge polar')
                             else:
-                                ei, ej = fra, til
+                                if fra >= til:
+                                    any_missing_edges = True
+                                    break
+                            ei, ej = fra, til
                         else:
                             util_common.check(use_edge_deltas is None, 'undirected edge delta') # TODO edge flip vars ?
                             util_common.check(use_edge_polars is None, 'undirected edge polar')
@@ -392,9 +459,14 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             else:
                 s.cnstr_implies_disj(vars_node_by_id[ii][label], True, patts, True, None)
 
+    if mkiv_setup is not None:
+        util_common.timer_section('add mkiv')
+        mkiv_info = util_mkiv.get_example_info(mkiv_setup)
+        mkiv_tuple = util_mkiv.add_mkiv(mkiv_info, s, grd.gtype, list(grd.node_labels), vars_node_by_id, list(grd.edge_labels_etc), vars_edge_by_id_by_label_etc)
+
     util_common.timer_section('solve')
 
-    result = None
+    result_info = None
     if s.solve():
         util_common.timer_section('create graph')
 
@@ -404,12 +476,8 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
             gr = nx.Graph()
 
         for ii, vvs in vars_node_by_id.items():
-            label = False
-            for ll, vv in vvs.items():
-                if s.get_var(vv):
-                    util_common.check(label == False, 'multiple labels')
-                    label = ll
-            util_common.check(label != False, 'no label')
+            label = util_solvers.get_one_set(s, vvs)
+
             if label is not None:
                 gr.add_node(ii)
                 gr.nodes[ii][util_graph.GATTR_LABEL] = label
@@ -417,13 +485,11 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                     gr.nodes[ii][util_graph.GATTR_POSITION] = s.get_var_pos_xform(vars_node_xform[ii])
 
         for (ii, jj), vvs in vars_edge_by_id_by_label_etc.items():
-            label_etc = False
-            for ll, vv in vvs.items():
-                if s.get_var(vv):
-                    util_common.check(label_etc == False, 'multiple labels/delta')
-                    label_etc = ll
-            util_common.check(label_etc != False, 'no label/et')
+            label_etc = util_solvers.get_one_set(s, vvs)
+
             if label_etc is not None:
+                util_common.check(ii in gr.nodes and jj in gr.nodes, 'edge with missing node')
+
                 label, delta, polar, cycle = label_etc
                 gr.add_edge(ii, jj)
                 gr.edges[(ii, jj)][util_graph.GATTR_LABEL] = label
@@ -437,7 +503,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
         util_graph.check_graph(gr, grd.gtype)
 
         if edgeopt in [EDGEOPT_GRID, EDGEOPT_RECT] and use_edge_deltas is None and use_edge_polars is None:
-            util_graph.layout_grid(gr)
+            util_graph.layout_grid(gr, east_label, south_label)
 
         if use_edge_deltas is not None or use_edge_polars is not None:
             for ii in node_id_order:
@@ -454,15 +520,19 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt, edgeopt_params, label_min, 
                     util_common.check(len(pos_ii) == len(pos_jj), 'lengths')
                     util_common.check(max([abs(pi - pj) for pi, pj in zip(pos_ii, pos_jj)]) >= MIN_LINF_DIST, 'dist')
 
-        grs = util_graph.Graphs()
-        grs.gtype = grd.gtype
-        grs.colors = grd.colors
-        grs.graphs = [gr]
-        result = grs
+        result_info = util_graph.GraphResultInfo()
+
+        result_info.graphs = util_graph.Graphs()
+        result_info.graphs.gtype = grd.gtype
+        result_info.graphs.colors = grd.colors
+        result_info.graphs.graphs = [gr]
+
+        if mkiv_setup is not None:
+            util_mkiv.update_result(mkiv_tuple, result_info)
 
     util_common.timer_section(None)
 
-    return result
+    return result_info
 
 
 
@@ -470,19 +540,30 @@ if __name__ == '__main__':
     util_common.timer_start()
 
     parser = argparse.ArgumentParser(description='Generate graphs based on example graph.')
+
     parser.add_argument('--solver', type=str, nargs='+', choices=util_solvers.SOLVER_LIST, default=[util_solvers.SOLVER_PYSAT_RC2], help='Solver name, from: ' + ','.join(util_solvers.SOLVER_LIST) + '.')
     parser.add_argument('--outfile', required=True, type=str, help='Output file.')
     parser.add_argument('--gdescfile', required=True, type=str, help='Input graph description file.')
+
     parser.add_argument('--minsize', required=True, type=int, help='Minimum size.')
     parser.add_argument('--maxsize', required=True, type=int, help='Maximum size.')
-    parser.add_argument('--edgeopt', type=str, nargs='+', default=[EDGEOPT_TRI], help='Edge options, from: ' + ','.join(EDGEOPT_LIST) + '.')
+
     parser.add_argument('--label-min', type=str, nargs='+', default=None, help='Minimum number of each label to generate.')
     parser.add_argument('--label-max', type=str, nargs='+', default=None, help='Maximum number of each label to generate.')
     parser.add_argument('--label-count', action='store_true', help='Generate using label counts from example.')
+
     parser.add_argument('--cycle-no', action='store_true', help='Forbid cycle.')
     parser.add_argument('--cycle-yes', action='store_true', help='Require cycle.')
+
+    parser.add_argument('--mkiv-example', type=str, choices=util_mkiv.EXAMPLES, help='MKIV example name, from: ' + ','.join(util_mkiv.EXAMPLES) + '.')
+    parser.add_argument('--mkiv-layers', type=int, help='MKIV number of layers.')
+
+    parser.add_argument('--edgeopt', type=str, nargs='+', default=[EDGEOPT_TRI], help='Edge options, from: ' + ','.join(EDGEOPT_LIST) + '.')
     parser.add_argument('--connect', type=str, choices=CONNECT_LIST, default=CONNECT_REACH, help='Connect approach name, from: ' + ','.join(CONNECT_LIST) + '.')
     parser.add_argument('--randomize', type=int, help='Randomize based on given number.')
+
+    parser.add_argument('--out-dot-none', action='store_true', help='Don\'t save dot file.')
+
     args = parser.parse_args()
 
     if len(args.solver) == 1:
@@ -495,16 +576,38 @@ if __name__ == '__main__':
         edgeopt_params = tuple([int(ee) for ee in args.edgeopt[1:]])
         util_common.check(edgeopt in EDGEOPT_LIST, '--edgeopt must be in ' + ','.join(EDGEOPT_LIST))
 
+
+
     label_min = util_common.arg_list_to_dict_int(parser, '--label-min', args.label_min)
     label_max = util_common.arg_list_to_dict_int(parser, '--label-max', args.label_max)
+
+
+
+    mkiv_setup = None
+
+    if args.mkiv_example or args.mkiv_layers:
+        if not args.mkiv_example or not args.mkiv_layers:
+            parser.error('must use --mkiv-example and --mkiv-layers together')
+
+        mkiv_setup = util_mkiv.MKIVSetup()
+        mkiv_setup.example = args.mkiv_example
+        mkiv_setup.layers = args.mkiv_layers
+
+
 
     with util_common.openz(args.gdescfile, 'rb') as f:
         grd = pickle.load(f)
 
-    ogrs = gdesc2graph(solver, grd, args.minsize, args.maxsize, edgeopt, edgeopt_params, label_min, label_max, args.label_count, args.cycle_no, args.cycle_yes, args.connect, args.randomize)
-    if ogrs is not None:
-        util_graph.write_graph(ogrs, sys.stdout)
-        util_graph.write_graph_to_file(ogrs, args.outfile)
+    result_info = gdesc2graph(solver, grd, args.minsize, args.maxsize, edgeopt, edgeopt_params, label_min, label_max, args.label_count, args.cycle_no, args.cycle_yes, args.connect, mkiv_setup, args.randomize)
+
+    if result_info is not None:
+        util_graph.write_graph_gr(result_info.graphs, sys.stdout)
+        util_graph.save_graph_result_info(result_info, args.out_dot_none, args.outfile)
+
+        if mkiv_setup is not None:
+            util_mkiv.save_graph_result_info_mkiv(result_info, args.out_dot_none, args.outfile)
+
         util_common.exit_solution_found()
+
     else:
         util_common.exit_solution_not_found()

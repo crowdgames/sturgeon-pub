@@ -1,28 +1,26 @@
-import json, multiprocessing, queue, random, sys
+import json, multiprocessing, queue, random, re, sys
 import util_common
 
 
-SOLVER_PRINT          = 'print'
-SOLVER_Z3_OPTIMIZE    = 'z3-opt'
-SOLVER_Z3_SOLVE       = 'z3-slv'
-SOLVER_CVC5           = 'cvc5'
-SOLVER_SCIPY          = 'scipy'
-SOLVER_CVXPY          = 'cvxpy'
-SOLVER_CLINGO_FE      = 'clingo-fe'
-SOLVER_CLINGO_BE      = 'clingo-be'
-SOLVER_PYSAT_FM       = 'pysat-fm'
-SOLVER_PYSAT_RC2      = 'pysat-rc2'
-SOLVER_PYSAT_FM_BOOL  = 'pysat-fm-boolonly'
-SOLVER_PYSAT_RC2_BOOL = 'pysat-rc2-boolonly'
-SOLVER_PYSAT_MC       = 'pysat-minicard'
-SOLVER_LIST           = [SOLVER_PRINT, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_SCIPY, SOLVER_CVXPY, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC]
-SOLVER_NOTEST_LIST    = [SOLVER_PRINT]
 
-Z3_OPTION_SOLVE       = 'solve'
-Z3_OPTION_OPTIMIZE    = 'optimize'
-
-PYSAT_OPTION_CARD     = 'card'
-PYSAT_OPTION_BOOLONLY = 'boolonly'
+SOLVER_JSON_WRITE         = 'json-write'
+SOLVER_DIMACS_WRITE_CNF   = 'dimacs-write-cnf'
+SOLVER_DIMACS_WRITE_WCNF  = 'dimacs-write-wcnf'
+SOLVER_DIMACS_READ        = 'dimacs-read'
+SOLVER_Z3_OPTIMIZE        = 'z3-opt'
+SOLVER_Z3_SOLVE           = 'z3-slv'
+SOLVER_CVC5               = 'cvc5'
+SOLVER_SCIPY              = 'scipy'
+SOLVER_CVXPY              = 'cvxpy'
+SOLVER_CLINGO_FE          = 'clingo-fe'
+SOLVER_CLINGO_BE          = 'clingo-be'
+SOLVER_PYSAT_FM           = 'pysat-fm'
+SOLVER_PYSAT_RC2          = 'pysat-rc2'
+SOLVER_PYSAT_FM_BOOL      = 'pysat-fm-boolonly'
+SOLVER_PYSAT_RC2_BOOL     = 'pysat-rc2-boolonly'
+SOLVER_PYSAT_MC           = 'pysat-minicard'
+SOLVER_LIST               = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_SCIPY, SOLVER_CVXPY, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC]
+SOLVER_NOTEST_LIST        = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ]
 
 
 
@@ -101,12 +99,18 @@ def try_import_pysat():
 
 
 def solver_id_to_solver(solver_id):
-    if solver_id == SOLVER_PRINT:
-        return PrintSolver()
+    if solver_id == SOLVER_JSON_WRITE:
+        return WriteJsonSolver()
+    elif solver_id == SOLVER_DIMACS_WRITE_CNF:
+        return CnfWriteDimacsSolver()
+    elif solver_id == SOLVER_DIMACS_WRITE_WCNF:
+        return WcnfWriteDimacsSolver()
+    elif solver_id == SOLVER_DIMACS_READ:
+        return ReadDimacsSolver()
     elif solver_id == SOLVER_Z3_OPTIMIZE:
-        return Z3SolverOptimize()
+        return OptimizeZ3Solver()
     elif solver_id == SOLVER_Z3_SOLVE:
-        return Z3SolverSolve()
+        return SolveZ3Solver()
     elif solver_id == SOLVER_CVC5:
         return CVC5Solver()
     elif solver_id == SOLVER_SCIPY:
@@ -114,25 +118,46 @@ def solver_id_to_solver(solver_id):
     elif solver_id == SOLVER_CVXPY:
         return CvxPySolver()
     elif solver_id == SOLVER_CLINGO_FE:
-        return ClingoFrontendSolver()
+        return FrontendClingoSolver()
     elif solver_id == SOLVER_CLINGO_BE:
-        return ClingoBackendSolver()
+        return BackendClingoSolver()
     elif solver_id == SOLVER_PYSAT_FM:
-        return PySatSolverFM()
+        return FMPySatSolver()
     elif solver_id == SOLVER_PYSAT_RC2:
-        return PySatSolverRC2()
+        return RC2PySatSolver()
     elif solver_id == SOLVER_PYSAT_FM_BOOL:
-        return PySatSolverFMBoolOnly()
+        return BoolOnlyFMPySatSolver()
     elif solver_id == SOLVER_PYSAT_RC2_BOOL:
-        return PySatSolverRC2BoolOnly()
+        return BoolOnlyRC2PySatSolver()
     elif solver_id == SOLVER_PYSAT_MC:
-        return PySatSolverMiniCard()
+        return MiniCardPySatSolver()
     else:
         util_common.check(False, 'solver ' + solver_id + ' unrecognized.')
 
+def solver_takes_filename(solver):
+    return isinstance(solver, _SolverFilename)
 
 
-class Solver:
+
+def get_one_set(solver, vv_map):
+    set_val, found = None, False
+    for val, vv in vv_map.items():
+        if solver.get_var(vv):
+            util_common.check(not found, 'multiple values')
+            set_val, found = val, True
+    util_common.check(found, 'no value')
+    return set_val
+
+def are_all_set(solver, vvs):
+    util_common.check(len(vvs) != 0, 'no vars to check')
+    for vv in vvs:
+        if not solver.get_var(vv):
+            return False
+    return True
+
+
+
+class _Solver:
     def __init__(self, solver_id):
         self._solver_id = solver_id
 
@@ -225,7 +250,7 @@ def _unwrap_xform_x2(vv):
 
 
 
-class SolverImpl(Solver):
+class _SolverImpl(_Solver):
     def __init__(self, solver_id, supports_weights, supports_xforms):
         super().__init__(solver_id)
 
@@ -303,9 +328,30 @@ class SolverImpl(Solver):
     def _IMPL_get_var(self, vv):
         util_common.check(False, 'unimplemented')
 
+class _SolverFilename:
+    def __init__(self):
+        self._filename = None
 
+    def set_filename(self, filename):
+        self._filename = filename
 
-class PortfolioSolver(Solver):
+    def file_write(self, data):
+        if self._filename is None:
+            print(data)
+        else:
+            print('writing to', self._filename)
+            with open(self._filename, 'wt') as f:
+                f.write(data)
+
+    def file_read(self):
+        if self._filename is None:
+            return sys.stdin.read()
+        else:
+            print('reading from', self._filename)
+            with open(self._filename, 'rt') as f:
+                return f.read()
+
+class PortfolioSolver(_Solver):
     RES_SOLN   = 'soln'
     RES_NOSOLN = 'nosoln'
     RES_ERROR  = 'error'
@@ -450,11 +496,13 @@ class PortfolioSolver(Solver):
 
 
 
-class PrintSolver(SolverImpl):
+class WriteJsonSolver(_SolverImpl, _SolverFilename):
     def __init__(self):
-        super().__init__(SOLVER_PRINT, True, False)
+        _SolverImpl.__init__(self, SOLVER_JSON_WRITE, True, False)
+        _SolverFilename.__init__(self)
 
         self._curr_id = 0
+
         self._output = {}
         self._output['var'] = []
         self._output['conj'] = []
@@ -485,20 +533,23 @@ class PrintSolver(SolverImpl):
         self._output['cnstr_count'].append({'of':lls, 'min':lo, 'max':hi, 'weight':print_weight})
 
     def _IMPL_solve(self):
-        print(json.dumps(self._output, indent=2))
+        self.file_write(json.dumps(self._output, indent=2) + '\n')
         return False
 
 
 
-class _Z3Solver(SolverImpl):
+class _Z3Solver(_SolverImpl):
+    Z3_OPTION_SOLVE       = 'solve'
+    Z3_OPTION_OPTIMIZE    = 'optimize'
+
     def __init__(self, solver_id, solver_option):
         util_common.check(try_import_z3(), 'z3 not available')
 
-        util_common.check(solver_option in [Z3_OPTION_OPTIMIZE, Z3_OPTION_SOLVE], 'invalid option for solver: ' + solver_option)
+        util_common.check(solver_option in [_Z3Solver.Z3_OPTION_OPTIMIZE, _Z3Solver.Z3_OPTION_SOLVE], 'invalid option for solver: ' + solver_option)
 
         self._option = solver_option
 
-        if self._option == Z3_OPTION_OPTIMIZE:
+        if self._option == _Z3Solver.Z3_OPTION_OPTIMIZE:
             super().__init__(solver_id, True, True)
             self._s = z3.Optimize()
         else:
@@ -524,13 +575,13 @@ class _Z3Solver(SolverImpl):
             return z3.And(*lls)
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
-        if self._option != Z3_OPTION_OPTIMIZE:
+        if self._option != _Z3Solver.Z3_OPTION_OPTIMIZE:
             util_common.check(weight is None, 'solver does not support weights')
 
         self._help_add_cnstr_weight(z3.Implies(in_ll, z3.Or(*out_lls)), weight)
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
-        if self._option != Z3_OPTION_OPTIMIZE:
+        if self._option != _Z3Solver.Z3_OPTION_OPTIMIZE:
             util_common.check(weight is None, 'solver does not support weights')
 
         if len(lls) == 0:
@@ -563,7 +614,7 @@ class _Z3Solver(SolverImpl):
                     self._help_add_cnstr_weight(z3.PbLe(lls_count, hi), weight)
 
     def _IMPL_solve(self):
-        if self._option == Z3_OPTION_OPTIMIZE:
+        if self._option == _Z3Solver.Z3_OPTION_OPTIMIZE:
             def on_model(_m):
                 util_common.write_time('.')
 
@@ -582,7 +633,7 @@ class _Z3Solver(SolverImpl):
 
         self._result = self._s.model()
 
-        if self._option == Z3_OPTION_OPTIMIZE:
+        if self._option == _Z3Solver.Z3_OPTION_OPTIMIZE:
             objs = [self._s.model().evaluate(obj) for obj in self._s.objectives()]
         else:
             objs = []
@@ -686,18 +737,18 @@ class _Z3Solver(SolverImpl):
         cond = _unwrap_var(cond)
         self._s.add(z3.Implies(cond, z3.And(xform_apply)))
 
-class Z3SolverOptimize(_Z3Solver):
+class OptimizeZ3Solver(_Z3Solver):
     def __init__(self):
-        super().__init__(SOLVER_Z3_OPTIMIZE, Z3_OPTION_OPTIMIZE)
+        super().__init__(SOLVER_Z3_OPTIMIZE, _Z3Solver.Z3_OPTION_OPTIMIZE)
 
-class Z3SolverSolve(_Z3Solver):
+class SolveZ3Solver(_Z3Solver):
     def __init__(self):
-        super().__init__(SOLVER_Z3_SOLVE, Z3_OPTION_SOLVE)
+        super().__init__(SOLVER_Z3_SOLVE, _Z3Solver.Z3_OPTION_SOLVE)
 
 
 
 
-class CVC5Solver(SolverImpl):
+class CVC5Solver(_SolverImpl):
     def __init__(self):
         util_common.check(try_import_cvc5(), 'cvc5 not available')
 
@@ -781,7 +832,7 @@ class CVC5Solver(SolverImpl):
 
 
 
-class _MilpSolver(SolverImpl):
+class _MilpSolver(_SolverImpl):
     def __init__(self, solver_id):
         super().__init__(solver_id, True, False)
 
@@ -986,7 +1037,7 @@ class CvxPySolver(_MilpSolver):
 
 
 
-class ClingoFrontendSolver(SolverImpl):
+class FrontendClingoSolver(_SolverImpl):
     def __init__(self):
         util_common.check(try_import_clingo(), 'clingo not available')
 
@@ -1119,7 +1170,7 @@ class ClingoFrontendSolver(SolverImpl):
 
 
 
-class ClingoBackendSolver(SolverImpl):
+class BackendClingoSolver(_SolverImpl):
     def __init__(self):
         util_common.check(try_import_clingo(), 'clingo not available')
 
@@ -1237,13 +1288,9 @@ class ClingoBackendSolver(SolverImpl):
 
 
 
-class PySatSolverMiniCard(SolverImpl):
-    def __init__(self):
-        util_common.check(try_import_pysat(), 'pysat not available')
-
-        super().__init__(SOLVER_PYSAT_MC, False, False)
-
-        self._s = pysat.solvers.Solver(name='mc')
+class _GenericSatSolver(_SolverImpl):
+    def __init__(self, solver_id, supports_weights):
+        super().__init__(solver_id, supports_weights, False)
 
         self._curr_id = 0
 
@@ -1263,17 +1310,19 @@ class PySatSolverMiniCard(SolverImpl):
         else:
             conj_var = self._next_var()
             for ll in lls:
-                self._s.add_clause([-conj_var, ll]) # ... conj_var -> A ll
-            self._s.add_clause([-ll for ll in lls] + [conj_var]) # A lls -> conj_var
+                self._IMPL_SAT_add_clause([-conj_var, ll], None) # ... conj_var -> A ll
+            self._IMPL_SAT_add_clause([-ll for ll in lls] + [conj_var], None) # A lls -> conj_var
             return conj_var
 
     def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
-        util_common.check(weight is None, 'solver does not support weights')
+        if not self.supports_weights():
+            util_common.check(weight is None, 'solver does not support weights')
 
-        self._s.add_clause([-in_ll] + out_lls)
+        self._IMPL_SAT_add_clause([-in_ll] + out_lls, weight)
 
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
-        util_common.check(weight is None, 'solver does not support weights')
+        if not self.supports_weights():
+            util_common.check(weight is None, 'solver does not support weights')
 
         if len(lls) == 0:
             pass
@@ -1282,9 +1331,9 @@ class PySatSolverMiniCard(SolverImpl):
             if lo == 0 and hi == 1:
                 pass
             elif lo == 0 and hi == 0:
-                self._s.add_clause([-lls[0]])
+                self._IMPL_SAT_add_clause([-lls[0]], weight)
             elif lo == 1 and hi == 1:
-                self._s.add_clause([lls[0]])
+                self._IMPL_SAT_add_clause([lls[0]], weight)
             else:
                 util_common.check(False, 'count vars')
 
@@ -1292,182 +1341,238 @@ class PySatSolverMiniCard(SolverImpl):
             if lo == 0:
                 pass
             elif lo == 1:
-                self._s.add_clause(lls)
+                self._IMPL_SAT_add_clause(lls, weight)
             else:
-                self._s.add_atmost([-ll for ll in lls], len(lls) - lo)
+                self._IMPL_SAT_add_atmost([-ll for ll in lls], len(lls) - lo, weight)
 
             if hi < len(lls):
-                self._s.add_atmost(lls, hi)
+                self._IMPL_SAT_add_atmost(lls, hi, weight)
 
     def _IMPL_solve(self):
-        if not self._s.solve():
+        result = self._IMPL_SAT_solve()
+        if result is None:
             return False
-
-        self._result = self._s.get_model()
-        self._objective = 0
-
-        for ii, vv in enumerate(self._result):
-            util_common.check(abs(vv) - 1 == ii, 'result index')
-
-        return True
+        else:
+            self._result, self._objective = result
+            return True
 
     def _IMPL_get_var(self, vv):
         return self._result[vv - 1] > 0
 
+    def _IMPL_SAT_add_clause(self, lls, weight):
+        util_common.check(False, '_IMPL_SAT_add_clause unimplemented')
 
+    def _IMPL_SAT_add_atmost(self, lls, atmost, weight):
+        util_common.check(False, '_IMPL_SAT_add_atmost unimplemented')
 
-class _PySatSolverWeighted(SolverImpl):
-    def __init__(self, solver_id, solver_option):
+    def _IMPL_SAT_solve(self):
+        util_common.check(False, '_IMPL_SAT_solve unimplemented')
+
+class MiniCardPySatSolver(_GenericSatSolver):
+    def __init__(self):
         util_common.check(try_import_pysat(), 'pysat not available')
 
-        util_common.check(solver_option in [PYSAT_OPTION_CARD, PYSAT_OPTION_BOOLONLY], 'invalid option for solver: ' + solver_option)
+        super().__init__(SOLVER_PYSAT_MC, False)
 
-        super().__init__(solver_id, True, False)
+        self._s = pysat.solvers.Solver(name='mc')
 
-        self._option = solver_option
+    def _IMPL_SAT_add_clause(self, lls, weight):
+        util_common.check(weight is None, 'solver does not support weights')
+        self._s.add_clause(lls)
+
+    def _IMPL_SAT_add_atmost(self, lls, atmost, weight):
+        util_common.check(weight is None, 'solver does not support weights')
+        self._s.add_atmost(lls, atmost)
+
+    def _IMPL_SAT_solve(self):
+        if not self._s.solve():
+            return None
+
+        result = self._s.get_model()
+
+        for ii, vv in enumerate(result):
+            util_common.check(abs(vv) - 1 == ii, 'result index')
+
+        return result, 0
+
+class _CardEncodingPySatSolver(_GenericSatSolver):
+    def __init__(self, solver_id, supports_weights, formula):
+        util_common.check(try_import_pysat(), 'pysat not available')
+
+        super().__init__(solver_id, supports_weights)
+
+        self._formula = formula
 
         self._pysat_encoding = pysat.card.EncType.kmtotalizer
 
-        if self._option == PYSAT_OPTION_CARD:
-            self._wcnf = pysat.formula.WCNFPlus()
-        else:
-            self._wcnf = pysat.formula.WCNF()
-
-        self._curr_id = 0
-
-    def _help_get_args_dict(self):
-        args_dict = {}
-        if self._option == PYSAT_OPTION_CARD:
-            args_dict['solver'] = 'minicard'
-        return args_dict
-
-    def _next_var(self):
-        self._curr_id += 1
-        return self._curr_id
-
-    def _IMPL_negate_var_conj(self, ll):
-        return -ll
-
-    def _IMPL_make_var(self):
-        return self._next_var()
-
-    def _IMPL_make_conj(self, lls):
-        if len(lls) == 1:
-            return lls[0]
-        else:
-            conj_var = self._next_var()
-            for ll in lls:
-                self._wcnf.append([-conj_var, ll]) # ... conj_var -> A ll
-            self._wcnf.append([-ll for ll in lls] + [conj_var]) # A lls -> conj_var
-            return conj_var
-
-    def _IMPL_cnstr_implies_disj(self, in_ll, out_lls, weight):
-        self._wcnf.append([-in_ll] + out_lls, weight=weight)
-
     def _IMPL_cnstr_count(self, lls, lo, hi, weight):
-        if len(lls) == 0:
-            pass
-
-        elif len(lls) == 1:
-            if lo == 0 and hi == 1:
-                pass
-            elif lo == 0 and hi == 0:
-                self._wcnf.append([-lls[0]], weight=weight)
-            elif lo == 1 and hi == 1:
-                self._wcnf.append([lls[0]], weight=weight)
-            else:
-                util_common.check(False, 'count vars')
+        if len(lls) <= 1:
+            _GenericSatSolver._IMPL_cnstr_count(self, lls, lo, hi, weight)
 
         else:
-            if self._option == PYSAT_OPTION_CARD and weight is None: # PySat currently only supports hard cardinality constraints
-                if lo == 0:
-                    pass
-                elif lo == 1:
-                    self._wcnf.append(lls)
-                else:
-                    self._wcnf.append([[-ll for ll in lls], len(lls) - lo], is_atmost=True)
+            label_var_cls = []
 
-                if hi < len(lls):
-                    self._wcnf.append([lls, hi], is_atmost=True)
-
+            if lo == 0:
+                pass
+            elif lo == 1:
+                self._IMPL_SAT_add_clause(lls, weight)
             else:
-                label_var_cls = []
+                if weight is not None and len(label_var_cls) == 0:
+                    label_var_cls = [self._next_var()]
 
-                if lo == 0:
-                    pass
-                elif lo == 1:
-                    self._wcnf.append(lls, weight=weight)
-                else:
-                    if weight is not None and len(label_var_cls) == 0:
-                        label_var_cls = [self._next_var()]
+                cnf = pysat.card.CardEnc.atleast(lits=lls, bound=lo, top_id=self._curr_id, encoding=self._pysat_encoding)
+                util_common.check(len(cnf.atmosts) == 0, 'atmosts in card encoding')
+                for cls in cnf.clauses:
+                    self._IMPL_SAT_add_clause(cls + label_var_cls, None)
+                    self._curr_id = max(self._curr_id, max([abs(cll) for cll in cls]))
 
-                    cnf = pysat.card.CardEnc.atleast(lits=lls, bound=lo, top_id=self._curr_id, encoding=self._pysat_encoding)
-                    for cls in cnf:
-                        self._wcnf.append(cls + label_var_cls)
-                        self._curr_id = max(self._curr_id, max(cls))
+            if hi < len(lls):
+                if weight is not None and len(label_var_cls) == 0:
+                    label_var_cls = [self._next_var()]
 
-                if hi < len(lls):
-                    if weight is not None and len(label_var_cls) == 0:
-                        label_var_cls = [self._next_var()]
+                cnf = pysat.card.CardEnc.atmost(lits=lls, bound=hi, top_id=self._curr_id, encoding=self._pysat_encoding)
+                util_common.check(len(cnf.atmosts) == 0, 'atmosts in card encoding')
+                for cls in cnf.clauses:
+                    self._IMPL_SAT_add_clause(cls + label_var_cls, None)
+                    self._curr_id = max(self._curr_id, max([abs(cll) for cll in cls]))
 
-                    cnf = pysat.card.CardEnc.atmost(lits=lls, bound=hi, top_id=self._curr_id, encoding=self._pysat_encoding)
-                    for cls in cnf:
-                        self._wcnf.append(cls + label_var_cls)
-                        self._curr_id = max(self._curr_id, max(cls))
+            for label_var in label_var_cls:
+                self._IMPL_SAT_add_clause([-label_var], weight)
 
-                for label_var in label_var_cls:
-                    self._wcnf.append([-label_var], weight=weight)
+    def _IMPL_SAT_add_clause(self, lls, weight):
+        extra_args = {}
+        if weight is not None:
+            extra_args['weight'] = weight
+        self._formula.append(lls, **extra_args)
 
-    def _IMPL_solve(self):
-        soln = self._do_solve()
+class CnfWriteDimacsSolver(_CardEncodingPySatSolver, _SolverFilename):
+    def __init__(self):
+        util_common.check(try_import_pysat(), 'pysat not available')
 
-        if soln is None:
+        _CardEncodingPySatSolver.__init__(self, SOLVER_DIMACS_WRITE_CNF, False, pysat.formula.CNF())
+        _SolverFilename.__init__(self)
+
+    def _IMPL_SAT_solve(self):
+        self.file_write(self._formula.to_dimacs())
+        return None
+
+class WcnfWriteDimacsSolver(_CardEncodingPySatSolver, _SolverFilename):
+    def __init__(self):
+        util_common.check(try_import_pysat(), 'pysat not available')
+
+        _CardEncodingPySatSolver.__init__(self, SOLVER_DIMACS_WRITE_CNF, True, pysat.formula.WCNF())
+        _SolverFilename.__init__(self)
+
+    def _IMPL_SAT_solve(self):
+        self.file_write(self._formula.to_dimacs())
+        return None
+
+class ReadDimacsSolver(_CardEncodingPySatSolver, _SolverFilename):
+    def __init__(self):
+        util_common.check(try_import_pysat(), 'pysat not available')
+
+        _CardEncodingPySatSolver.__init__(self, SOLVER_DIMACS_WRITE_CNF, True, pysat.formula.WCNF())
+        _SolverFilename.__init__(self)
+
+    def _IMPL_SAT_solve(self):
+        data = self.file_read()
+
+        v_find_re = re.compile(r'-?\d+')
+        v_re = re.compile(r'^v((?:\s+-?\d+)+)\s*$')
+
+        v_match = None
+        for line in data.split('\n'):
+            if (m := v_re.match(line)) is not None:
+                v_match = m
+
+        if v_match is None:
+            return None
+
+        result = []
+        v_nums = re.findall(v_find_re, v_match.group(1))
+        for ii, v_num in enumerate(v_nums):
+            v_num_int = int(v_num)
+            if v_num_int == 0:
+                util_common.check(ii + 1 == len(v_nums), '0 before end')
+                break
+            util_common.check(ii + 1 == abs(v_num_int), 'variables out of order')
+            result.append(v_num_int)
+
+        def _satisfies(_cls, _vvs):
+            for _cc in _cls:
+                if (_cc > 0) == (_vvs[abs(_cc) - 1] > 0):
+                    return True
             return False
 
-        self._result, self._objective = soln
+        for cls in self._formula.hard:
+            if not _satisfies(cls, result):
+                return None
 
-        for ii, vv in enumerate(self._result):
-            util_common.check(abs(vv) - 1 == ii, 'result index')
+        objective = 0
+        for cls, wt in zip(self._formula.soft, self._formula.wght):
+            if not _satisfies(cls, result):
+                objective += wt
 
-        return True
+        return result, objective
 
-    def _IMPL_get_var(self, vv):
-        return self._result[vv - 1] > 0
+class _OptionsPySatSolver(_CardEncodingPySatSolver):
+    def __init__(self, solver_id, formula):
+        super().__init__(solver_id, True, formula)
 
-class _PySatSolverFM(_PySatSolverWeighted):
-    def __init__(self, solver_id, solver_option):
-        super().__init__(solver_id, solver_option)
+        self._solve_options = {}
 
-    def _do_solve(self):
-        fm = pysat.examples.fm.FM(self._wcnf, **self._help_get_args_dict())
+class _BoolOnlyPySatSolver(_OptionsPySatSolver):
+    def __init__(self, solver_id):
+        util_common.check(try_import_pysat(), 'pysat not available')
+
+        super().__init__(solver_id, pysat.formula.WCNF())
+
+class _FullPySatSolver(_OptionsPySatSolver):
+    def __init__(self, solver_id):
+        util_common.check(try_import_pysat(), 'pysat not available')
+
+        super().__init__(solver_id, pysat.formula.WCNFPlus())
+
+        self._solve_options['solver'] = 'minicard'
+
+    def _IMPL_cnstr_count(self, lls, lo, hi, weight):
+        if weight is None: # PySat currently only supports hard cardinality constraints
+            return _GenericSatSolver._IMPL_cnstr_count(self, lls, lo, hi, weight)
+        else: # fall back to encoding
+            return _CardEncodingPySatSolver._IMPL_cnstr_count(self, lls, lo, hi, weight)
+
+    def _IMPL_SAT_add_atmost(self, lls, atmost, weight):
+        util_common.check(weight is None, 'solver does not support weighted atmost')
+        self._formula.append([lls, atmost], is_atmost=True, weight=weight)
+
+class _PySatFMSolveFunc:
+    def _IMPL_SAT_solve(self):
+        fm = pysat.examples.fm.FM(self._formula, **self._solve_options)
         if fm.compute():
             return fm.model, fm.cost
 
         return None
 
-class PySatSolverFM(_PySatSolverFM):
+class FMPySatSolver(_PySatFMSolveFunc, _FullPySatSolver):
     def __init__(self):
-        super().__init__(SOLVER_PYSAT_FM, PYSAT_OPTION_CARD)
+        _FullPySatSolver.__init__(self, SOLVER_PYSAT_FM)
 
-class PySatSolverFMBoolOnly(_PySatSolverFM):
+class BoolOnlyFMPySatSolver(_PySatFMSolveFunc, _BoolOnlyPySatSolver):
     def __init__(self):
-        super().__init__(SOLVER_PYSAT_FM_BOOL, PYSAT_OPTION_BOOLONLY)
+        _BoolOnlyPySatSolver.__init__(self, SOLVER_PYSAT_FM_BOOL)
 
-class _PySatSolverRC2(_PySatSolverWeighted):
-    def __init__(self, solver_id, solver_option):
-        super().__init__(solver_id, solver_option)
-
-    def _do_solve(self):
-        with pysat.examples.rc2.RC2(self._wcnf, **self._help_get_args_dict()) as rc2:
+class _PySatRC2SolveFunc:
+    def _IMPL_SAT_solve(self):
+        with pysat.examples.rc2.RC2(self._formula, **self._solve_options) as rc2:
             for m in rc2.enumerate():
                 return list(m), rc2.cost
 
         return None
 
-class PySatSolverRC2(_PySatSolverRC2):
+class RC2PySatSolver(_PySatRC2SolveFunc, _FullPySatSolver):
     def __init__(self):
-        super().__init__(SOLVER_PYSAT_RC2, PYSAT_OPTION_CARD)
+        _FullPySatSolver.__init__(self, SOLVER_PYSAT_RC2)
 
-class PySatSolverRC2BoolOnly(_PySatSolverRC2):
+class BoolOnlyRC2PySatSolver(_PySatRC2SolveFunc, _BoolOnlyPySatSolver):
     def __init__(self):
-        super().__init__(SOLVER_PYSAT_RC2_BOOL, PYSAT_OPTION_BOOLONLY)
+        _BoolOnlyPySatSolver.__init__(self, SOLVER_PYSAT_RC2_BOOL)

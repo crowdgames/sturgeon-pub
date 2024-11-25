@@ -3,24 +3,12 @@ import util_common
 
 RANDOM_PATH_INSET = 1
 
-def point_path_from_json(point_path_json):
-    return [tuple(pt) for pt in point_path_json]
+UNWRAP_NONE = 0
+UNWRAP_PRE  = 1
+UNWRAP_POST = 2
 
 def edge_path_from_json(edge_path_json):
     return [tuple(pt) for pt in edge_path_json]
-
-def point_path_from_edge_path(edge_path):
-    point_path = []
-    if len(edge_path) > 0:
-        (fr, fc, tr, tc) = edge_path[0]
-        point_path.append((fr, fc))
-    for (fr, fc, tr, tc) in edge_path:
-        util_common.check((fr, fc) == point_path[-1], 'edge path')
-        point_path.append((tr, tc))
-    return point_path
-
-def edge_path_from_point_path(point_path):
-    return [(a, b, c, d) for (a, b), (c, d) in zip(point_path, point_path[1:])]
 
 def order_edge_path(edge_path_unordered):
     src_to_dst = {}
@@ -46,6 +34,34 @@ def order_edge_path(edge_path_unordered):
 
     return edge_path
 
+def unwrap_edge_path(path):
+    path_unwrapped = []
+    path_orig_from = []
+    path_was_unwrapped = []
+    for edge in path:
+        if len(edge) == 4:
+            fr, fc, tr, tc = edge
+            path_unwrapped.append(edge)
+            path_orig_from.append((fr, fc))
+            path_was_unwrapped.append(UNWRAP_NONE)
+        elif len(edge) == 6:
+            fr, fc, tr, tc, pwtr, pwtc = edge
+            path_unwrapped.append((fr, fc, pwtr, pwtc))
+            path_orig_from.append((fr, fc))
+            path_was_unwrapped.append(UNWRAP_PRE)
+            path_unwrapped.append((tr - (pwtr - fr), tc - (pwtc - fc), tr, tc))
+            path_orig_from.append((fr, fc))
+            path_was_unwrapped.append(UNWRAP_POST)
+        else:
+            util_common.check(False, 'path edge wrong length')
+    return path_unwrapped, path_orig_from, path_was_unwrapped
+
+def path_begin_point(path):
+    return path[0][0:2]
+
+def path_end_point(path):
+    return path[-1][2:4]
+
 def edge_path_from_lines(prefix, lines):
     for line in lines:
         if line.startswith(prefix):
@@ -58,38 +74,45 @@ def edge_path_from_lines(prefix, lines):
             return edge_path
     return None
 
-def get_open_closed_template(move_template):
-    open_closed_template = {}
-    for dest, need_open_path, need_open_aux, need_closed_path, need_closed_aux in move_template:
-        need_open_close = ([(0, 0)] + need_open_path + need_open_aux + [dest], need_closed_path + need_closed_aux, 1 + len(need_open_path) + len(need_closed_path))
-        if dest not in open_closed_template:
-            open_closed_template[dest] = []
-        open_closed_template[dest].append(need_open_close)
-    return open_closed_template
+def get_move_info_delta_moves(move_info, dr, dc):
+    ret = []
 
-def get_path_open_closed(path, game_to_open_closed_template, game_locations):
+    for move in move_info.move_template:
+        dest_delta, need_open_path_delta, need_open_aux_delta, need_closed_path_delta, need_closed_aux_delta = move
+
+        if (dr, dc) == dest_delta:
+            ret.append(move)
+
+    return ret
+
+def get_path_open_closed(path, game_to_move_info, game_locations):
     path_open = {}
     path_closed = {}
 
-    for (fr, fc, tr, tc) in edge_path_from_point_path(path):
-        open_closed_template = game_to_open_closed_template[game_locations[(fr, fc)]]
+    path_unwrapped, path_orig_from, path_was_unwrapped = unwrap_edge_path(path)
+    for (fr, fc, tr, tc), (ofr, ofc) in zip(path_unwrapped, path_orig_from):
+        move_info = game_to_move_info[game_locations[(ofr, ofc)]]
 
         dr, dc = tr - fr, tc - fc
         open_sets, closed_sets = [], []
 
-        for dopen, dclosed, dlen in open_closed_template[(dr, dc)]:
+        for move in get_move_info_delta_moves(move_info, dr, dc):
+            dest_delta, need_open_path_delta, need_open_aux_delta, need_closed_path_delta, need_closed_aux_delta = move
+
             open_set, closed_set = set(), set()
-            for (rr, cc) in dopen:
+            for (rr, cc) in [(0, 0)] + need_open_path_delta + need_open_aux_delta + [dest_delta]:
                 open_set.add((fr + rr, fc + cc))
             open_sets.append(open_set)
-            for (rr, cc) in dclosed:
+            for (rr, cc) in need_closed_path_delta + need_closed_aux_delta:
                 closed_set.add((fr + rr, fc + cc))
             closed_sets.append(closed_set)
 
-        for open_pt in sorted(set.intersection(*open_sets)):
-            path_open[open_pt] = None
-        for closed_pt in sorted(set.intersection(*closed_sets)):
-            path_closed[closed_pt] = None
+        if len(open_sets) > 0:
+            for open_pt in sorted(set.intersection(*open_sets)):
+                path_open[open_pt] = None
+        if len(closed_sets) > 0:
+            for closed_pt in sorted(set.intersection(*closed_sets)):
+                path_closed[closed_pt] = None
 
     return path_open, path_closed
 
@@ -127,85 +150,125 @@ def get_level_open_closed(text_level, open_text, src_text, dst_text):
 
     return open_locations, closed_locations
 
-def get_nexts_from(pt, rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations, exclude):
-    lr, lc = pt
+def get_nexts_from(pt, rows, cols, game_to_move_info, game_locations, open_locations, closed_locations, exclude):
     nexts = {}
 
-    open_closed_template = game_to_open_closed_template[game_locations[pt]]
+    move_info = game_to_move_info[game_locations[pt]]
 
-    for dest, need_open_closed_len in open_closed_template.items():
-        nr, nc = lr + dest[0], lc + dest[1]
-        if nr < 0 or rows <= nr or nc < 0 or cols <= nc:
-            continue
-        if (nr, nc) in exclude:
-            continue
+    rr, cc = pt
 
-        for need_open, need_closed, path_len in need_open_closed_len:
-            need_missing = False
-            for need_r, need_c in need_open:
-                need_r, need_c = lr + need_r, lc + need_c
-                if need_r < 0 or rows <= need_r or need_c < 0 or cols <= need_c:
-                    need_missing = True
-                if (need_r, need_c) in closed_locations:
-                    need_missing = True
-            for need_r, need_c in need_closed:
-                need_r, need_c = lr + need_r, lc + need_c
-                if need_r < 0 or rows <= need_r or need_c < 0 or cols <= need_c:
-                    need_missing = True
-                if (need_r, need_c) in open_locations:
-                    need_missing = True
-            if need_missing:
-                continue
+    edge_keys = util_common.get_edge_keys_from(pt, rows, cols, move_info, game_locations, open_locations, closed_locations, exclude)
 
-            util_common.check((nr, nc) not in nexts, 'duplicate next')
-            nexts[(nr, nc)] = path_len
+    for edge_key in edge_keys:
+        fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+        util_common.check(fr == rr and fc == cc, 'edge')
+        util_common.check((tr, tc) not in nexts, 'duplicate next')
+
+        nexts[(tr, tc)] = ((fr, fc, tr, tc, pwtr, pwtc), 1 + len(need_open_path) + len(need_closed_path))
 
     return nexts
 
-def get_nexts_open_closed_from(path, reverse, rows, cols, game_to_open_closed_template, game_locations):
+def get_nexts_open_closed_from(pt, path, reverse, rows, cols, game_to_move_info, game_locations):
     path_nexts = {}
-    path_open, path_closed = get_path_open_closed(path, game_to_open_closed_template, game_locations)
+    path_open, path_closed = get_path_open_closed(path, game_to_move_info, game_locations)
 
-    if len(path) > 0:
-        if not reverse:
-            path_nexts = get_nexts_from(path[-1], rows, cols, game_to_open_closed_template, path_open, path_closed, game_locations, path)
-        else:
-            path_nexts = {}
-            for rr in range(rows):
-                for cc in range(cols):
-                    pt = (rr, cc)
-                    if pt in path:
-                        continue
-                    if path[0] not in get_nexts_from(pt, rows, cols, game_to_open_closed_template, path_open, path_closed, game_locations, path[1:]):
-                        continue
-                    path_nexts[pt] = None
+    path_unwrapped, path_orig_from, path_was_unwrapped = unwrap_edge_path(path)
+
+    exclude = {}
+    for (fr, fc, tr, tc) in path_unwrapped:
+        exclude[(fr, fc)] = None
+        exclude[(tr, tc)] = None
+
+    if not reverse:
+        path_nexts = get_nexts_from(pt, rows, cols, game_to_move_info, game_locations, path_open, path_closed, exclude)
+    else:
+        if pt in exclude:
+            del exclude[pt]
+
+        path_nexts = {}
+        for rr in range(rows):
+            for cc in range(cols):
+                frompt = (rr, cc)
+                if frompt in path_closed:
+                    continue
+                if frompt in exclude:
+                    continue
+                if pt not in get_nexts_from(frompt, rows, cols, game_to_move_info, game_locations, path_open, path_closed, exclude):
+                    continue
+                path_nexts[frompt] = None
 
     return path_nexts, path_open, path_closed
 
-def path_between(rng, start, end, rows, cols, inset, game_to_open_closed_template, open_locations, closed_locations, game_locations):
+def path_between_dijkstra(start, end, rows, cols, game_to_move_info, game_locations, open_locations, closed_locations):
+    for location in game_locations:
+        util_common.check(location in open_locations or location in closed_locations, 'location not open or closed')
+
+    q = []
+    best_cost = {}
+
+    heapq.heappush(q, (0, []))
+    best_cost[start] = 0.0
+
+    found_path = None
+    while len(q) > 0:
+        cost, path = heapq.heappop(q)
+
+        if len(path) == 0:
+            path_end = start
+        else:
+            path_end = path[-1][2:4]
+
+        if path_end == end:
+            found_path = path
+            break
+
+        path_nexts = get_nexts_from(path_end, rows, cols, game_to_move_info, game_locations, open_locations, closed_locations, path)
+
+        for n in path_nexts:
+            (fr, fc, tr, tc, pwtr, pwtc), edge_len = path_nexts[n]
+            new_cost = cost + edge_len
+            if n not in best_cost or new_cost < best_cost[n]:
+                best_cost[n] = new_cost
+                heapq.heappush(q, (new_cost, path + [util_common.get_path_edge(fr, fc, tr, tc, pwtr, pwtc)]))
+
+    if found_path is None:
+        return None, dict.fromkeys(best_cost)
+    else:
+        return found_path, None
+
+def path_between(rng, start, end, rows, cols, inset, game_to_move_info, game_locations, open_locations, closed_locations):
     recompute_open_closed_locations = False
     if open_locations is None or closed_locations is None:
         util_common.check(open_locations is None and closed_locations is None, 'open_locations and closed_locations must be set together')
         recompute_open_closed_locations = True
-        
+
+    if not recompute_open_closed_locations:
+        for location in game_locations:
+            util_common.check(location in open_locations or location in closed_locations, 'location not open or closed')
+
     q = []
     seen = {}
 
-    q.append([start])
+    q.append([])
     seen[start] = None
 
     found_path = None
     while len(q) > 0:
         path = q.pop()
 
-        if path[-1] == end:
+        if len(path) == 0:
+            path_end = start
+        else:
+            path_end = path[-1][2:4]
+
+        if path_end == end:
             found_path = path
             break
 
         if recompute_open_closed_locations:
-            open_locations, closed_locations = get_path_open_closed(path, game_to_open_closed_template, game_locations)
+            open_locations, closed_locations = get_path_open_closed(path, game_to_move_info, game_locations)
 
-        path_nexts = get_nexts_from(path[-1], rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations, path)
+        path_nexts = get_nexts_from(path_end, rows, cols, game_to_move_info, game_locations, open_locations, closed_locations, path)
 
         for n in path_nexts:
             if n[0] < inset or n[0] >= rows - inset:
@@ -214,50 +277,29 @@ def path_between(rng, start, end, rows, cols, inset, game_to_open_closed_templat
                 continue
 
             if n not in seen:
-                q.insert(0, path + [n])
                 seen[n] = None
+                (fr, fc, tr, tc, pwtr, pwtc), edge_len = path_nexts[n]
+                q.insert(0, path + [util_common.get_path_edge(fr, fc, tr, tc, pwtr, pwtc)])
 
         if rng is not None:
             rng.shuffle(q)
 
-    return found_path
+    if found_path is None:
+        return None, seen
+    else:
+        return found_path, None
 
-def path_between_dijkstra(start, end, rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations):
-    q = []
-    best_cost = {}
+def shortest_path_between(start, end, rows, cols, game_to_move_info, game_locations, open_locations, closed_locations):
+    return path_between(None, start, end, rows, cols, 0, game_to_move_info, game_locations, open_locations, closed_locations)
 
-    heapq.heappush(q, (0, (start,)))
-    best_cost[start] = 0.0
+def random_path_between(rng, start, end, rows, cols, inset, game_to_move_info, game_locations):
+    return path_between(rng, start, end, rows, cols, inset, game_to_move_info, game_locations, None, None)
 
-    found_path = None
-    while len(q) > 0:
-        cost, path = heapq.heappop(q)
-
-        if path[-1] == end:
-            found_path = path
-            break
-
-        path_nexts = get_nexts_from(path[-1], rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations, path)
-
-        for n in path_nexts:
-            new_cost = cost + path_nexts[n]
-            if n not in best_cost or new_cost < best_cost[n]:
-                heapq.heappush(q, (new_cost, path + (n,)))
-                best_cost[n] = new_cost
-
-    return found_path, dict.fromkeys(best_cost)
-
-def shortest_path_between(start, end, rows, cols, game_to_open_closed_template, open_locations, closed_locations, game_locations):
-    return path_between(None, start, end, rows, cols, 0, game_to_open_closed_template, open_locations, closed_locations, game_locations)
-
-def random_path_between(rng, start, end, rows, cols, inset, game_to_open_closed_template, game_locations):
-    return path_between(rng, start, end, rows, cols, inset, game_to_open_closed_template, None, None, game_locations)
-
-def random_path_by_search(rng, rows, cols, game_to_open_closed_template, game_locations):
+def random_path_by_search(rng, rows, cols, game_to_move_info, game_locations):
     pts = []
     for rr in range(RANDOM_PATH_INSET, rows - RANDOM_PATH_INSET):
         for cc in range(RANDOM_PATH_INSET, cols - RANDOM_PATH_INSET):
             pts.append((rr, cc))
     start, end = rng.sample(pts, 2)
 
-    return random_path_between(rng, start, end, rows, cols, RANDOM_PATH_INSET, game_to_open_closed_template, game_locations)
+    return random_path_between(rng, start, end, rows, cols, RANDOM_PATH_INSET, game_to_move_info, game_locations)
