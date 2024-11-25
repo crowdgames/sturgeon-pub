@@ -61,8 +61,8 @@ Tile Utilities:
 * `file2file.py` - convert between a few different formats, usually between pickle and json
 
 Applications:
-* `pathed.py` - path editor, draw paths and generate levels interactively, needs scheme file
-* `explorer.py` - level explorer, explore a datast of levels, needs explorer file
+* `app_pathed.py` - path editor, draw paths and generate levels interactively, needs scheme file
+* `app_explorer.py` - level explorer, explore a datast of levels, needs explorer file
 
 Level Explorer:
 * `levels2explore.py` - produce an explore file dataset from given levels
