@@ -8,6 +8,9 @@ mkdir -p work
 
 # visit
 
+python mkiv2dot.py --mkiv-example visit-edge
+python mkiv2dot.py --mkiv-example visit-node
+
 python graph2gdesc.py --outfile work/visit.gd --graphfile levels/graphs/mkiv/visit.gr --nrad edge
 
 python gdesc2graph.py --outfile work/visit --gdescfile work/visit.gd --solver pysat-minicard --minsize 8 --maxsize 10 --edgeopt band 4 --mkiv-example visit-edge --mkiv-layers 10

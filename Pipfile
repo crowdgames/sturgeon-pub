@@ -8,7 +8,7 @@ python_version = "3.12"
 
 [packages]
 networkx = "*"
-numpy = "<2"
+numpy = "*"
 Pillow = "*"
 pydot = "*"
 reportlab = "*"
@@ -17,27 +17,27 @@ webcolors = "*"
 
 [solvers-minimal]
 networkx = "*"
-numpy = "<2"
+numpy = "*"
 Pillow = "*"
 pydot = "*"
 reportlab = "*"
 squarify = "*"
 webcolors = "*"
 
-python-sat = "==0.1.8.dev12"
+python-sat = "==1.8.dev14"
 
 [solvers-all]
 networkx = "*"
-numpy = "<2"
+numpy = "*"
 Pillow = "*"
 pydot = "*"
 reportlab = "*"
 squarify = "*"
 webcolors = "*"
 
-clingo = "==5.6.2"
-cvc5 = "==1.1.1"
-cvxpy = "==1.4.1"
-python-sat = {version="==0.1.8.dev12", extras=["aiger", "approxmc", "cryptosat", "pblib"]}
-scipy = "==1.11.4"
-z3-solver = "==4.12.5.0"
+clingo = "==5.7.1"
+cvc5 = "==1.2.1"
+cvxpy = "==1.6.2"
+python-sat = {version="==1.8.dev14", extras=["aiger", "approxmc", "cryptosat", "pblib"]}
+scipy = "==1.15.2"
+z3-solver = "==4.14.0.0"

@@ -1,3 +1,4 @@
+import os, shutil
 import util_common, util_generator, util_solvers
 
 
@@ -996,6 +997,8 @@ class GeneratorMKIII(util_generator.Generator):
     def _get_playthrough(self):
         steps = []
 
+        prev_term = False
+
         for ll in range(self._layers):
             step_info = util_common.PlaythroughStepInfo()
             steps.append(step_info)
@@ -1068,3 +1071,48 @@ class GeneratorMKIII(util_generator.Generator):
                     step_info.first_term = False
 
         return steps
+
+
+
+def save_result_info_mkiii(result_info, prefix):
+    util_common.check(result_info.playthrough_info is not None, 'playthrough')
+
+    play_folder = prefix + '_play'
+    print('writing playthrough levels to', play_folder)
+    if os.path.exists(play_folder):
+        shutil.rmtree(play_folder)
+    os.makedirs(play_folder)
+
+    for ii, step_info in enumerate(result_info.playthrough_info):
+        descr = ['term' if step_info.term else 'step']
+        if step_info.name:
+            descr.append(step_info.name)
+
+        step_prefix = play_folder + ('/%02d_' % ii) + '_'.join(descr) + '_play'
+
+        meta = list(result_info.extra_meta)
+        if len(step_info.changes) != 0:
+            meta.append(util_common.meta_rect('change', step_info.changes))
+        meta.append(util_common.meta_custom({'type': 'mkiii', 'desc': descr}))
+
+        step_text_name = step_prefix + '.lvl'
+        with util_common.openz(step_text_name, 'wt') as f:
+            util_common.print_text_level(step_info.text_level, meta=meta, outstream=f)
+
+        if step_info.image_level is not None:
+            step_image_name = step_prefix + '.png'
+            step_info.image_level.save(step_image_name)
+
+def print_result_info_mkiii(result_info, outstream):
+    util_common.check(result_info.playthrough_info is not None, 'playthrough')
+
+    outstream.write('playthrough\n')
+    outstream.write('\n')
+    for step_info in result_info.playthrough_info:
+        if step_info.first_term:
+            outstream.write('>>> TERM <<<\n')
+            outstream.write('\n')
+        if step_info.name:
+            outstream.write('>>> ' + step_info.name + '\n')
+        util_common.print_text_level(step_info.text_level, outstream=outstream)
+        outstream.write('\n')

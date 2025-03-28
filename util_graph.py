@@ -214,7 +214,7 @@ def read_graphs(filenames):
                     else:
                         util_common.check(edge_cattrs == t_edge_cattrs, 'node mismatch')
 
-                    util_common.check(gr is None, 'mutliple t')
+                    util_common.check(gr is None, 'multiple t')
                     if gtype_directed(grs.gtype):
                         gr = nx.DiGraph()
                     else:
@@ -319,6 +319,12 @@ def fmtpos(ff):
             return str(rounded)
     return str(round(ff, MAX_DECIMALS))
 
+def write_graph_gr_single(gr, gtype, out):
+    grs = Graphs()
+    grs.gtype = gtype
+    grs.graphs = [gr]
+    write_graph_gr(grs, out)
+
 def write_graph_gr(grs, out):
     util_common.check(len(grs.graphs) == 1, 'can only write single graph')
     gr = grs.graphs[0]
@@ -386,7 +392,7 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
     for gg, gr in enumerate(grs.graphs):
         if use_clusters:
             out.write(f'  subgraph cluster_{gg} {{\n')
-            out.write(f'  margin="10";\n')
+            out.write(f'    margin="10";\n')
 
         if len(grs.graphs) > 1:
             nodeprefix = f'{gg}-'
@@ -423,6 +429,8 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
                 pos_str = ','.join([fmtpos(ee) for ee in pos])
                 attrs += f' pos="{pos_str}!"'
 
+            if use_clusters:
+                out.write(f'  ')
             out.write(f'  "{nodeprefix}{node}" [{attrs.strip()}]\n')
 
         for fra, til, label, central, delta, polar, cycle in edges_and_label_central_delta_polar_cycle(gr):
@@ -455,6 +463,8 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
 
             attrs += f' label=<{dot_label}>'
 
+            if use_clusters:
+                out.write(f'  ')
             out.write(f'  "{nodeprefix}{fra}" {dedge} "{nodeprefix}{til}" [{attrs.strip()}]\n')
         if use_clusters:
             out.write(f'  }}\n')
@@ -470,13 +480,13 @@ def write_graph_to_file(grs, filename):
             else:
                 write_graph_gr(grs, outfile)
 
-def save_graph_gr_dot(grs, no_dot, prefix):
+def save_graph_gr_dot(grs, prefix, no_dot):
     write_graph_to_file(grs, prefix + '.gr')
     if not no_dot:
         write_graph_to_file(grs, prefix + '.dot')
 
-def save_graph_result_info(result_info, no_dot, prefix):
-    save_graph_gr_dot(result_info.graphs, no_dot, prefix)
+def save_graph_result_info(result_info, prefix, no_dot):
+    save_graph_gr_dot(result_info.graphs, prefix, no_dot)
 
 
 

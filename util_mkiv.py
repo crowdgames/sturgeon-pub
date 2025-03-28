@@ -1,4 +1,4 @@
-import itertools, os, shutil
+import itertools, os, shutil, sys
 import util_common, util_graph, util_solvers
 import networkx as nx
 
@@ -69,6 +69,40 @@ def get_example_info(mkiv_setup):
             _ret.append((_nodes, _edges))
 
         return _ret
+
+    def _check_rep_rules_subiso(_directed, _rep_rules):
+        _nm = nx.algorithms.isomorphism.categorical_node_match([util_graph.GATTR_LABEL], [None])
+        _em = nx.algorithms.isomorphism.categorical_edge_match([util_graph.GATTR_LABEL], [None])
+
+        if _directed:
+            _class_graph = nx.DiGraph
+            _class_match = nx.algorithms.isomorphism.DiGraphMatcher
+        else:
+            _class_graph = nx.Graph
+            _class_match = nx.algorithms.isomorphism.GraphMatcher
+
+        _graphs = []
+        for _nodes, _edges in _rep_rules:
+            _gr = _class_graph()
+            for _node, (_static_node_label, _dynamic_node_label0, _dynamic_node_label1) in enumerate(_nodes):
+                _gr.add_node(_node)
+                _gr.nodes[_node][util_graph.GATTR_LABEL] = (_static_node_label, _dynamic_node_label0, _dynamic_node_label1)
+            for _fra, _til, _static_edge_label, _dynamic_edge_label0, _dynamic_edge_label1 in _edges:
+                _gr.add_edge(_fra, _til)
+                _gr.edges[(_fra, _til)][util_graph.GATTR_LABEL] = (_static_edge_label, _dynamic_edge_label0, _dynamic_edge_label1)
+            _graphs.append(_gr)
+
+        for _ii, _gr_main in enumerate(_graphs):
+            for _jj, _gr_sub in enumerate(_graphs):
+                if _ii == _jj:
+                    continue
+                _matcher = _class_match(_gr_main, _gr_sub, node_match=_nm, edge_match=_em)
+                if _matcher.subgraph_is_isomorphic():
+                    _gtype = util_graph.GTYPE_DGRAPH if _directed else util_graph.GTYPE_UGRAPH
+                    util_graph.write_graph_gr_single(_gr_main, _gtype, sys.stdout)
+                    util_graph.write_graph_gr_single(_gr_sub, _gtype, sys.stdout)
+                    util_common.check(False, 'rep rule subgraph isomorphism')
+
 
 
     if mkiv_setup.example == EX_VISIT_NODE:
@@ -227,6 +261,10 @@ def get_example_info(mkiv_setup):
                     _ret += '.'
             return _ret
 
+        def _append_uniq(_rep_rules, _rule):
+            if _rule not in _rep_rules:
+                _rep_rules.append(_rule)
+
         ei.rep_rules = []
         for keys in _powerset(all_keys):
             for pows in _powerset(all_pows):
@@ -238,13 +276,13 @@ def get_example_info(mkiv_setup):
                             lock = lock.upper()
                             boss = boss.upper()
 
-                            ei.rep_rules.append(([(None, pla), ('_', boss)], [(0, 1, lock, '_')],
-                                                 [       '_',        pla  ], [             '_']))
+                            _append_uniq(ei.rep_rules, ([(None, pla), ('_', boss)], [(0, 1, lock, '_')],
+                                                        [       '_',        pla  ], [             '_']))
                             for pick in all_keys + all_pows:
                                 if pick not in keys + pows: # with only one of each pickup, don't need to pick up a second time
                                     plp = _pstring(keys + pows + (pick,))
-                                    ei.rep_rules.append(([(None, pla), ('_', pick)], [(0, 1, lock, '_')],
-                                                         [       '_',        plp  ], [             '_']))
+                                    _append_uniq(ei.rep_rules, ([(None, pla), ('_', pick)], [(0, 1, lock, '_')],
+                                                                [       '_',        plp  ], [             '_']))
 
         for pick in all_keys + all_pows:
             ei.dynamic_node_init_count[pick] = 1
@@ -327,6 +365,7 @@ def get_example_info(mkiv_setup):
         util_common.check(False, 'mkiv_setup example ' + mkiv_setup.example)
 
     ei.rep_rules = _organize_rep_rules(ei.rep_rules)
+    _check_rep_rules_subiso(ei.directed, ei.rep_rules)
 
     return ei
 
@@ -354,7 +393,7 @@ def get_codemaster_edges(fra, map_count, scroll_count):
                     tils[til] = ['sT:_', 'sT:*', 'sF:_', 'sF:*']
         return tils
 
-def write_graph_dot_lightsout(grs, out):
+def write_graph_dot_lightsout(grs, outstream):
     util_common.check(len(grs.graphs) == 1, 'can only write single graph')
     gr = grs.graphs[0]
 
@@ -372,9 +411,9 @@ def write_graph_dot_lightsout(grs, out):
     grs_out.colors = {' ':'00FF00', '':'006600'}
     grs_out.graphs = [gr]
 
-    util_graph.write_graph_dot(grs_out, True, False, 1.0, out)
+    util_graph.write_graph_dot(grs_out, True, False, 1.0, outstream)
 
-def write_graph_dot_soko(grs, out):
+def write_graph_dot_soko(grs, outstream):
     util_common.check(len(grs.graphs) == 1, 'can only write single graph')
     gr = grs.graphs[0]
 
@@ -392,9 +431,9 @@ def write_graph_dot_soko(grs, out):
     grs_out.colors = {'X':'AAAAAA', 'P':'AAAAFF', 'C':'FFFFAA', 'o':'AAFFFF', 'O':'AAFFAA'}
     grs_out.graphs = [gr]
 
-    util_graph.write_graph_dot(grs_out, True, False, 1.0, out)
+    util_graph.write_graph_dot(grs_out, True, False, 1.0, outstream)
 
-def write_graph_dot_codemaster(grs, out):
+def write_graph_dot_codemaster(grs, outstream):
     util_common.check(len(grs.graphs) == 1, 'can only write single graph')
     gr = grs.graphs[0]
 
@@ -404,10 +443,10 @@ def write_graph_dot_codemaster(grs, out):
     fontsize_per = 2.0
     fontsize_min = 5
 
-    out.write(f'digraph G {{\n')
-    out.write(f'  graph [fontname="Courier New" margin="0"]\n')
-    out.write(f'  node [fontname="Courier New" fontsize="{fontsize}" shape="circle" width="{size}" height="{size}" fixedsize="true" style="filled" color="none"]\n')
-    out.write(f'  edge [fontname="Courier New" fontsize="{fontsize}"]\n')
+    outstream.write(f'digraph G {{\n')
+    outstream.write(f'  graph [fontname="Courier New" margin="0"]\n')
+    outstream.write(f'  node [fontname="Courier New" fontsize="{fontsize}" shape="circle" width="{size}" height="{size}" fixedsize="true" style="filled" color="none"]\n')
+    outstream.write(f'  edge [fontname="Courier New" fontsize="{fontsize}"]\n')
 
     for node, label, central, pos in util_graph.nodes_and_label_central_pos(gr):
         static_label, dynamic_label = get_static_dynamic_label(label)
@@ -419,7 +458,7 @@ def write_graph_dot_codemaster(grs, out):
             attrs += f' width="0.0" height="0.0"'
             attrs += f' ordering="out"'
             attrs += f' rank="min"'
-            out.write(f'  {{rank="source" "{node}"}}\n')
+            outstream.write(f'  {{rank="source" "{node}"}}\n')
         elif static_label in ['mO', 'mE']:
             display_label = ''
 
@@ -497,7 +536,7 @@ def write_graph_dot_codemaster(grs, out):
         else:
             util_common.check(False, 'node label: ' + label)
 
-        out.write(f'  "{node}" [{attrs.strip()}]\n')
+        outstream.write(f'  "{node}" [{attrs.strip()}]\n')
 
     root_map_edges = {}
     root_scroll_edges = {}
@@ -542,7 +581,7 @@ def write_graph_dot_codemaster(grs, out):
         attrs = ''
         attrs += f' label=""'
         attrs += f' style="invis"'
-        out.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
+        outstream.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
 
     for (fra, til, color), (both, central) in map_edges.items():
         attrs = ''
@@ -558,7 +597,7 @@ def write_graph_dot_codemaster(grs, out):
             attrs += (f' color="#0000aa"' if central else f' color="#aaaaff"')
         if both:
             attrs += f' arrowhead="none"'
-        out.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
+        outstream.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
 
     for (fra, til), (what, central) in scroll_edges.items():
         attrs = ''
@@ -574,9 +613,9 @@ def write_graph_dot_codemaster(grs, out):
         elif what is False:
             attrs += f' label="\u00D7"'
             attrs += f' fontsize="30"'
-        out.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
+        outstream.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
 
-    out.write('}\n')
+    outstream.write('}\n')
 
 
 
@@ -803,7 +842,6 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
         changes_by_layer[layer] = []
 
         # connect layers
-        seen_changes = {}
         for nodes, edges in mkiv_info.rep_rules:
             for node_indices in itertools.permutations(vars_node_by_id, len(nodes)):
                 change_edges, ved_st, ved_in, ved_ou  = [], [], [], []
@@ -1015,7 +1053,7 @@ def update_result(mkiv_tuple, result_info):
 
 
 
-def save_graph_result_info_mkiv(result_info, no_dot, prefix):
+def save_graph_result_info_mkiv(result_info, prefix, no_dot):
     util_common.check(result_info.playthrough_info is not None, 'playthrough not set')
 
     play_folder = prefix + '_play'
@@ -1029,4 +1067,16 @@ def save_graph_result_info_mkiv(result_info, no_dot, prefix):
 
         step_prefix = play_folder + ('/%02d_' % ii) + '_'.join(descr) + '_play'
 
-        util_graph.save_graph_gr_dot(step_info.graphs, no_dot, step_prefix)
+        util_graph.save_graph_gr_dot(step_info.graphs, step_prefix, no_dot)
+
+def print_graph_result_info_mkiv(result_info, outstream):
+    util_common.check(result_info.playthrough_info is not None, 'playthrough not set')
+
+    outstream.write('playthrough\n')
+    outstream.write('\n')
+    for step_info in result_info.playthrough_info:
+        if step_info.first_term:
+            outstream.write('>>> TERM <<<\n')
+            outstream.write('\n')
+        util_graph.write_graph_gr(step_info.graphs, outstream)
+        outstream.write('\n')

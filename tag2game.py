@@ -44,4 +44,4 @@ if __name__ == '__main__':
     game_level = tag2game(tag_level, scheme_info, args.game)
     util_common.print_text_level(game_level)
     with util_common.openz(args.outfile, 'wt') as f:
-        util_common.print_text_level(game_level, outfile=f)
+        util_common.print_text_level(game_level, outstream=f)

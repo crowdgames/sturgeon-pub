@@ -18,7 +18,7 @@ def get_tile_key(tile_text, tile_image):
 
 
 
-def input2tiles(tileset_input, text_levels, image_levels, tag_levels, games, paths, tile_image_size, no_levels, text_key_only, tile_output_folder):
+def input2tiles(tileset_input, text_levels, image_levels, tag_levels, game_strs_or_levels, paths, tile_image_size, no_levels, text_key_only, tile_output_folder):
     tile_key_to_tile_id = {}
 
     if tileset_input is not None:
@@ -70,10 +70,10 @@ def input2tiles(tileset_input, text_levels, image_levels, tag_levels, games, pat
     else:
         tag_levels = [None] * level_count
 
-    if games is not None:
-        util_common.check(len(games) == level_count, 'need same number of levels')
+    if game_strs_or_levels is not None:
+        util_common.check(len(game_strs_or_levels) == level_count, 'need same number of levels')
     else:
-        games = [None] * level_count
+        game_strs_or_levels = [None] * level_count
 
     if paths is not None:
         util_common.check(len(paths) == level_count, 'need same number of levels')
@@ -82,7 +82,7 @@ def input2tiles(tileset_input, text_levels, image_levels, tag_levels, games, pat
 
 
 
-    for ii, (text_level_meta, image_level, tag_level, game, path) in enumerate(zip(text_levels, image_levels, tag_levels, games, paths)):
+    for ii, (text_level_meta, image_level, tag_level, game_str_or_level, path) in enumerate(zip(text_levels, image_levels, tag_levels, game_strs_or_levels, paths)):
         if text_level_meta is not None:
             text_level, meta = text_level_meta
             text_sz = (len(text_level), len(text_level[0]))
@@ -171,11 +171,18 @@ def input2tiles(tileset_input, text_levels, image_levels, tag_levels, games, pat
                 for cc in range(cols):
                     util_common.check((tile_level[rr][cc] == util_common.VOID_TILE) == (tag_level[rr][cc] == util_common.VOID_TEXT), 'void')
 
-        if game is None:
+        if game_str_or_level is None:
             game_level = util_common.make_grid(rows, cols, util_common.DEFAULT_TEXT)
+        elif type(game_str_or_level) is str:
+            util_common.check(len(game_str_or_level) == 1, 'game')
+            game_level = util_common.make_grid(rows, cols, game_str_or_level)
         else:
-            util_common.check(type(game) == str and len(game) == 1, 'game')
-            game_level = util_common.make_grid(rows, cols, game)
+            game_level = game_str_or_level
+            util_common.check(len(game_level) == rows, 'tile and game level row count mismatch')
+            for rr in range(rows):
+                util_common.check(len(game_level[rr]) == cols, 'row length mismatch')
+                for cc in range(cols):
+                    util_common.check(game_level[rr][cc] != util_common.VOID_TEXT, 'void')
 
         if path is not None:
             meta.insert(0, util_common.meta_path(path))
@@ -223,7 +230,9 @@ if __name__ == '__main__':
     parser.add_argument('--textfile', type=str, nargs='+', help='Input text file(s).')
     parser.add_argument('--imagefile', type=str, nargs='+', help='Input image file(s).')
     parser.add_argument('--tagfile', type=str, nargs='+', help='Input tag level file(s).')
-    parser.add_argument('--game', type=str, nargs='+', help='Input game(s).')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--game', type=str, nargs='+', help='Input game(s).')
+    group.add_argument('--gamefile', type=str, nargs='+', help='Input game file(s).')
     parser.add_argument('--pathfile', type=str, nargs='+', help='Input path file(s).')
     parser.add_argument('--tilesize', type=int, help='Size of tiles in image.')
     parser.add_argument('--savetileimages', action='store_true', help='Save tile images.')
@@ -267,6 +276,13 @@ if __name__ == '__main__':
     else:
         tag_levels = None
 
+    if args.gamefile is not None:
+        game_strs_or_levels = [util_common.read_text_level(gamefile) for gamefile in args.gamefile]
+    elif args.game is not None:
+        game_strs_or_levels = args.game
+    else:
+        game_strs_or_levels = None
+
     if args.pathfile is not None:
         def open_and_load_path(fn):
             with util_common.openz(fn, 'rt') as f:
@@ -275,7 +291,7 @@ if __name__ == '__main__':
     else:
         paths = None
 
-    tile_info = input2tiles(tileset_input, text_levels, image_levels, tag_levels, args.game, paths, args.tilesize,
+    tile_info = input2tiles(tileset_input, text_levels, image_levels, tag_levels, game_strs_or_levels, paths, args.tilesize,
                             args.out_tileset, args.text_key_only, TILE_OUTPUT_FOLDER if args.savetileimages else None)
     with util_common.openz(args.outfile, 'wb') as f:
         if args.out_tileset:

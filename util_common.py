@@ -1,4 +1,4 @@
-import atexit, base64, bz2, copy, gzip, io, json, os, pickle, shutil, subprocess, sys, time
+import atexit, base64, bz2, copy, gzip, io, json, os, pickle, subprocess, sys, time
 import PIL.Image
 import webcolors
 
@@ -6,9 +6,12 @@ import webcolors
 
 META_STR         = 'META'
 
-MGROUP_PATH      = 'path'
-MGROUP_OFFPATH   = 'offpath'
-MGROUP_REACHABLE = 'reachable'
+MGROUP_PATH            = 'path'
+MGROUP_OFFPATH         = 'offpath'
+MGROUP_REACHABLE       = 'reachable'
+MGROUP_REACHABLE_BACK  = 'reachable-back'
+MGROUP_REACHABLE_STUCK = 'reachable-stuck'
+MGROUP_REACHABLE_SINK  = 'reachable-sink'
 
 OPEN_TEXT        = '-'
 OPEN_TEXT_ZELDA  = 'DLOMS-'
@@ -82,9 +85,15 @@ class ReachConnectSetup:
     def __init__(self):
         self.src = None
         self.dst = None
+
         self.unreachable = None
+        self.fwdbwd_layers = None
+
+        self.sink_bottom = None
+        self.sink_sides = None
 
         self.game_to_reach_move = None
+        self.missing_aux_closed = None
         self.wrap_rows = None
         self.wrap_cols = None
 
@@ -96,9 +105,10 @@ class ReachJunctionInfo:
         self.rcs = None
         self.game_to_junction_tile = None
 
-class MoveInfo:
+class ReachMoveInfo:
     def __init__(self):
         self.move_template = None
+        self.missing_aux_closed = None
         self.wrap_rows = None
         self.wrap_cols = None
 
@@ -106,7 +116,12 @@ class ReachConnectInfo:
     def __init__(self):
         self.src = None
         self.dst = None
+
         self.unreachable = None
+        self.fwdbwd_layers = None
+
+        self.sink_bottom = None
+        self.sink_sides = None
 
         self.game_to_move_info = None
 
@@ -115,8 +130,9 @@ class ReachConnectInfo:
 class ResultReachInfo:
     def __init__(self):
         self.path_edges = None
-        self.path_tiles = None
-        self.offpath_edges = None
+        self.path_locations = None
+
+        self.extra_meta = []
 
 class PlaythroughStepInfo:
     def __init__(self):
@@ -485,33 +501,23 @@ def get_meta_from_result(result_info):
     meta.append(meta_custom({ 'type': 'solver', 'id': result_info.solver_id, 'objective': result_info.solver_objective }))
 
     for reach_info in result_info.reach_info:
-        meta.append(meta_path(MGROUP_PATH, reach_info.path_edges))
-        meta.append(meta_tile(MGROUP_PATH, reach_info.path_tiles))
-        meta.append(meta_line(MGROUP_OFFPATH, reach_info.offpath_edges))
+        if reach_info.path_edges is not None:
+            meta.append(meta_path(MGROUP_PATH, reach_info.path_edges))
+        if reach_info.path_locations is not None:
+            meta.append(meta_tile(MGROUP_PATH, reach_info.path_locations))
+        meta += reach_info.extra_meta
 
-    if result_info.extra_meta is not None:
-        meta += result_info.extra_meta
+    meta += result_info.extra_meta
 
     return meta
 
-def print_result_info(result_info):
-    print('tile level')
-    print_tile_level(result_info.tile_level)
+def print_result_info(result_info, outstream):
+    outstream.write('tile level\n')
+    print_tile_level(result_info.tile_level, outstream)
 
     if result_info.text_level is not None:
-        print('text level')
+        outstream.write('text level\n')
         print_result_text_level(result_info)
-
-    if result_info.playthrough_info is not None:
-        print('playthrough')
-        for step_info in result_info.playthrough_info:
-            if step_info.first_term:
-                print('>>> TERM <<<')
-                print()
-            if step_info.name:
-                print('>>> ' + step_info.name)
-            print_text_level(step_info.text_level)
-            print()
 
 def save_result_info(result_info, prefix, compress=False, save_level=True, save_result=True, save_tlvl=True):
     if save_result:
@@ -529,40 +535,13 @@ def save_result_info(result_info, prefix, compress=False, save_level=True, save_
             print('writing text level to', text_name)
 
             with openz(text_name, 'wt') as f:
-                print_result_text_level(result_info, outfile=f)
+                print_result_text_level(result_info, outstream=f)
 
         if result_info.image_level is not None:
             image_name = prefix + '.png'
             print('writing image level to', image_name)
 
             result_info.image_level.save(image_name)
-
-        if result_info.playthrough_info is not None:
-            play_folder = prefix + '_play'
-            print('writing playthrough levels to', play_folder)
-            if os.path.exists(play_folder):
-                shutil.rmtree(play_folder)
-            os.makedirs(play_folder)
-
-            for ii, step_info in enumerate(result_info.playthrough_info):
-                descr = ['term' if step_info.term else 'step']
-                if step_info.name:
-                    descr.append(step_info.name)
-
-                step_prefix = play_folder + ('/%02d_' % ii) + '_'.join(descr) + '_play'
-
-                meta = result_info.extra_meta
-                if len(step_info.changes) != 0:
-                    meta.append(meta_rect('change', step_info.changes))
-                meta.append(meta_custom({'type': 'mkiii', 'desc': descr}))
-
-                step_text_name = step_prefix + '.lvl'
-                with openz(step_text_name, 'wt') as f:
-                    print_text_level(step_info.text_level, meta=meta, outfile=f)
-
-                if step_info.image_level is not None:
-                    step_image_name = step_prefix + '.png'
-                    step_info.image_level.save(step_image_name)
 
     if save_tlvl:
         json_name = prefix + '.tlvl'
@@ -571,7 +550,7 @@ def save_result_info(result_info, prefix, compress=False, save_level=True, save_
         print('writing json to', json_name)
 
         with openz(json_name, 'wt') as f:
-            print_tile_level_json(result_info.tile_level, meta=get_meta_from_result(result_info), outfile=f)
+            print_tile_level_json(result_info.tile_level, meta=get_meta_from_result(result_info), outstream=f)
 
 def index_to_char(idx):
     if idx < len(INDEX_CHARS):
@@ -579,9 +558,9 @@ def index_to_char(idx):
     else:
         return '?'
 
-def print_tile_level(tile_level, outfile=None):
-    if outfile is None:
-        outfile = sys.stdout
+def print_tile_level(tile_level, outstream=None):
+    if outstream is None:
+        outstream = sys.stdout
 
     for row in tile_level:
         for tile in row:
@@ -589,41 +568,41 @@ def print_tile_level(tile_level, outfile=None):
                 display_tile = VOID_TEXT
             else:
                 display_tile = index_to_char(tile)
-            outfile.write(display_tile)
-        outfile.write('\n')
+            outstream.write(display_tile)
+        outstream.write('\n')
 
-def print_tile_level_json(tile_level, meta=None, outfile=None):
-    if outfile is None:
-        outfile = sys.stdout
+def print_tile_level_json(tile_level, meta=None, outstream=None):
+    if outstream is None:
+        outstream = sys.stdout
 
     json_data = {}
     json_data['tile_level'] = tile_level
     if meta != None:
         json_data['meta'] = meta
 
-    json.dump(json_data, outfile)
-    outfile.write('\n')
+    json.dump(json_data, outstream)
+    outstream.write('\n')
 
-def print_result_text_level(result_info, outfile=None):
-    if outfile is None:
-        outfile = sys.stdout
+def print_result_text_level(result_info, outstream=None):
+    if outstream is None:
+        outstream = sys.stdout
 
     meta = get_meta_from_result(result_info)
 
-    print_text_level(result_info.text_level, meta=meta, outfile=outfile)
+    print_text_level(result_info.text_level, meta=meta, outstream=outstream)
 
-def print_text_level(text_level, meta=None, outfile=None):
-    if outfile is None:
-        outfile = sys.stdout
+def print_text_level(text_level, meta=None, outstream=None):
+    if outstream is None:
+        outstream = sys.stdout
 
     for row in text_level:
         for tile in row:
-            outfile.write(tile)
-        outfile.write('\n')
+            outstream.write(tile)
+        outstream.write('\n')
 
     if meta is not None:
         for md in meta:
-            outfile.write(META_STR + ' ' + json.dumps(md) + '\n')
+            outstream.write(META_STR + ' ' + json.dumps(md) + '\n')
 
 def process_old_meta(line):
     TAG = 'META DRAW'
@@ -705,37 +684,40 @@ def get_edge_keys_from(pt, rows, cols, move_info, all_locations, open_locations,
     for move in move_info.move_template:
         dest_delta, need_open_path_delta, need_open_aux_delta, need_closed_path_delta, need_closed_aux_delta = move
 
-        def inst_deltas(_deltas, _exclude_these):
+        def inst_deltas(_deltas, _exclude_these, _ignore_missing):
             _inst = ()
             for _dr, _dc in _deltas:
                 _nr = rr + _dr
                 _nc = cc + _dc
                 if move_info.wrap_rows: _nr = _nr % rows
                 if move_info.wrap_cols: _nc = _nc % cols
-                if (_nr, _nc) not in all_locations:
-                    return None
                 if (_nr, _nc) in _exclude_these:
                     return None
+                if (_nr, _nc) not in all_locations:
+                    if _ignore_missing:
+                        continue
+                    else:
+                        return None
                 _inst = _inst + ((_nr, _nc),)
             return _inst
 
-        need_open_path = inst_deltas(need_open_path_delta, closed_locations)
+        need_open_path = inst_deltas(need_open_path_delta, closed_locations, False)
         if need_open_path is None:
             continue
 
-        need_open_aux = inst_deltas(need_open_aux_delta, closed_locations)
+        need_open_aux = inst_deltas(need_open_aux_delta, closed_locations, False)
         if need_open_aux is None:
             continue
 
-        need_closed_path = inst_deltas(need_closed_path_delta, open_locations)
+        need_closed_path = inst_deltas(need_closed_path_delta, open_locations, False)
         if need_closed_path is None:
             continue
 
-        need_closed_aux = inst_deltas(need_closed_aux_delta, open_locations)
+        need_closed_aux = inst_deltas(need_closed_aux_delta, open_locations, move_info.missing_aux_closed)
         if need_closed_aux is None:
             continue
 
-        dest = inst_deltas([dest_delta], set.union(closed_locations, exclude))
+        dest = inst_deltas([dest_delta], set.union(closed_locations, exclude), False)
         if dest is None:
             continue
 

@@ -43,7 +43,7 @@ def decode_result_info(result_info):
     return result_info
 
 class PathCanvas(tkinter.Canvas):
-    def __init__(self, root, rows, cols, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
+    def __init__(self, root, rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
         super().__init__(root, width=cols*CELL_SIZE+2*INSET-FRAME, height=rows*CELL_SIZE+2*INSET-FRAME)
 
         self._rows = rows
@@ -54,10 +54,12 @@ class PathCanvas(tkinter.Canvas):
         self._reverse = False
 
         self._reach_move = reach_move
+        self._reach_missing_aux_closed = reach_missing_aux_closed
         self._reach_wrap_rows = reach_wrap_rows
         self._reach_wrap_cols = reach_wrap_cols
+
         self._game_locations = { (rr, cc): util_common.DEFAULT_TEXT for rr in range(self._rows) for cc in range(self._cols) }
-        self._game_to_move_info = { util_common.DEFAULT_TEXT: util_reach.get_move_info(self._reach_move, self._reach_wrap_rows, self._reach_wrap_cols) }
+        self._game_to_move_info = { util_common.DEFAULT_TEXT: util_reach.get_move_info(self._reach_move, self._reach_missing_aux_closed, self._reach_wrap_rows, self._reach_wrap_cols) }
 
         self._schemefile = schemefile
         self._outfolder = outfolder
@@ -506,11 +508,11 @@ class PathCanvas(tkinter.Canvas):
 
 
 
-def pathed(rows, cols, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
+def pathed(rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
     root = tkinter.Tk()
     root.title('pathed')
 
-    PathCanvas(root, rows, cols, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder)
+    PathCanvas(root, rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder)
 
     root.mainloop()
 
@@ -521,6 +523,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--size', required=True, type=int, nargs=2, help='Level size.')
     parser.add_argument('--reach-move', required=True, type=str, help='Use reachability move rules, from: ' + ','.join(util_reach.RMOVE_LIST) + '.')
+    parser.add_argument('--reach-missing-aux-closed', action='store_true', help='Treat missing locations as aux closed.')
     parser.add_argument('--reach-wrap-rows', action='store_true', help='Wrap rows in reachability.')
     parser.add_argument('--reach-wrap-cols', action='store_true', help='Wrap columns in reachability.')
     parser.add_argument('--schemefile', type=str, help='Input scheme file.')
@@ -528,4 +531,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    pathed(args.size[0], args.size[1], args.reach_move, args.reach_wrap_rows, args.reach_wrap_cols, args.schemefile, args.outfolder)
+    pathed(args.size[0], args.size[1], args.reach_move, args.reach_missing_aux_closed, args.reach_wrap_rows, args.reach_wrap_cols, args.schemefile, args.outfolder)

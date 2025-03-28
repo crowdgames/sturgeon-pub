@@ -110,6 +110,7 @@ python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nb
 python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nbr.scheme --size 8 8 --pattern-hard --count-hard --solver pysat-fm
 python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nbr.scheme --size 8 8 --pattern-hard --count-hard --solver pysat-fm-boolonly
 python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nbr.scheme --size 8 8 --pattern-hard --count-hard --solver pysat-minicard
+python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nbr.scheme --size 8 8 --pattern-hard --count-hard --solver pysat-gluecard41
 python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nbr.scheme --size 8 8 --pattern-hard --count-hard --solver clingo-fe
 python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nbr.scheme --size 8 8 --pattern-hard --count-hard --solver clingo-be
 python scheme2output.py --outfile work/mario-1-1-TEST --schemefile work/mario-nbr.scheme --size 8 8 --pattern-hard --count-hard --solver z3-opt

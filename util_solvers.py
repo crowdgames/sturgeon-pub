@@ -19,7 +19,8 @@ SOLVER_PYSAT_RC2          = 'pysat-rc2'
 SOLVER_PYSAT_FM_BOOL      = 'pysat-fm-boolonly'
 SOLVER_PYSAT_RC2_BOOL     = 'pysat-rc2-boolonly'
 SOLVER_PYSAT_MC           = 'pysat-minicard'
-SOLVER_LIST               = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_SCIPY, SOLVER_CVXPY, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC]
+SOLVER_PYSAT_GC41         = 'pysat-gluecard41'
+SOLVER_LIST               = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_SCIPY, SOLVER_CVXPY, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC, SOLVER_PYSAT_GC41]
 SOLVER_NOTEST_LIST        = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ]
 
 
@@ -131,6 +132,8 @@ def solver_id_to_solver(solver_id):
         return BoolOnlyRC2PySatSolver()
     elif solver_id == SOLVER_PYSAT_MC:
         return MiniCardPySatSolver()
+    elif solver_id == SOLVER_PYSAT_GC41:
+        return GlueCard41PySatSolver()
     else:
         util_common.check(False, 'solver ' + solver_id + ' unrecognized.')
 
@@ -147,6 +150,13 @@ def get_one_set(solver, vv_map):
             set_val, found = val, True
     util_common.check(found, 'no value')
     return set_val
+
+def get_all_set(solver, vv_map):
+    which_set = []
+    for val, vv in vv_map.items():
+        if solver.get_var(vv):
+            which_set.append(val)
+    return which_set
 
 def are_all_set(solver, vvs):
     util_common.check(len(vvs) != 0, 'no vars to check')
@@ -1368,13 +1378,13 @@ class _GenericSatSolver(_SolverImpl):
     def _IMPL_SAT_solve(self):
         util_common.check(False, '_IMPL_SAT_solve unimplemented')
 
-class MiniCardPySatSolver(_GenericSatSolver):
-    def __init__(self):
+class _UnweightedPySatSatSolver(_GenericSatSolver):
+    def __init__(self, solver_id, pysat_name):
         util_common.check(try_import_pysat(), 'pysat not available')
 
         super().__init__(SOLVER_PYSAT_MC, False)
 
-        self._s = pysat.solvers.Solver(name='mc')
+        self._s = pysat.solvers.Solver(name=pysat_name)
 
     def _IMPL_SAT_add_clause(self, lls, weight):
         util_common.check(weight is None, 'solver does not support weights')
@@ -1394,6 +1404,18 @@ class MiniCardPySatSolver(_GenericSatSolver):
             util_common.check(abs(vv) - 1 == ii, 'result index')
 
         return result, 0
+
+class MiniCardPySatSolver(_UnweightedPySatSatSolver):
+    def __init__(self):
+        util_common.check(try_import_pysat(), 'pysat not available')
+
+        super().__init__(SOLVER_PYSAT_MC, 'minicard')
+
+class GlueCard41PySatSolver(_UnweightedPySatSatSolver):
+    def __init__(self):
+        util_common.check(try_import_pysat(), 'pysat not available')
+
+        super().__init__(SOLVER_PYSAT_GC41, 'gluecard41')
 
 class _CardEncodingPySatSolver(_GenericSatSolver):
     def __init__(self, solver_id, supports_weights, formula):

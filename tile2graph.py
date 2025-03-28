@@ -1,4 +1,4 @@
-import argparse, os, shutil, pickle, sys
+import argparse, os, pickle
 import util_common, util_graph, util_mkiv
 import networkx as nx
 

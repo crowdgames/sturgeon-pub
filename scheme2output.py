@@ -8,12 +8,11 @@ WEIGHT_COUNTS         =     1
 
 
 
-COUNTS_SCALE_HALF     = (0.5, 1.5)
-COUNTS_SCALE_ZERO     = (0.0, 1e10)
+COUNTS_SCALE_DEFAULT  = (0.5, 1.5)
 
 
 
-def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, print_reach_internal):
+def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, reach_path_search, reach_print_internal, reach_meta_internal):
     si = scheme_info
 
     rows = len(tag_level)
@@ -46,10 +45,15 @@ def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_
     if weight_counts != 0:
         util_common.check(si.count_info is not None, 'count rules requested but not counts')
         util_common.timer_section('add count rules')
-        lo, hi = counts_scale
-        gen.add_rules_counts(False, lo, hi, weight_counts) # TODO? (si.tile_to_text is not None)
+        gen.add_rules_counts(False, counts_scale, weight_counts) # TODO? (si.tile_to_text is not None)
     elif si.count_info is not None:
         print('scheme has counts but not using count rules')
+
+    if reach_path_search:
+        gen.use_reach_path_search()
+
+    if reach_meta_internal:
+        gen.use_reach_meta_internal()
 
     if reach_junction_setups is not None or reach_connect_setups is not None:
         util_common.timer_section('add reachability rules')
@@ -77,9 +81,8 @@ def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_
     if gen.solve():
         util_common.timer_section('create output')
         result = gen.get_result()
-        util_common.print_result_info(result)
 
-        if print_reach_internal:
+        if reach_print_internal:
             gen.print_reach_internal()
 
     util_common.timer_section(None)
@@ -101,7 +104,6 @@ if __name__ == '__main__':
     parser.add_argument('--size', type=int, nargs=2, help='Level size (if no tag or game file provided.')
 
     parser.add_argument('--randomize', type=int, help='Randomize based on given number.')
-    parser.add_argument('--print-reach-internal', action='store_true', help='Display some extra internal information about reachability.')
 
     parser.add_argument('--solver', type=str, nargs='+', choices=util_solvers.SOLVER_LIST, default=[util_solvers.SOLVER_PYSAT_RC2], help='Solver name, from: ' + ','.join(util_solvers.SOLVER_LIST) + '.')
     parser.add_argument('--solver-file', type=str, help='Filename to use, for solvers that read/write files.')
@@ -117,7 +119,8 @@ if __name__ == '__main__':
 
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('--count-scale', type=float, nargs=2, help='Use given count scaling.')
-    group.add_argument('--count-scale-zero', action='store_true', help='Only use counts to prevent tiles not occuring in region.')
+    group.add_argument('--count-zero', action='store_true', help='Use counts to prevent tiles from occuring in divisions where unseen.')
+    group.add_argument('--count-zero-one', action='store_true', help='Use counts to prevent tiles from occuring in divisions where unseen, and occur in in divisions where seen.')
 
     parser.add_argument('--reach-junction', type=str, nargs='+', action='append', default=None, help='Use reachability junction, from: ' + ','.join(util_reach.RPLOC_DICT.keys()) + ', plus params.')
     parser.add_argument('--reach-connect', type=str, action='append', default=None, help='Use reachability junction connect, as sub-arguments.')
@@ -128,6 +131,10 @@ if __name__ == '__main__':
     parser.add_argument('--reach-wrap-cols', action='store_true', help='Wrap columns in reachability.')
     parser.add_argument('--reach-open-zelda', action='store_true', help='Use Zelda open tiles.')
     parser.add_argument('--reach-unreachable', action='store_true', help='Generate levels with unreachable goals.')
+
+    parser.add_argument('--reach-path-search', action='store_true', help='Search to find path rather that using solution path (if present)')
+    parser.add_argument('--reach-print-internal', action='store_true', help='Display some extra internal information about reachability.')
+    parser.add_argument('--reach-meta-internal', action='store_true', help='Include some extra internal information about reachability in metadata.')
 
     parser.add_argument('--mkiii-example', type=str, choices=util_mkiii.EXAMPLES, help='MKIII example name, from: ' + ','.join(util_mkiii.EXAMPLES) + '.')
     parser.add_argument('--mkiii-layers', type=int, help='MKIII number of layers.')
@@ -184,37 +191,24 @@ if __name__ == '__main__':
 
 
 
-    reach_junction_setups = None
+    reach_junction_setups = []
 
     if args.reach_start_goal is not None:
-        reach_junction_setups = util_reach.get_reach_start_goal_setups(parser, '--reach-start-goal', args.reach_start_goal)
+        reach_junction_setups += util_reach.get_reach_junction_start_goal_setups(parser, '--reach-start-goal', args.reach_start_goal)
 
     if args.reach_junction is not None:
-        if reach_junction_setups is None:
-            reach_junction_setups = []
         for reach_junction in args.reach_junction:
             reach_junction_setups.append(util_reach.get_reach_junction_setup(parser, '--reach-junction', reach_junction))
 
+    reach_junction_setups = reach_junction_setups if len(reach_junction_setups) > 0 else None
 
 
-    reach_connect_setups = None
+
+    reach_connect_setups = []
 
     if args.reach_move is not None:
-        if reach_junction_setups is None:
-            parser.error('cannot specify --reach-move without --reach-junction (or --reach-start-goal)')
+        reach_connect_setups.append(util_reach.default_reach_connect(util_common.arg_list_to_dict_options(parser, '--reach-move', args.reach_move, util_reach.RMOVE_LIST), args.reach_wrap_rows, args.reach_wrap_cols, util_common.OPEN_TEXT_ZELDA if args.reach_open_zelda else util_common.OPEN_TEXT, args.reach_unreachable))
 
-        reach_connect_setup = util_common.ReachConnectSetup()
-        reach_connect_setup.src = util_common.START_TEXT
-        reach_connect_setup.dst = util_common.GOAL_TEXT
-        reach_connect_setup.unreachable = args.reach_unreachable
-        reach_connect_setup.game_to_reach_move = util_common.arg_list_to_dict_options(parser, '--reach-move', args.reach_move, util_reach.RMOVE_LIST)
-        reach_connect_setup.wrap_rows = args.reach_wrap_rows
-        reach_connect_setup.wrap_cols = args.reach_wrap_cols
-        reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if args.reach_open_zelda else util_common.OPEN_TEXT
-
-        if reach_connect_setups is None:
-            reach_connect_setups = []
-        reach_connect_setups.append(reach_connect_setup)
     else:
         if args.reach_open_zelda:
             parser.error('cannot specify --reach-open-zelda without --reach-move')
@@ -230,9 +224,9 @@ if __name__ == '__main__':
             parser.error('cannot specify --reach-connect without --reach-junction (or --reach-start-goal)')
 
         for reach_connect in args.reach_connect:
-            if reach_connect_setups is None:
-                reach_connect_setups = []
-            reach_connect_setups.append(util_reach.parse_reach_subargs('--reach-connect', reach_connect.split()))
+            reach_connect_setups.append(util_reach.parse_reach_connect_subargs('--reach-connect', reach_connect.split()))
+
+    reach_connect_setups = reach_connect_setups if len(reach_connect_setups) > 0 else None
 
 
 
@@ -270,16 +264,28 @@ if __name__ == '__main__':
     else:
         weight_counts = 0
 
-    if args.count_scale_zero:
-        counts_scale = COUNTS_SCALE_ZERO
-    elif args.count_scale:
-        counts_scale = args.count_scale
-    else:
-        counts_scale = COUNTS_SCALE_HALF
+    counts_scale = None
+    if weight_counts != 0:
+        if args.count_scale is not None:
+            counts_scale = args.count_scale
+        elif args.count_zero:
+            counts_scale = util_generator.COUNTS_ZERO
+        elif args.count_zero_one:
+            counts_scale = util_generator.COUNTS_ZERO_ONE
+        else:
+            counts_scale = COUNTS_SCALE_DEFAULT
 
-    result_info = scheme2output(scheme_info, tag_level, game_level, solver, args.randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, args.print_reach_internal)
-    if result_info:
+    result_info = scheme2output(scheme_info, tag_level, game_level, solver, args.randomize, weight_patterns, weight_counts, counts_scale, reach_junction_setups, reach_connect_setups, mkiii_setup, custom_constraints, args.reach_path_search, args.reach_print_internal, args.reach_meta_internal)
+
+    if result_info is not None:
+        util_common.print_result_info(result_info, sys.stdout)
         util_common.save_result_info(result_info, args.outfile, args.out_compress, not args.out_level_none, not args.out_result_none, not args.out_tlvl_none)
+
+        if mkiii_setup is not None:
+            util_mkiii.print_result_info_mkiii(result_info, sys.stdout)
+            util_mkiii.save_result_info_mkiii(result_info, args.outfile)
+
         util_common.exit_solution_found()
+
     else:
         util_common.exit_solution_not_found()

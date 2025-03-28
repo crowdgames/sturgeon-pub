@@ -10,11 +10,11 @@ mkdir -p work
 python input2tile.py --outfile work/cave.tile --textfile levels/kenney/cave.lvl --imagefile levels/kenney/cave.png
 python tile2scheme.py --outfile work/cave.scheme --tilefile work/cave.tile --count-divs 1 1 --pattern nbr-plus
 
-python scheme2output.py --outfile work/cave-a --schemefile work/cave.scheme --size 15 15 --pattern-hard --count-soft --reach-junction "{" tl 5 --reach-junction "}" br 5 --reach-connect "--src { --dst } --move maze" --print-reach-internal
+python scheme2output.py --outfile work/cave-a --schemefile work/cave.scheme --size 15 15 --pattern-hard --count-soft --reach-junction "{" tl 5 --reach-junction "}" br 5 --reach-connect "--src { --dst } --move maze" --reach-print-internal
 python level2repath.py --outfile work/cave-a-rp1.lvl --textfile work/cave-a.lvl --reach-connect "--src { --dst } --move maze" --print-level
 python level2repath.py --outfile work/cave-a-rp2.lvl --textfile work/cave-a.lvl --reach-connect "--src { --dst } --move maze" --print-level --type edges
 
-python scheme2output.py --outfile work/cave-b --schemefile work/cave.scheme --size 15 15 --pattern-hard --count-soft --reach-junction "{" tl 5 --reach-junction "}" br 5 --reach-connect "--src { --dst } --move maze --unreachable" --print-reach-internal
+python scheme2output.py --outfile work/cave-b --schemefile work/cave.scheme --size 15 15 --pattern-hard --count-soft --reach-junction "{" tl 5 --reach-junction "}" br 5 --reach-connect "--src { --dst } --move maze --unreachable" --reach-print-internal
 python level2repath.py --outfile work/cave-b-rp1.lvl --textfile work/cave-b.lvl --reach-connect "--src { --dst } --move maze --unreachable" --print-level
 python level2repath.py --outfile work/cave-b-rp2.lvl --textfile work/cave-b.lvl --reach-connect "--src { --dst } --move maze --unreachable" --print-level --type edges
 
@@ -33,7 +33,7 @@ python scheme2output.py --outfile work/cave-junction-b --schemefile work/cave-ju
 
 python scheme2output.py --outfile work/cave-junction-d --schemefile work/cave-junction.scheme --size 15 15 --pattern-hard --count-soft --reach-junction 0 tl 4 --reach-junction 1 tr 4 --reach-junction 2 bl 4 --reach-junction 3 br 4 --reach-connect "--src 0 --dst 1 --move maze" --reach-connect "--src 1 --dst 3 --move maze" --reach-connect "--src 3 --dst 2 --move maze" --reach-connect "--src 2 --dst 0 --move maze"
 
-python scheme2output.py --outfile work/cave-junction-c --schemefile work/cave-junction.scheme --size 15 15 --pattern-hard --count-soft --reach-junction 0 tl 4 --reach-junction 1 tr 4 --reach-junction 2 bl 4 --reach-junction 3 br 4 --reach-connect "--src 0 --dst 2 --move maze --unreachable" --reach-connect "--src 0 --dst 1 --move maze" --reach-connect "--src 2 --dst 3 --move maze" --print-reach-internal
+python scheme2output.py --outfile work/cave-junction-c --schemefile work/cave-junction.scheme --size 15 15 --pattern-hard --count-soft --reach-junction 0 tl 4 --reach-junction 1 tr 4 --reach-junction 2 bl 4 --reach-junction 3 br 4 --reach-connect "--src 0 --dst 2 --move maze --unreachable" --reach-connect "--src 0 --dst 1 --move maze" --reach-connect "--src 2 --dst 3 --move maze" --reach-print-internal
 
 # cave-doors
 python input2tile.py --outfile work/cave-doors.tile --textfile levels/kenney/cave-doors.lvl --imagefile levels/kenney/cave-doors.png
@@ -57,6 +57,7 @@ python scheme2output.py --outfile work/cave-doors --schemefile work/cave-doors.s
 # mario
 python input2tile.py --outfile work/mario.tile --textfile levels/vglc/mario-1-1-generic.lvl
 python tile2scheme.py --outfile work/mario.scheme --tilefile work/mario.tile --count-divs 1 1 --pattern ring
+
 python scheme2output.py --outfile work/mario --schemefile work/mario.scheme --size 14 32 --pattern-hard --count-soft --reach-start-goal l-r 6 --reach-move platform --reach-unreachable
 python level2repath.py --outfile work/mario-rp1.lvl --textfile work/mario.lvl --reach-connect "--src { --dst } --move platform --unreachable" --print-level
 python level2repath.py --outfile work/mario-rp2.lvl --textfile work/mario.lvl --reach-connect "--src { --dst } --move platform --unreachable" --print-level --type edges

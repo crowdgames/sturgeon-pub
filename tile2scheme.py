@@ -25,9 +25,6 @@ PATTERN_NO_OUT_BLOCK_3  = [([(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2,
 
 PATTERN_BLOCKZ         = [([(0, 0)], [(0, 1), (1, 1)]),
                           ([(0, 0)], [(1, 0), (1, 1)])]
-#PATTERN_BLOCKZ        = [([(0, 0)], [(0, 1)]),
-#                          ([(0, 0)], [(1, 0)]),
-#                          ([(1, 0), (0, 1)], [(1, 1)])]
 
 PATTERN_BLOCK2         = [([(0, 0)],
                            [(0, 1), (1, 1), (1, 0)])]
@@ -179,17 +176,14 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                 game_to_patterns_delta[game] = patterns_delta
 
         for game, patterns_delta in game_to_patterns_delta.items():
-            if patterns_delta is None:
-                si.pattern_info.game_to_patterns[game] = None
-            else:
-                si.pattern_info.game_to_patterns[game] = {}
+            si.pattern_info.game_to_patterns[game] = {}
 
-                for pattern_template_in, pattern_template_out in patterns_delta:
-                    for dr, dc in pattern_template_in + (pattern_template_out if pattern_template_out else []):
-                        si.pattern_info.dr_lo = min(si.pattern_info.dr_lo, dr)
-                        si.pattern_info.dr_hi = max(si.pattern_info.dr_hi, dr)
-                        si.pattern_info.dc_lo = min(si.pattern_info.dc_lo, dc)
-                        si.pattern_info.dc_hi = max(si.pattern_info.dc_hi, dc)
+            for pattern_template_in, pattern_template_out in patterns_delta:
+                for dr, dc in pattern_template_in + (pattern_template_out if pattern_template_out else []):
+                    si.pattern_info.dr_lo = min(si.pattern_info.dr_lo, dr)
+                    si.pattern_info.dr_hi = max(si.pattern_info.dr_hi, dr)
+                    si.pattern_info.dc_lo = min(si.pattern_info.dc_lo, dc)
+                    si.pattern_info.dc_hi = max(si.pattern_info.dc_hi, dc)
 
     tile_levels, tag_levels, game_levels = [], [], []
     for tli in ti.levels:
@@ -279,7 +273,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
                 for cc in col_range:
                     game = game_level[max(0, min(rows - 1, rr))][max(0, min(cols - 1, cc))]
 
-                    if game_to_patterns_delta[game] is None:
+                    if game not in game_to_patterns_delta:
                         continue
 
                     def get_pattern(_template):
@@ -348,7 +342,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create scheme from tile info and (optionally) tag level.')
     parser.add_argument('--outfile', required=True, type=str, help='Output scheme file.')
     parser.add_argument('--tilefile', required=True, type=str, help='Input tile file.')
-    parser.add_argument('--count-divs', type=int, nargs=2)
+    parser.add_argument('--count-divs', type=int, nargs=2, help='Count divisions.')
     parser.add_argument('--pattern', type=str, nargs='+', help='Pattern template, from: ' + ','.join(PATTERN_DICT.keys()) + '.')
     parser.add_argument('--level-rotate', action='store_true', help='Rotate levels to create more patterns.')
     parser.add_argument('--quiet', action='store_true', help='Reduce output.')

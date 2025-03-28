@@ -1,0 +1,43 @@
+set -e
+set -x
+
+export STG_MUTE_TIME=1
+
+rm -rf work
+mkdir -p work
+
+# driller
+python input2tile.py --outfile work/driller.tile --textfile levels/kenney/driller.lvl --imagefile levels/kenney/driller.png
+python tile2scheme.py --outfile work/driller.scheme --tilefile work/driller.tile --count-divs 1 1 --pattern nbr-plus
+
+python scheme2output.py --outfile work/driller-fb-nostuck-sink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-count-sink 1 100 hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/driller-fb-stuckoksink-sink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-stuck sink-ok hard --custom fwdbwd-count-sink 1 100 hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/driller-fb-stucknosink-sink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-stuck sink-no hard --custom fwdbwd-count-sink 1 100 hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/driller-fb-nostuck-allopen-sink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-reach-open hard --custom fwdbwd-count-sink 1 100 hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/driller-fb-unreachable-sink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20 --unreachable" --reach-print-internal --custom fwdbwd-count-sink 1 100 hard --custom fwdbwd-reach-sink hard
+
+python scheme2output.py --outfile work/driller-fb-nostuck-nosink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-count-sink 0 0 hard
+python scheme2output.py --outfile work/driller-fb-stuckoksink-nosink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-stuck sink-ok hard --custom fwdbwd-count-sink 0 0 hard
+python scheme2output.py --outfile work/driller-fb-stucknosink-nosink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-stuck sink-no hard --custom fwdbwd-count-sink 0 0 hard
+python scheme2output.py --outfile work/driller-fb-nostuck-allopen-nosink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20" --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-reach-open hard --custom fwdbwd-count-sink 0 0 hard
+python scheme2output.py --outfile work/driller-fb-unreachable-nosink --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20 --unreachable" --reach-print-internal --custom fwdbwd-count-sink 0 0 hard
+
+python scheme2output.py --outfile work/driller-fb-unreachable-count --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --sink-bottom --fwdbwd-layers 20 --unreachable" --reach-print-internal --custom fwdbwd-count-fwdbwd 26 100 26 100 hard --custom fwdbwd-count-sink 0 0 hard
+
+# mario
+python input2tile.py --outfile work/mario.tile --textfile levels/vglc/mario-1-1-generic.lvl
+python tile2scheme.py --outfile work/mario.scheme --tilefile work/mario.tile --count-divs 1 1 --pattern ring
+
+python scheme2output.py --outfile work/mario-fb-nostuck-sink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-count-sink 1 200 hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/mario-fb-stuckoksink-sink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-stuck sink-ok hard --custom fwdbwd-count-sink 1 200 hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/mario-fb-stucknosink-sink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-stuck sink-no hard --custom fwdbwd-count-sink 1 200 hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/mario-fb-nostuck-sink-allopen --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-count-sink 1 200 hard --custom fwdbwd-reach-open hard --custom fwdbwd-reach-sink hard
+python scheme2output.py --outfile work/mario-fb-unreachable-sink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20 --unreachable' --custom fwdbwd-count-sink 1 200 hard --reach-print-internal --custom fwdbwd-reach-sink hard
+
+python scheme2output.py --outfile work/mario-fb-nostuck-nosink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-count-sink 0 0 hard
+python scheme2output.py --outfile work/mario-fb-stuckoksink-nosink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-stuck sink-ok hard --custom fwdbwd-count-sink 0 0 hard
+python scheme2output.py --outfile work/mario-fb-stucknosink-nosink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-stuck sink-no hard --custom fwdbwd-count-sink 0 0 hard
+python scheme2output.py --outfile work/mario-fb-nostuck-nosink-allopen --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20' --reach-print-internal --custom fwdbwd-nostuck hard --custom fwdbwd-count-sink 0 0 hard --custom fwdbwd-reach-open hard
+python scheme2output.py --outfile work/mario-fb-unreachable-nosink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 20 --unreachable' --custom fwdbwd-count-sink 0 0 hard --reach-print-internal
+
+python scheme2output.py --outfile work/mario-fb-repair --schemefile work/mario.scheme --size 10 29 --pattern-hard --reach-junction "{" l 3 --reach-junction "}" r 3 --reach-connect '--src { --dst } --move platform --sink-bottom --fwdbwd-layers 25' --reach-print-internal --custom fwdbwd-nostuck hard --custom text-level levels/vglc/mario-1-1-cst-pit.lvl soft

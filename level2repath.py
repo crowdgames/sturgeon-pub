@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     reach_connect_setups = []
     for reach_connect in args.reach_connect:
-        reach_connect_setups.append(util_reach.parse_reach_subargs('--reach-connect', reach_connect.split()))
+        reach_connect_setups.append(util_reach.parse_reach_connect_subargs('--reach-connect', reach_connect.split()))
 
     text_level, meta = util_common.read_text_level(args.textfile, True)
 
@@ -73,5 +73,5 @@ if __name__ == '__main__':
     with util_common.openz(args.outfile, 'wt') as f:
         if args.print_level:
             util_common.print_text_level(text_level, meta=meta)
-        util_common.print_text_level(text_level, meta=meta, outfile=f)
+        util_common.print_text_level(text_level, meta=meta, outstream=f)
     util_common.exit_solution_found()

@@ -602,10 +602,11 @@ if __name__ == '__main__':
 
     if result_info is not None:
         util_graph.write_graph_gr(result_info.graphs, sys.stdout)
-        util_graph.save_graph_result_info(result_info, args.out_dot_none, args.outfile)
+        util_graph.save_graph_result_info(result_info, args.outfile, args.out_dot_none)
 
         if mkiv_setup is not None:
-            util_mkiv.save_graph_result_info_mkiv(result_info, args.out_dot_none, args.outfile)
+            util_mkiv.print_graph_result_info_mkiv(result_info, sys.stdout)
+            util_mkiv.save_graph_result_info_mkiv(result_info, args.outfile, args.out_dot_none)
 
         util_common.exit_solution_found()
 
