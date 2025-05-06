@@ -1382,7 +1382,7 @@ class _UnweightedPySatSatSolver(_GenericSatSolver):
     def __init__(self, solver_id, pysat_name):
         util_common.check(try_import_pysat(), 'pysat not available')
 
-        super().__init__(SOLVER_PYSAT_MC, False)
+        super().__init__(solver_id, False)
 
         self._s = pysat.solvers.Solver(name=pysat_name)
 

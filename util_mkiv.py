@@ -161,15 +161,20 @@ def get_example_info(mkiv_setup):
     elif mkiv_setup.example == EX_PEBBLE:
         ei.directed = True
 
-        ei.rep_rules = []
-        for src in range(7):
-            for dst in range(7):
-                if src >= 2:
-                    ei.rep_rules.append(([('_', str(src)),    ('_', str(dst))],    [(0, 1, '_', '_')],
-                                         [      str(src - 2),       str(dst + 1)], [            '_']))
+        MAX_PEBBLE = 6
 
-        ei.dynamic_node_init_count = {'0':lambda nvars: nvars // 2}
-        ei.dynamic_node_fini_count = {'0':0}
+        def _pstr(_num):
+            return str(_num)
+
+        ei.rep_rules = []
+        for src in range(MAX_PEBBLE + 1):
+            for dst in range(MAX_PEBBLE):
+                if src >= 2:
+                    ei.rep_rules.append(([('_', _pstr(src)),    ('_', _pstr(dst))],    [(0, 1, '_', '_')],
+                                         [      _pstr(src - 2),       _pstr(dst + 1)], [            '_']))
+
+        ei.dynamic_node_init_count[_pstr(0)] = lambda nvars: nvars // 2
+        ei.dynamic_node_fini_count[_pstr(0)] = 0
 
     elif mkiv_setup.example == EX_LIGHTS:
         ei.directed = False

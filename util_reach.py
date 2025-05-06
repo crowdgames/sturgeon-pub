@@ -227,7 +227,7 @@ def parse_reach_connect_subargs(name, subargs):
     reach_parser.add_argument('--missing-aux-closed', action='store_true', help='Treat missing locations as aux closed.')
     reach_parser.add_argument('--wrap-rows', action='store_true', help='Wrap rows in reachability.')
     reach_parser.add_argument('--wrap-cols', action='store_true', help='Wrap columns in reachability.')
-    reach_parser.add_argument('--open-zelda', action='store_true', help='Use Zelda open tiles.')
+    reach_parser.add_argument('--open', type=str, help='Use specified open tiles.')
     reach_parser.add_argument('--unreachable', action='store_true', help='Generate levels with unreachable goals.')
     reach_parser.add_argument('--fwdbwd-layers', type=int, help='Use forward/backward reachability, with given number of layers.')
     reach_parser.add_argument('--sink-bottom', action='store_true', help='Bottom side is sink.')
@@ -252,7 +252,7 @@ def parse_reach_connect_subargs(name, subargs):
     reach_connect_setup.wrap_rows = reach_args.wrap_rows
     reach_connect_setup.wrap_cols = reach_args.wrap_cols
 
-    reach_connect_setup.open_text = util_common.OPEN_TEXT_ZELDA if reach_args.open_zelda else util_common.OPEN_TEXT
+    reach_connect_setup.open_text = reach_args.open if reach_args.open is not None else util_common.OPEN_TEXT
 
     return reach_connect_setup
 

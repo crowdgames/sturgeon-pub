@@ -193,9 +193,10 @@ def get_nexts_open_closed_from(pt, path, reverse, rows, cols, game_to_move_info,
                     continue
                 if frompt in exclude:
                     continue
-                if pt not in get_nexts_from(frompt, rows, cols, game_to_move_info, game_locations, path_open, path_closed, exclude):
+                nexts = get_nexts_from(frompt, rows, cols, game_to_move_info, game_locations, path_open, path_closed, exclude)
+                if pt not in nexts:
                     continue
-                path_nexts[frompt] = None
+                path_nexts[frompt] = nexts[pt]
 
     return path_nexts, path_open, path_closed
 

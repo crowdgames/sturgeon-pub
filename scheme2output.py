@@ -22,7 +22,7 @@ def scheme2output(scheme_info, tag_level, game_level, solver, randomize, weight_
         util_common.check(len(tag_row) == len(game_row) == cols, 'row length mismatch')
         for tag, game in zip(tag_row, game_row):
             util_common.check(game != util_common.VOID_TEXT, 'void game')
-            util_common.check(game in si.game_to_tag_to_tiles, 'unrecognized game ' + game)
+            util_common.check(tag == util_common.VOID_TEXT or game in si.game_to_tag_to_tiles, 'unrecognized game ' + game)
             util_common.check(tag == util_common.VOID_TEXT or tag in si.game_to_tag_to_tiles[game], 'unrecognized tag ' + tag + ' for game ' + game)
 
     print('using solver', solver.get_id())

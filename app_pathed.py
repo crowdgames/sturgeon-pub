@@ -9,10 +9,10 @@ WEIGHT_COUNTS  =    1
 
 INSET          =   10
 CELL_SIZE      =   25
-FRAME          =    5
 
 LEVEL_COUNT    =  128
 
+MAX_SIZE       =  800
 REFRESH_MSEC   =   50
 PATH_DELAY_SEC =    1.0
 
@@ -43,8 +43,8 @@ def decode_result_info(result_info):
     return result_info
 
 class PathCanvas(tkinter.Canvas):
-    def __init__(self, root, rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
-        super().__init__(root, width=cols*CELL_SIZE+2*INSET-FRAME, height=rows*CELL_SIZE+2*INSET-FRAME)
+    def __init__(self, parent, rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
+        super().__init__(parent)
 
         self._rows = rows
         self._cols = cols
@@ -85,48 +85,51 @@ class PathCanvas(tkinter.Canvas):
         self._gen_text = None
         self._image_draw = []
 
+        self._gen_result = None
+
         self._gen_proc = None
         self._gen_proc_wanted = None
         self._gen_proc_termed = False
         self._gen_proc_q = None
 
-        self.bind_all("<BackSpace>", self.on_key_backspace) # delete from end
-        self.bind_all("<KeyPress-=>", self.on_key_equal)    # delete from beginning
-        self.bind_all("<KeyPress-c>", self.on_key_c)        # copy generated path
-        self.bind_all("<KeyPress-x>", self.on_key_x)        # clear path
-        self.bind_all("<KeyPress-p>", self.on_key_p)        # toggle add to beginning/end
-        self.bind_all("<KeyPress-n>", self.on_key_n)        # next generated level
-        self.bind_all("<KeyPress-b>", self.on_key_b)        # previous generated level
-        self.bind_all("<KeyPress-o>", self.on_key_o)        # toggle show open/closed tiles
-        self.bind_all("<KeyPress-r>", self.on_key_r)        # random path
-        self.bind_all("<KeyPress-s>", self.on_key_s)        # shortest path between drawn beginning/end
-        self.bind_all("<KeyPress-w>", self.on_key_w)        # shortest path between generated beginning/end in level
+        self.bind_all("<KeyPress-e>", self.on_evt_export)          # export
+        self.bind_all("<BackSpace>",  self.on_evt_del_end)         # delete from end
+        self.bind_all("<KeyPress-=>", self.on_evt_del_begin)       # delete from beginning
+        self.bind_all("<KeyPress-c>", self.on_evt_copy)            # copy generated path
+        self.bind_all("<KeyPress-x>", self.on_evt_clear)           # clear path
+        self.bind_all("<KeyPress-p>", self.on_evt_tog_begend)      # toggle add to beginning/end
+        self.bind_all("<KeyPress-n>", self.on_evt_next_level)      # next generated level
+        self.bind_all("<KeyPress-b>", self.on_evt_prev_level)      # previous generated level
+        self.bind_all("<KeyPress-o>", self.on_evt_tog_opcl)        # toggle show open/closed tiles
+        self.bind_all("<KeyPress-r>", self.on_evt_random)          # random path
+        self.bind_all("<KeyPress-s>", self.on_evt_shortest_drawn)  # shortest path between drawn beginning/end
+        self.bind_all("<KeyPress-w>", self.on_evt_shortest_gen)    # shortest path between generated beginning/end in level
         self.bind("<Motion>", self.on_mouse_motion)
         self.bind("<Leave>", self.on_mouse_leave)
         self.bind("<ButtonPress-1>", self.on_mouse_button)
         self.after(REFRESH_MSEC, self.on_timer)
 
-        self.pack()
-
         self.redraw_from_image()
+
+    def get_gen_text_level(self):
+        return self._gen_text
 
     def restart_gen_proc(self, delay):
         if self._schemefile:
             self._gen_proc_wanted = time.time() + delay
 
-    @staticmethod
-    def gen_proc_body(q, rows, cols, seed, start_goal, path, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, want_image, outfile):
-        util_common.timer_start(False)
+    def is_gen_proc_running(self):
+        return self._gen_proc is not None
 
-        if outfile is not None:
-            outfile_file = util_common.openz(outfile + '.log', 'wt')
-            sys.stdout = outfile_file
+    @staticmethod
+    def gen_proc_body(q, rows, cols, seed, start_goal, path, reach_move, reach_wrap_rows, reach_wrap_cols, schemefile, want_image):
+        util_common.timer_start(False)
 
         with util_common.openz(schemefile, 'rb') as f:
             scheme_info = pickle.load(f)
 
         tag_game_level = util_common.make_grid(rows, cols, util_common.DEFAULT_TEXT)
-        solver = util_solvers.PySatSolverRC2()
+        solver = util_solvers.RC2PySatSolver()
 
         reach_start_setup = util_common.ReachJunctionSetup()
         reach_start_setup.text = util_common.START_TEXT
@@ -160,16 +163,12 @@ class PathCanvas(tkinter.Canvas):
 
         if scheme_info.count_info is not None:
             count_weight = WEIGHT_COUNTS
-            count_scale = scheme2output.COUNTS_SCALE_HALF
+            count_scale = scheme2output.COUNTS_SCALE_DEFAULT
         else:
             count_weight = 0
             count_scale = None
 
-        result_info = scheme2output.scheme2output(scheme_info, tag_game_level, tag_game_level, solver, seed, pattern_weight, count_weight, count_scale, [reach_start_setup, reach_goal_setup], [reach_connect_setup], None, custom_cnstrs, False)
-
-        if outfile is not None and result_info is not None:
-            print('saving to', outfile)
-            util_common.save_result_info(result_info, outfile)
+        result_info = scheme2output.scheme2output(scheme_info, tag_game_level, tag_game_level, solver, seed, pattern_weight, count_weight, count_scale, [reach_start_setup, reach_goal_setup], [reach_connect_setup], None, custom_cnstrs, False, False, False)
 
         encode_result_info(result_info, want_image)
         q.put(result_info)
@@ -193,6 +192,7 @@ class PathCanvas(tkinter.Canvas):
                     decode_result_info(result_info)
 
                     if result_info is not None:
+                        self._gen_result = result_info
                         if result_info.image_level is None:
                             self._gen_image = None
                         else:
@@ -218,16 +218,12 @@ class PathCanvas(tkinter.Canvas):
                 if PathCanvas.is_edge_path(self._path_or_point):
                     print('starting proc')
 
-                    if self._outfolder is None:
-                        outfile = None
-                    else:
-                        outfile = os.path.join(self._outfolder, hashlib.md5(str(self._path_or_point).encode('utf-8')).hexdigest() + ('_%04d' % self._seed_gen))
-
                     self._gen_proc_q = multiprocessing.Queue()
-                    self._gen_proc = multiprocessing.Process(target=PathCanvas.gen_proc_body, args=(self._gen_proc_q, self._rows, self._cols, self._seed_gen, None, self._path_or_point, self._reach_move, self._reach_wrap_rows, self._reach_wrap_cols, self._schemefile, True, outfile))
+                    self._gen_proc = multiprocessing.Process(target=PathCanvas.gen_proc_body, args=(self._gen_proc_q, self._rows, self._cols, self._seed_gen, None, self._path_or_point, self._reach_move, self._reach_wrap_rows, self._reach_wrap_cols, self._schemefile, True))
                     self._gen_proc.start()
                 else:
                     print('empty path')
+                    self._gen_result = None
                     self._gen_image = None
                     self._gen_text = None
                     self._gen_path = None
@@ -402,68 +398,75 @@ class PathCanvas(tkinter.Canvas):
     def is_edge_path(path):
         return type(path) == list
 
-    def on_key_backspace(self, event):
+    def on_evt_export(self, event):
+        if self._outfolder is not None and self._gen_result is not None:
+            outfile = os.path.join(self._outfolder, hashlib.md5(str(self._path_or_point).encode('utf-8')).hexdigest() + ('_%04d' % self._seed_gen))
+            print('saving to', outfile)
+            util_common.print_result_info(self._gen_result, sys.stdout)
+            util_common.save_result_info(self._gen_result, outfile)
+
+    def on_evt_del_end(self, event):
         if PathCanvas.is_single_point_path(self._path_or_point):
             self._path_or_point = None
             self.new_manual_path(True)
         elif PathCanvas.is_edge_path(self._path_or_point):
             if len(self._path_or_point) == 1:
-                self._path_or_point = tuple(self._path_or_point[0][0:2])
+                self._path_or_point = util_path.path_begin_point(self._path_or_point)
             else:
                 self._path_or_point = self._path_or_point[:-1]
             self.new_manual_path(True)
 
-    def on_key_equal(self, event):
+    def on_evt_del_begin(self, event):
         if PathCanvas.is_single_point_path(self._path_or_point):
             self._path_or_point = None
             self.new_manual_path(True)
         elif PathCanvas.is_edge_path(self._path_or_point):
             if len(self._path_or_point) == 1:
-                self._path_or_point = tuple(self._path_or_point[0][2:4])
+                self._path_or_point = util_path.path_end_point(self._path_or_point)
             else:
                 self._path_or_point = self._path_or_point[1:]
             self.new_manual_path(True)
 
-    def on_key_x(self, event):
+    def on_evt_clear(self, event):
         if self._schemefile:
             self._path_or_point = None
             self.new_manual_path(True)
 
-    def on_key_p(self, event):
+    def on_evt_tog_begend(self, event):
         self._reverse = not self._reverse
         self.recompute_nexts()
 
-    def on_key_c(self, event):
+    def on_evt_copy(self, event):
         if self._schemefile:
             self._path_or_point = self._gen_path
             self.new_manual_path(True)
 
-    def on_key_b(self, event):
-        self._seed_gen = (self._seed_gen + LEVEL_COUNT - 1) % LEVEL_COUNT
-        self.new_manual_path(False)
-
-    def on_key_n(self, event):
+    def on_evt_next_level(self, event):
         self._seed_gen = (self._seed_gen + 1) % LEVEL_COUNT
         self.new_manual_path(False)
 
-    def on_key_o(self, event):
+    def on_evt_prev_level(self, event):
+        self._seed_gen = (self._seed_gen + LEVEL_COUNT - 1) % LEVEL_COUNT
+        self.new_manual_path(False)
+
+    def on_evt_tog_opcl(self, event):
         self._draw_open_closed = not self._draw_open_closed
         self.redraw_from_path()
 
-    def on_key_r(self, event):
+    def on_evt_random(self, event):
         self._seed_rand_path += 1
         rng = random.Random(self._seed_rand_path)
         self._path_or_point, reachable = util_path.random_path_by_search(rng, self._rows, self._cols, self._game_to_move_info, self._game_locations)
         self.new_manual_path(False)
 
-    def on_key_s(self, event):
+    def on_evt_shortest_drawn(self, event):
         if PathCanvas.is_edge_path(self._path_or_point):
             begin = util_path.path_begin_point(self._path_or_point)
             end = util_path.path_end_point(self._path_or_point)
             self._path_or_point, reachable = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, None, None)
             self.new_manual_path(False)
 
-    def on_key_w(self, event):
+    def on_evt_shortest_gen(self, event):
         if PathCanvas.is_edge_path(self._gen_path):
             begin = util_path.path_begin_point(self._gen_path)
             end = util_path.path_end_point(self._gen_path)
@@ -472,7 +475,7 @@ class PathCanvas(tkinter.Canvas):
             self.new_manual_path(False)
 
     def on_mouse_motion(self, event):
-        mr, mc = math.floor(fromcvs(event.y)), math.floor(fromcvs(event.x))
+        mr, mc = math.floor(fromcvs(self.canvasy(event.y))), math.floor(fromcvs(self.canvasx(event.x)))
         if 0 <= mr and mr < self._rows and 0 <= mc and mc < self._cols:
             self._mouse = (mr, mc)
         else:
@@ -508,13 +511,47 @@ class PathCanvas(tkinter.Canvas):
 
 
 
-def pathed(rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder):
+def pathed(rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder, test):
+    canvas_width  = cols * CELL_SIZE + 2 * INSET
+    canvas_height = rows * CELL_SIZE + 2 * INSET
+
+    width = min(canvas_width, MAX_SIZE)
+    height = min(canvas_height, MAX_SIZE)
+
     root = tkinter.Tk()
     root.title('pathed')
 
-    PathCanvas(root, rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder)
+    frame = tkinter.Frame(root, width=width, height=width)
+    frame.pack(expand=True, fill=tkinter.BOTH)
 
-    root.mainloop()
+    canvas = PathCanvas(frame, rows, cols, reach_move, reach_missing_aux_closed, reach_wrap_rows, reach_wrap_cols, schemefile, outfolder)
+
+    if width < canvas_width:
+        hbar = tkinter.Scrollbar(frame, orient=tkinter.HORIZONTAL)
+        hbar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
+        hbar.config(command=canvas.xview)
+        canvas.config(xscrollcommand=hbar.set)
+
+    if height < canvas_height:
+        vbar = tkinter.Scrollbar(frame, orient=tkinter.VERTICAL)
+        vbar.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+        vbar.config(command=canvas.yview)
+        canvas.config(yscrollcommand=vbar.set)
+
+    canvas.config(scrollregion=(0, 0, canvas_width, canvas_height), width=width, height=height)
+    canvas.pack(side=tkinter.LEFT, expand=True, fill=tkinter.BOTH)
+
+    if test:
+        canvas.on_evt_random(None)
+        canvas.restart_gen_proc(-1.0)
+        canvas.on_timer()
+        while canvas.is_gen_proc_running():
+            time.sleep(REFRESH_MSEC / 1000)
+            canvas.on_timer()
+        canvas.on_evt_export(None)
+        util_common.print_text_level(canvas.get_gen_text_level())
+    else:
+        root.mainloop()
 
 
 
@@ -527,8 +564,9 @@ if __name__ == '__main__':
     parser.add_argument('--reach-wrap-rows', action='store_true', help='Wrap rows in reachability.')
     parser.add_argument('--reach-wrap-cols', action='store_true', help='Wrap columns in reachability.')
     parser.add_argument('--schemefile', type=str, help='Input scheme file.')
-    parser.add_argument('--outfolder', type=str, help='Output folder.')
+    parser.add_argument('--outfolder', required=True, type=str, help='Output folder.')
+    parser.add_argument('--test', action='store_true', help='Test with a random path.')
 
     args = parser.parse_args()
 
-    pathed(args.size[0], args.size[1], args.reach_move, args.reach_missing_aux_closed, args.reach_wrap_rows, args.reach_wrap_cols, args.schemefile, args.outfolder)
+    pathed(args.size[0], args.size[1], args.reach_move, args.reach_missing_aux_closed, args.reach_wrap_rows, args.reach_wrap_cols, args.schemefile, args.outfolder, args.test)

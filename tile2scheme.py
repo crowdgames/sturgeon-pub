@@ -3,6 +3,8 @@ import util_common
 
 
 
+PATTERN_SINGLE         = [([(0, 0)], None)]
+
 PATTERN_NEIGH_2        = [([(0, 0)], [( 0, 1)]),
                           ([(0, 0)], [( 1, 0)])]
 
@@ -48,6 +50,7 @@ PATTERN_DYN_ZGRAM_COLS        = 'PATTERN_DYN_ZGRAM_COLS'
 PATTERN_DYN_ROOMS             = 'PATTERN_DYN_ROOMS'
 
 PATTERN_DICT = {
+    'single'     : PATTERN_SINGLE,
     'nbr-2'      : PATTERN_NEIGH_2,
     'nbr-l'      : PATTERN_NEIGH_L,
     'nbr-plus'   : PATTERN_NEIGH_PLUS,

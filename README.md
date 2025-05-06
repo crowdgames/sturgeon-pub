@@ -41,7 +41,8 @@ For example usage (within pipenv), see:
 * `examples_mkiii.sh` - MKIII tile rewrite rules for generating playthroughs
 * `examples_graph.sh` - graph generation
 * `examples_mkiv.sh` - MKIV graph label rewrite rules for generating playthroughs
-* `examples_explore.sh` - setup and use of level explorer application
+* `examples_explorer.sh` - setup and use of explore files and level explorer application
+* `examples_pathed.sh` - setup and use of path editor application
 * `examples_file.sh` - file conversion utilities
 * `examples_external.sh` - use of external solver executables
 
@@ -118,4 +119,6 @@ Graph Utilities:
 
 * Seth Cooper and Mahsa Bazzaz. 2024. "Literally unplayable: on constraint-based generation of uncompletable levels." Proceedings of the 15th Workshop on Procedural Content Generation. https://doi.org/10.1145/3649921.3659844
 
-* Seth Cooper and Mahsa Bazzaz. 2024. "Sturgeon-MKIV: Constraint-Based Level and Playthrough Generation with Graph Label Rewrite Rules." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 20(1), 13-24. https://doi.org/10.1609/aiide.v20i1.31862
+* Seth Cooper and Mahsa Bazzaz. 2024. "Sturgeon-MKIV: constraint-based level and playthrough generation with graph label rewrite rules." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 20(1), 13-24. https://doi.org/10.1609/aiide.v20i1.31862
+
+* Seth Cooper and Mahsa Bazzaz. 2025. "Stuck in the middle: generating levels without (or with) softlocks." Proceedings of the 16th Workshop on Procedural Content Generation. https://pcgworkshop.com/archive/cooper2025softlocks.pdf

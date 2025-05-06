@@ -387,7 +387,7 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
 
     out.write(f'{dtype} G {{\n')
     out.write(f'  graph [fontname="Courier New" margin="0"]\n')
-    out.write(f'  node [fontname="Courier New" fontsize="{fontsize}" shape="circle" width="{size}" height="{size}" fixedsize="true"]\n')
+    out.write(f'  node [fontname="Courier New" fontsize="{fontsize}" shape="circle" width="{size}" height="{size}" fixedsize="true" ordering="out"]\n')
     out.write(f'  edge [fontname="Courier New" fontsize="{fontsize}"]\n')
     for gg, gr in enumerate(grs.graphs):
         if use_clusters:
