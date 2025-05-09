@@ -121,4 +121,4 @@ Graph Utilities:
 
 * Seth Cooper and Mahsa Bazzaz. 2024. "Sturgeon-MKIV: constraint-based level and playthrough generation with graph label rewrite rules." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 20(1), 13-24. https://doi.org/10.1609/aiide.v20i1.31862
 
-* Seth Cooper and Mahsa Bazzaz. 2025. "Stuck in the middle: generating levels without (or with) softlocks." Proceedings of the 16th Workshop on Procedural Content Generation. https://pcgworkshop.com/archive/cooper2025softlocks.pdf
+* Seth Cooper and Mahsa Bazzaz. 2025. "Stuck in the middle: generating levels without (or with) softlocks." Proceedings of the 16th Workshop on Procedural Content Generation. https://dl.acm.org/doi/10.1145/3723498.3723844
