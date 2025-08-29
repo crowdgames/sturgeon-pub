@@ -8,7 +8,7 @@ mkdir -p work
 
 # wfc-flowers
 python input2tile.py --outfile work/wfc-flowers.tile --imagefile levels/wfc/wfc-flowers.png --tilesize 2
-python tile2scheme.py --outfile work/wfc-flowers.scheme --tilefile work/wfc-flowers.tile --count-divs 1 1 --pattern noout-bl-3
+python tile2scheme.py --outfile work/wfc-flowers.scheme --tilefile work/wfc-flowers.tile --count-divs 1 1 --pattern block-noout,3
 
 ! python scheme2output.py --outfile work/wfc-flowers-soft --schemefile work/wfc-flowers.scheme --pattern-hard --count-soft --size 8 8 --solver dimacs-write-wcnf --solver-file work/wfc-flowers-soft.wcnf
 rc2.py -vv work/wfc-flowers-soft.wcnf > work/wfc-flowers-soft.soln 2> /dev/null

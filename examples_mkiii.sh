@@ -30,7 +30,7 @@ python tile2scheme.py --outfile work/soko.scheme --tilefile work/soko.tile
 python scheme2output.py --outfile work/soko --schemefile work/soko.scheme --mkiii-example soko2 --size 8 8 --mkiii-layers 15 --solver pysat-minicard
 
 python input2tile.py --outfile work/slide.tile --textfile levels/mkiii/slide.lvl
-python tile2scheme.py --outfile work/slide.scheme --tilefile work/slide.tile --pattern noout-bl-2 --level-rotate
+python tile2scheme.py --outfile work/slide.scheme --tilefile work/slide.tile --pattern block-noout,2 --level-rotate
 python scheme2output.py --outfile work/slide --schemefile work/slide.scheme --pattern-hard --mkiii-example slide --size 8 8 --mkiii-layers 51 --solver pysat-minicard
 
 python input2tile.py --outfile work/fill.tile --textfile levels/mkiii/fill.lvl
@@ -38,15 +38,15 @@ python tile2scheme.py --outfile work/fill.scheme --tilefile work/fill.tile
 python scheme2output.py --outfile work/fill --schemefile work/fill.scheme --mkiii-example fill --size 6 6 --mkiii-layers 25 --solver pysat-minicard
 
 python input2tile.py --outfile work/lock.tile --textfile levels/mkiii/lock.lvl
-python tile2scheme.py --outfile work/lock.scheme --tilefile work/lock.tile --pattern noout-bl-2 --level-rotate
+python tile2scheme.py --outfile work/lock.scheme --tilefile work/lock.tile --pattern block-noout,2 --level-rotate
 python scheme2output.py --outfile work/lock --schemefile work/lock.scheme --pattern-hard --mkiii-example lock --size 8 10 --mkiii-layers 31 --solver pysat-minicard
 
 python input2tile.py --outfile work/plat.tile --textfile levels/mkiii/plat.lvl
-python tile2scheme.py --outfile work/plat.scheme --tilefile work/plat.tile --pattern noout-gc-2
+python tile2scheme.py --outfile work/plat.scheme --tilefile work/plat.tile --pattern cgram-noout,2
 python scheme2output.py --outfile work/plat --schemefile work/plat.scheme --pattern-hard --mkiii-example plat --size 8 12 --mkiii-layers 40 --solver pysat-minicard
 
 python input2tile.py --outfile work/vvv.tile --textfile levels/mkiii/vvv.lvl
-python tile2scheme.py --outfile work/vvv.scheme --tilefile work/vvv.tile --pattern noout-gc-2
+python tile2scheme.py --outfile work/vvv.scheme --tilefile work/vvv.tile --pattern cgram-noout,2
 python scheme2output.py --outfile work/vvv --schemefile work/vvv.scheme --pattern-hard --mkiii-example vvv --size 9 14 --mkiii-layers 47 --solver pysat-minicard
 
 python input2tile.py --outfile work/match.tile --textfile levels/mkiii/match.lvl --imagefile levels/mkiii/match.png

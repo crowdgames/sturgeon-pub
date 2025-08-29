@@ -928,7 +928,7 @@ class ExplorerFrame(tkinter.Frame):
 
 
 
-def explorer(explorer_info, cell_size, text_colors, text_disp, image_disp):
+def app_explorer(explorer_info, cell_size, text_colors, text_disp, image_disp):
     root = tkinter.Tk()
     root.title('explorer')
 
@@ -945,6 +945,8 @@ def explorer(explorer_info, cell_size, text_colors, text_disp, image_disp):
 
 
 if __name__ == '__main__':
+    util_common.print_command()
+
     parser = argparse.ArgumentParser(description='Level Explorer.')
 
     parser.add_argument('--explorefile', required=True, type=str, help='Explore file to run, or write to.')
@@ -972,4 +974,4 @@ if __name__ == '__main__':
     print(msg)
 
     if not args.test:
-        explorer(explore_info, args.cell_size, text_colors, args.text, args.image)
+        app_explorer(explore_info, args.cell_size, text_colors, args.text, args.image)

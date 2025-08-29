@@ -8,12 +8,12 @@ mkdir -p work
 
 # wfc-flowers
 python input2tile.py --outfile work/wfc-flowers_i.tile --imagefile levels/wfc/wfc-flowers.png --tilesize 2
-python tile2scheme.py --outfile work/wfc-flowers_i.scheme --tilefile work/wfc-flowers_i.tile --count-divs 1 1 --pattern noout-bl-3
+python tile2scheme.py --outfile work/wfc-flowers_i.scheme --tilefile work/wfc-flowers_i.tile --count-divs 1 1 --pattern block-noout,3
 python scheme2output.py --outfile work/wfc-flowers_i --schemefile work/wfc-flowers_i.scheme --pattern-hard --count-soft --size 15 15
 
 # wfc-skyline
 python input2tile.py --outfile work/wfc-skyline_i.tile --imagefile levels/wfc/wfc-skyline.png --tilesize 2
-python tile2scheme.py --outfile work/wfc-skyline_i.scheme --tilefile work/wfc-skyline_i.tile --count-divs 1 1 --pattern noout-bl-3
+python tile2scheme.py --outfile work/wfc-skyline_i.scheme --tilefile work/wfc-skyline_i.tile --count-divs 1 1 --pattern block-noout,3
 python scheme2output.py --outfile work/wfc-skyline_i --schemefile work/wfc-skyline_i.scheme --pattern-hard --count-soft --size 15 15
 
 # cave
@@ -62,7 +62,7 @@ python scheme2output.py --outfile work/mario-1-1_ring-template --schemefile work
 
 # mario - gram
 python input2tile.py --outfile work/mario-1-1_t_gram.tile --textfile levels/vglc/mario-1-1-generic.lvl
-python tile2scheme.py --outfile work/mario-1-1_t_gram.scheme --tilefile work/mario-1-1_t_gram.tile --count-divs 1 1 --pattern 3gc
+python tile2scheme.py --outfile work/mario-1-1_t_gram.scheme --tilefile work/mario-1-1_t_gram.tile --count-divs 1 1 --pattern cgram,3
 python scheme2output.py --outfile work/mario-1-1_gram --schemefile work/mario-1-1_t_gram.scheme --size 14 32 --pattern-hard --count-soft --reach-start-goal l-r 6 --reach-move platform
 
 python input2tile.py --outfile work/mario-1-1_i_gram.tile --imagefile levels/vglc/mario-1-1-clean.png --tilesize 16 --tagfile levels/vglc/mario-1-1-generic.lvl
@@ -80,7 +80,7 @@ python scheme2output.py --outfile work/kidicarus-1_ring --schemefile work/kidica
 
 # icarus - gram
 python input2tile.py --outfile work/kidicarus-1_t_gram.tile --textfile levels/vglc/kidicarus-1-doors.lvl
-python tile2scheme.py --outfile work/kidicarus-1_t_gram.scheme --tilefile work/kidicarus-1_t_gram.tile --count-divs 1 1 --pattern 2gr
+python tile2scheme.py --outfile work/kidicarus-1_t_gram.scheme --tilefile work/kidicarus-1_t_gram.tile --count-divs 1 1 --pattern rgram,2
 python scheme2output.py --outfile work/kidicarus-1_gram --schemefile work/kidicarus-1_t_gram.scheme --size 32 16 --pattern-hard --count-soft --reach-start-goal b-t 6 --reach-move platform --reach-wrap-cols
 
 python input2tile.py --outfile work/kidicarus-1_i_gram.tile --imagefile levels/vglc/kidicarus-1-clean.png --tilesize 16 --tagfile levels/vglc/kidicarus-1-doors.lvl
@@ -93,12 +93,12 @@ python tile2scheme.py --outfile work/super-mario-land-11_t.scheme --tilefile wor
 python scheme2output.py --outfile work/super-mario-land-11 --schemefile work/super-mario-land-11_t.scheme --size 16 24 --pattern-hard --count-soft --reach-start-goal l-r 6 --reach-move platform
 
 python input2tile.py --outfile work/super-mario-land-11_i.tile --imagefile levels/vglc/super-mario-land-11-clean.png --tilesize 8 --tagfile levels/vglc/super-mario-land-11-generic.lvl
-python tile2scheme.py --outfile work/super-mario-land-11_i.scheme --tilefile work/super-mario-land-11_i.tile --pattern block2 # --count-divs 8 10
+python tile2scheme.py --outfile work/super-mario-land-11_i.scheme --tilefile work/super-mario-land-11_i.tile --pattern block,2 # --count-divs 8 10
 python scheme2output.py --outfile work/super-mario-land-11 --schemefile work/super-mario-land-11_i.scheme --tagfile work/super-mario-land-11.lvl --pattern-hard
 
 # zelda
 python input2tile.py --outfile work/tloz1-1_ti.tile --textfile levels/vglc/tloz1-1-doors.lvl --imagefile levels/vglc/tloz1-1.png
-python tile2scheme.py --outfile work/tloz1-1_ti.scheme --tilefile work/tloz1-1_ti.tile --pattern zgc # --count-divs 6 6
+python tile2scheme.py --outfile work/tloz1-1_ti.scheme --tilefile work/tloz1-1_ti.tile --pattern zcgram # --count-divs 6 6
 python scheme2output.py --outfile work/tloz1-1 --schemefile work/tloz1-1_ti.scheme --size 22 32 --pattern-hard --reach-start-goal b-t 11 --reach-move maze --reach-open-zelda
 
 # mario tests

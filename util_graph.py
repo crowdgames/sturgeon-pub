@@ -206,13 +206,13 @@ def read_graphs(filenames):
                     if node_cattrs is None:
                         node_cattrs = t_node_cattrs
                     else:
-                        util_common.check(node_cattrs == t_node_cattrs, 'node mismatch')
+                        util_common.check(node_cattrs == t_node_cattrs, 'node_cattrs mismatch')
 
                     t_edge_cattrs = splt[2] if splt[2] != CATTR_NONE else ''
                     if edge_cattrs is None:
                         edge_cattrs = t_edge_cattrs
                     else:
-                        util_common.check(edge_cattrs == t_edge_cattrs, 'node mismatch')
+                        util_common.check(edge_cattrs == t_edge_cattrs, 'edge_cattrs mismatch')
 
                     util_common.check(gr is None, 'multiple t')
                     if gtype_directed(grs.gtype):

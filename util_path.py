@@ -7,9 +7,6 @@ UNWRAP_NONE = 0
 UNWRAP_PRE  = 1
 UNWRAP_POST = 2
 
-def edge_path_from_json(edge_path_json):
-    return [tuple(pt) for pt in edge_path_json]
-
 def order_edge_path(edge_path_unordered):
     src_to_dst = {}
     dsts = {}

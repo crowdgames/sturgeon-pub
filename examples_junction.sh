@@ -77,6 +77,6 @@ python level2repath.py --outfile work/mario-special-rp2.lvl --textfile work/mari
 
 # zelda - open tiles
 python input2tile.py --outfile work/tloz1-1_ti.tile --textfile levels/vglc/tloz1-1-doors.lvl --imagefile levels/vglc/tloz1-1.png
-python tile2scheme.py --outfile work/tloz1-1_ti.scheme --tilefile work/tloz1-1_ti.tile --pattern zgc
+python tile2scheme.py --outfile work/tloz1-1_ti.scheme --tilefile work/tloz1-1_ti.tile --pattern zcgram
 python scheme2output.py --outfile work/tloz1-1-a --schemefile work/tloz1-1_ti.scheme --size 22 32 --pattern-hard --reach-start-goal b-t 11 --reach-move maze --reach-open-zelda
 python scheme2output.py --outfile work/tloz1-1-b --schemefile work/tloz1-1_ti.scheme --size 22 32 --pattern-hard --reach-junction "{" b 11 --reach-junction "}" t 11 --reach-connect "--src { --dst } --move maze --open DLOMS-"

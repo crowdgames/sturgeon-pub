@@ -5,6 +5,8 @@ import networkx as nx
 
 
 if __name__ == '__main__':
+    util_common.timer_start()
+
     parser = argparse.ArgumentParser(description='.')
     parser.add_argument('--mkiv-example', required=True, type=str, choices=util_mkiv.EXAMPLES, help='MKIV example name, from: ' + ','.join(util_mkiv.EXAMPLES) + '.')
     parser.add_argument('--select', type=int, nargs='+', help='Include selected rules by index, rather than including all.')

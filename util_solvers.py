@@ -140,6 +140,18 @@ def solver_id_to_solver(solver_id):
 def solver_takes_filename(solver):
     return isinstance(solver, _SolverFilename)
 
+def make_solver(solver_ids, solver_filename, solver_timeout):
+    if len(solver_ids) == 1 and solver_timeout is None:
+        solver = solver_id_to_solver(solver_ids[0])
+    else:
+        solver = PortfolioSolver(solver_ids, solver_timeout)
+
+    if solver_filename is not None:
+        util_common.check(solver_takes_filename(solver), 'solver cannot use filename')
+        solver.set_filename(solver_filename)
+
+    return solver
+
 
 
 def get_one_set(solver, vv_map):

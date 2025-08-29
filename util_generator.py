@@ -148,8 +148,8 @@ class Generator:
 
                 self._solver.cnstr_count(vvs, True, 1, 1, None)
 
-    def add_rules_patterns(self, weight_patterns):
-        print('add pattern constraints', weight_patterns)
+    def add_rules_patterns(self, single_patterns, ignore_no_in_patterns, weight_patterns):
+        print('add pattern constraints' + (' single' if single_patterns else '') + (' ignore-no-in' if ignore_no_in_patterns else '') + ' ' + str(weight_patterns))
 
         util_common.check(weight_patterns is None or weight_patterns > 0, 'weight')
 
@@ -162,8 +162,10 @@ class Generator:
             else:
                 _pattern_out_vars = [self._pattern_var(_pattern_out) for _pattern_out in _pattern_out_list]
                 self._solver.cnstr_implies_disj(_pattern_in_var, True, _pattern_out_vars, True, weight_patterns)
+                if single_patterns:
+                    self._solver.cnstr_count(_pattern_out_vars, True, 0, 1, weight_patterns)
 
-        def add_pattern_options(_patterns):
+        def add_pattern_options(_patterns, _ignore_empty):
             _pattern_vars = [self._pattern_var(_pattern) for _pattern in _patterns]
             self._solver.cnstr_count(_pattern_vars, True, 1, len(_pattern_vars), weight_patterns)
 
@@ -204,28 +206,43 @@ class Generator:
 
                 for pattern_template_in in game_patterns_info:
                     all_pattern_in_inst = []
+                    found_void_in = False
 
                     for pattern_in in game_patterns_info[pattern_template_in]:
                         pattern_inst_in = pattern_inst(pattern_template_in, pattern_in)
                         if pattern_inst_in is None:
                             continue
+                        if pattern_inst_in is False:
+                            found_void_in = True
+                            continue
 
                         all_pattern_in_inst.append(pattern_inst_in)
 
-                        for pattern_template_out in game_patterns_info[pattern_template_in][pattern_in]:
-                            if pattern_template_out is None:
+                        for pattern_group_template_out in game_patterns_info[pattern_template_in][pattern_in]:
+                            if pattern_group_template_out is None:
                                 continue
 
+                            if type(pattern_group_template_out) == tuple:
+                                group_out_info = {pattern_group_template_out: game_patterns_info[pattern_template_in][pattern_in][pattern_group_template_out]}
+                            else:
+                                group_out_info = game_patterns_info[pattern_template_in][pattern_in][pattern_group_template_out]
+
                             pattern_list_out = []
-                            for pattern_out in game_patterns_info[pattern_template_in][pattern_in][pattern_template_out]:
-                                pattern_inst_out = pattern_inst(pattern_template_out, pattern_out)
-                                if pattern_inst_out is not None:
+                            for pattern_template_out in group_out_info:
+                                for pattern_out in group_out_info[pattern_template_out]:
+                                    pattern_inst_out = pattern_inst(pattern_template_out, pattern_out)
+                                    if pattern_inst_out is None:
+                                        continue
                                     pattern_list_out.append(pattern_inst_out)
 
                             add_tile_patterns(pattern_inst_in, pattern_list_out)
 
-                    util_common.check(len(all_pattern_in_inst) > 0, 'no inst in patterns')
-                    add_pattern_options(all_pattern_in_inst)
+                    if ignore_no_in_patterns:
+                        if len(all_pattern_in_inst) == 0:
+                            continue
+                    else:
+                        util_common.check(len(all_pattern_in_inst) > 0, 'no inst in patterns')
+                    add_pattern_options(all_pattern_in_inst, ignore_no_in_patterns)
 
     def add_rules_counts(self, use_out_text_groups, counts_scale, weight_counts):
         print('add count constraints', weight_counts)

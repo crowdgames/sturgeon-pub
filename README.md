@@ -41,8 +41,8 @@ For example usage (within pipenv), see:
 * `examples_mkiii.sh` - MKIII tile rewrite rules for generating playthroughs
 * `examples_graph.sh` - graph generation
 * `examples_mkiv.sh` - MKIV graph label rewrite rules for generating playthroughs
+* `examples_editor.sh` - setup and use of level editor application
 * `examples_explorer.sh` - setup and use of explore files and level explorer application
-* `examples_pathed.sh` - setup and use of path editor application
 * `examples_file.sh` - file conversion utilities
 * `examples_external.sh` - use of external solver executables
 
@@ -62,7 +62,7 @@ Tile Utilities:
 * `file2file.py` - convert between a few different formats, usually between pickle and json
 
 Applications:
-* `app_pathed.py` - path editor, draw paths and generate levels interactively, needs scheme file
+* `app_editor.py` - level editor, draw tiles and paths and generate levels interactively, needs scheme file
 * `app_explorer.py` - level explorer, explore a datast of levels, needs explorer file
 
 Level Explorer:
@@ -121,4 +121,4 @@ Graph Utilities:
 
 * Seth Cooper and Mahsa Bazzaz. 2024. "Sturgeon-MKIV: constraint-based level and playthrough generation with graph label rewrite rules." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 20(1), 13-24. https://doi.org/10.1609/aiide.v20i1.31862
 
-* Seth Cooper and Mahsa Bazzaz. 2025. "Stuck in the middle: generating levels without (or with) softlocks." Proceedings of the 16th Workshop on Procedural Content Generation. https://dl.acm.org/doi/10.1145/3723498.3723844
+* Seth Cooper and Mahsa Bazzaz. 2025. "Stuck in the middle: generating levels without (or with) softlocks." Proceedings of the 16th Workshop on Procedural Content Generation. https://doi.org/10.1145/3723498.3723844

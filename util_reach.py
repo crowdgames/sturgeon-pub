@@ -247,7 +247,7 @@ def parse_reach_connect_subargs(name, subargs):
     reach_connect_setup.sink_bottom = reach_args.sink_bottom
     reach_connect_setup.sink_sides = reach_args.sink_sides
 
-    reach_connect_setup.game_to_reach_move = util_common.arg_list_to_dict_options(reach_parser, name+' sub-argument --move', reach_args.move, RMOVE_LIST)
+    reach_connect_setup.game_to_reach_move = util_common.arg_list_to_dict_text_options(reach_parser, name+' sub-argument --move', reach_args.move, RMOVE_LIST, False)
     reach_connect_setup.missing_aux_closed = reach_args.missing_aux_closed
     reach_connect_setup.wrap_rows = reach_args.wrap_rows
     reach_connect_setup.wrap_cols = reach_args.wrap_cols

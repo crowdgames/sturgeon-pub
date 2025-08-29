@@ -141,7 +141,7 @@ def input2tiles(tileset_input, text_levels, image_levels, tag_levels, game_strs_
                     tile_key = get_tile_key(tile_text, tile_image if not text_key_only else None)
                     if tile_key not in tile_key_to_tile_id:
                         if tileset_input is not None:
-                            util_common.check(False, 'tile missing in input tileset')
+                            util_common.check(False, 'tile missing in input tileset, tile key: ' + str(tile_key))
 
                         tile_id = len(ts.tile_ids)
                         ts.tile_ids[tile_id] = None

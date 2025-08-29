@@ -1,4 +1,4 @@
-import atexit, base64, bz2, copy, gzip, io, json, os, pickle, subprocess, sys, time
+import atexit, base64, bz2, copy, gzip, io, json, os, pickle, pprint, subprocess, sys, time
 import PIL.Image
 import webcolors
 
@@ -59,12 +59,12 @@ class SchemePatternInfo:
     def __init__(self):
         self.game_to_patterns = None
 
-        self.stride_rows = None
-        self.stride_cols = None
         self.dr_lo = None
         self.dr_hi = None
         self.dc_lo = None
         self.dc_hi = None
+        self.stride_rows = None
+        self.stride_cols = None
 
 class SchemeInfo:
     def __init__(self):
@@ -196,12 +196,15 @@ def _timer_stop():
     _section_timer.print_done()
     _section_timer = None
 
-def timer_start(print_cmdline=True):
+def print_command():
+    print('running ' + subprocess.list2cmdline(sys.argv))
+
+def timer_start(print_cmd=True):
     global _section_timer
     _section_timer = SectionTimer()
     atexit.register(_timer_stop)
-    if print_cmdline:
-        print('running ' + subprocess.list2cmdline(sys.argv))
+    if print_cmd:
+        print_command()
 
 def timer_section(section):
     global _section_timer
@@ -255,31 +258,32 @@ def strtobool(val):
     else:
         raise ValueError('invalid truth value \'' + str(val) + '\'')
 
-def arg_list_to_dict(parser, name, arg_list, check_option):
+def arg_list_to_dict(parser, name, arg_list, default_key, check_key, check_val):
     if arg_list is None:
         return None
 
     res = {}
     if len(arg_list) == 1 and '=' not in arg_list[0]:
-        res[DEFAULT_TEXT] = check_option(arg_list[0])
+        res[default_key] = check_val(arg_list[0])
     else:
         for kv in arg_list:
             if kv.count('=') != 1:
                 parser.error(name + ' as dict must have exactly 1 =')
             key, val = kv.split('=')
-            res[key] = check_option(val)
+            res[check_key(key)] = check_val(val)
     return res
 
-def arg_list_to_dict_int(parser, name, arg_list):
-    return arg_list_to_dict(parser, name, arg_list, int)
+def arg_list_to_dict_str_int(parser, name, arg_list):
+    return arg_list_to_dict(parser, name, arg_list, None, str, int)
 
-def arg_list_to_dict_options(parser, name, arg_list, val_options):
+def arg_list_to_dict_text_options(parser, name, arg_list, val_options, allow_comma_prefix):
     def check_option(option):
-        if option not in val_options:
+        option_check = option.split(',')[0] if allow_comma_prefix else option
+        if option_check not in val_options:
             parser.error(name + ' must be in ' + ','.join(val_options))
         return option
 
-    return arg_list_to_dict(parser, name, arg_list, check_option)
+    return arg_list_to_dict(parser, name, arg_list, DEFAULT_TEXT, str, check_option)
 
 def load_color_cfg(filename):
     color_cfg = {}
@@ -329,8 +333,39 @@ def make_grid(rows, cols, elem):
         out.append(out_row)
     return out
 
-def rotate_grid_cw(grid):
+def grid_size(grid):
+    rows = len(grid)
+    cols = None
+    for row in grid:
+        if cols is None:
+            cols = len(row)
+        else:
+            check(len(row) == cols, 'grid not rectangular')
+    return rows, cols
+
+def xform_grid_rotate_cw(grid):
     return [list(elem) for elem in zip(*grid[::-1])]
+
+def xform_grid_flip_rows(grid):
+    return list(reversed(grid))
+
+def xform_grid_flip_cols(grid):
+    return [list(reversed(row)) for row in grid]
+
+def xform_grid_pad_side(grid, ll, rr):
+    new_grid = []
+    for row in grid:
+        new_grid.append([ll] + row + [rr])
+    return new_grid
+
+def xform_grid_pad_around(grid, tl, tt, tr, ll, rr, bl, bb, br):
+    cols = len(grid[0])
+    new_grid = []
+    new_grid.append([tl] + ([tt] * cols) + [tr])
+    for row in grid:
+        new_grid.append([ll] + row + [rr])
+    new_grid.append([bl] + ([bb] * cols) + [br])
+    return new_grid
 
 def corner_indices(til, depth):
     def corner_indices_helper(_fra, _til, _depth, _sofar, _track):
@@ -510,6 +545,25 @@ def get_meta_from_result(result_info):
     meta += result_info.extra_meta
 
     return meta
+
+def summarize_scheme_info(scheme_info, outstream):
+    printer = pprint.PrettyPrinter(width=200, stream=outstream)
+    printer.pprint(scheme_info.game_to_tag_to_tiles)
+
+    outstream.write('\n')
+    if scheme_info.count_info is not None:
+        outstream.write('Counts:\n')
+        printer.pprint(scheme_info.count_info.divs_to_game_to_tag_to_tile_count)
+    else:
+        outstream.write('No counts.\n')
+
+    outstream.write('\n')
+    if scheme_info.pattern_info is not None:
+        outstream.write('Patterns:\n')
+        outstream.write(f'{scheme_info.pattern_info.dr_lo} {scheme_info.pattern_info.dr_hi} {scheme_info.pattern_info.dc_lo} {scheme_info.pattern_info.dc_hi} {scheme_info.pattern_info.stride_rows} {scheme_info.pattern_info.stride_cols}\n')
+        printer.pprint(scheme_info.pattern_info.game_to_patterns)
+    else:
+        outstream.write('No patterns.\n')
 
 def print_result_info(result_info, outstream):
     outstream.write('tile level\n')

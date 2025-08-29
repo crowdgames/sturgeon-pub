@@ -3,72 +3,131 @@ import util_common
 
 
 
-PATTERN_SINGLE         = [([(0, 0)], None)]
+PATTERN_SINGLE           = 'single'
+PATTERN_NBR_2            = 'nbr-2'
+PATTERN_NBR_L            = 'nbr-l'
+PATTERN_NBR_PLUS         = 'nbr-plus'
+PATTERN_RING             = 'ring'
+PATTERN_DIAMOND          = 'diamond'
+PATTERN_BLOCK            = 'block'
+PATTERN_BLOCK_NOOUT      = 'block-noout'
+PATTERN_BLOCK_RST_NOOUT  = 'block-rst-noout'
+PATTERN_RGRAM            = 'rgram'
+PATTERN_CGRAM            = 'cgram'
+PATTERN_ZCGRAM           = 'zcgram'
+PATTERN_CGRAM_NOOUT      = 'cgram-noout'
+PATTERN_LIST = [PATTERN_SINGLE,
+                PATTERN_NBR_2, PATTERN_NBR_L, PATTERN_NBR_PLUS,
+                PATTERN_RING, PATTERN_DIAMOND,
+                PATTERN_BLOCK, PATTERN_BLOCK_NOOUT, PATTERN_BLOCK_RST_NOOUT,
+                PATTERN_RGRAM, PATTERN_CGRAM, PATTERN_ZCGRAM, PATTERN_CGRAM_NOOUT]
 
-PATTERN_NEIGH_2        = [([(0, 0)], [( 0, 1)]),
-                          ([(0, 0)], [( 1, 0)])]
 
-PATTERN_NEIGH_L        = [([(0, 0)], [( 0, 1)]),
-                          ([(0, 0)], [( 1, 1)]),
-                          ([(0, 0)], [( 1, 0)])]
 
-PATTERN_NEIGH_PLUS     = [([(0, 0)], [( 0,  1)]),
-                          ([(0, 0)], [( 1,  0)]),
-                          ([(0, 0)], [( 0, -1)]),
-                          ([(0, 0)], [(-1,  0)])]
+BASIC_PATTERNS = {
+    PATTERN_SINGLE    : [([(0, 0)], None)],
 
-PATTERN_NEIGH_BLOCK2   = [([(0, 0), (0, 1), (1, 0), (1, 1)], [(2, 0), (2, 1)]),
-                          ([(0, 0), (0, 1), (1, 0), (1, 1)], [(0, 2), (1, 2)]),
-                          ([(0, 0), (0, 1), (1, 0), (1, 1)], [(1, 2), (2, 1), (2, 2)])]
+    PATTERN_NBR_2     : [([(0, 0)], [( 0, 1)]),
+                         ([(0, 0)], [( 1, 0)])],
 
-PATTERN_NO_OUT_BLOCK_2  = [([(0, 0), (0, 1), (1, 0), (1, 1)], None)]
+    PATTERN_NBR_L     : [([(0, 0)], [( 0, 1)]),
+                         ([(0, 0)], [( 1, 1)]),
+                         ([(0, 0)], [( 1, 0)])],
 
-PATTERN_NO_OUT_BLOCK_3  = [([(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)], None)]
+    PATTERN_NBR_PLUS  : [([(0, 0)], [( 0,  1)]),
+                         ([(0, 0)], [( 1,  0)]),
+                         ([(0, 0)], [( 0, -1)]),
+                         ([(0, 0)], [(-1,  0)])],
 
-PATTERN_BLOCKZ         = [([(0, 0)], [(0, 1), (1, 1)]),
-                          ([(0, 0)], [(1, 0), (1, 1)])]
+    PATTERN_RING      : [([(0, 0)],
+                          [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])],
 
-PATTERN_BLOCK2         = [([(0, 0)],
-                           [(0, 1), (1, 1), (1, 0)])]
-
-PATTERN_BLOCK2_INV     = [([(0, 0), (0, 1), (1, 0)],
-                           [(1, 1)])]
-
-PATTERN_BLOCK3         = [([(0, 0)],
-                           [(0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)])]
-
-PATTERN_RING           = [([(0, 0)],
-                           [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])]
-
-PATTERN_DIAMOND        = [([(0, 0)],
-                           [(-2, 0), (-1, -1), (-1, 0), (-1, 1), (0, -2), (0, -1), (0, 1), (0, 2), (1, -1), (1, 0), (1, 1), (2, 0)])]
-
-PATTERN_DYN_NO_OUT_2GRAM_COLS = 'PATTERN_DYN_NO_OUT_2GRAM_COLS'
-PATTERN_DYN_3GRAM_COLS        = 'PATTERN_DYN_3GRAM_COLS'
-PATTERN_DYN_2GRAM_ROWS        = 'PATTERN_DYN_2GRAM_ROWS'
-PATTERN_DYN_ZGRAM_COLS        = 'PATTERN_DYN_ZGRAM_COLS'
-PATTERN_DYN_ROOMS             = 'PATTERN_DYN_ROOMS'
-
-PATTERN_DICT = {
-    'single'     : PATTERN_SINGLE,
-    'nbr-2'      : PATTERN_NEIGH_2,
-    'nbr-l'      : PATTERN_NEIGH_L,
-    'nbr-plus'   : PATTERN_NEIGH_PLUS,
-    'nbr-block2' : PATTERN_NEIGH_BLOCK2,
-    'noout-bl-2' : PATTERN_NO_OUT_BLOCK_2,
-    'noout-bl-3' : PATTERN_NO_OUT_BLOCK_3, # was no-out3
-    'blockz'     : PATTERN_BLOCKZ,
-    'block2'     : PATTERN_BLOCK2,
-    'block2-inv' : PATTERN_BLOCK2_INV,
-    'block3'     : PATTERN_BLOCK3,
-    'ring'       : PATTERN_RING,
-    'diamond'    : PATTERN_DIAMOND,
-    'noout-gc-2' : PATTERN_DYN_NO_OUT_2GRAM_COLS,
-    '3gc'        : PATTERN_DYN_3GRAM_COLS,
-    '2gr'        : PATTERN_DYN_2GRAM_ROWS,
-    'zgc'        : PATTERN_DYN_ZGRAM_COLS,
-    'rooms'      : PATTERN_DYN_ROOMS,
+    PATTERN_DIAMOND   : [([(0, 0)],
+                          [(-2, 0), (-1, -1), (-1, 0), (-1, 1), (0, -2), (0, -1), (0, 1), (0, 2), (1, -1), (1, 0), (1, 1), (2, 0)])],
 }
+
+def patternopts_to_deltas(patternopt_name, patternopt_params, level_rows, level_cols, game_count, desired_stride):
+    if patternopt_name in BASIC_PATTERNS:
+        util_common.check(len(patternopt_params) == 0, 'patternopt_params')
+        return BASIC_PATTERNS[patternopt_name]
+
+    elif patternopt_name == PATTERN_BLOCK:
+        util_common.check(len(patternopt_params) == 1, 'patternopt_params')
+        size = patternopt_params[0]
+        util_common.check(size >= 2, 'size')
+        if size == 2: # backwards compatibility
+            return [([(0, 0)],
+                     [(0, 1), (1, 1), (1, 0)])]
+        return [([(0, 0)],
+                 [(rr, cc) for rr in range(size) for cc in range(size) if (rr, cc) != (0, 0)])]
+
+    elif patternopt_name == PATTERN_BLOCK_RST_NOOUT:
+        util_common.check(len(patternopt_params) == 4, 'patternopt_params')
+        rows, cols, times, t_step = patternopt_params
+        util_common.check(rows >= 1, 'rows')
+        util_common.check(cols >= 1, 'cols')
+        util_common.check(times >= 2, 'times')
+        util_common.check(t_step >= rows, 't_step')
+        return [([(t_step * tt + rr, cc) for tt in range(times) for rr in range(rows) for cc in range(cols)], None)]
+
+    elif patternopt_name == PATTERN_BLOCK_NOOUT:
+        if len(patternopt_params) == 1:
+            rsize = patternopt_params[0]
+            csize = patternopt_params[0]
+        elif len(patternopt_params) == 2:
+            rsize = patternopt_params[0]
+            csize = patternopt_params[1]
+        else:
+            util_common.check(False, 'patternopt_params')
+        util_common.check(rsize >= 1, 'size')
+        util_common.check(csize >= 1, 'size')
+        return [([(rr, cc) for rr in range(rsize) for cc in range(csize)], None)]
+
+    elif patternopt_name == PATTERN_RGRAM:
+        util_common.check(len(patternopt_params) == 1, 'patternopt_params')
+        util_common.check(game_count == 1, 'multiple games stride')
+        util_common.check(len(set(level_cols)) == 1, 'all levels must be same width')
+        gram_cols = level_cols[0]
+        size = patternopt_params[0]
+        util_common.check(size >= 2, 'size')
+        desired_stride[1] = 0
+        return [([(rr, cc) for rr in range(size - 1) for cc in range(gram_cols)],
+                 [(size - 1, cc) for cc in range(gram_cols)])]
+
+    elif patternopt_name == PATTERN_CGRAM:
+        util_common.check(len(patternopt_params) == 1, 'patternopt_params')
+        util_common.check(game_count == 1, 'multiple games stride')
+        util_common.check(len(set(level_rows)) == 1, 'all levels must be same height')
+        gram_rows = level_rows[0]
+        size = patternopt_params[0]
+        util_common.check(size >= 2, 'size')
+        desired_stride[0] = 0
+        return [([(rr, cc) for rr in range(gram_rows) for cc in range(size - 1)],
+                 [(rr, size - 1) for rr in range(gram_rows)])]
+
+    elif patternopt_name == PATTERN_ZCGRAM:
+        util_common.check(len(patternopt_params) == 0, 'patternopt_params')
+        util_common.check(game_count == 1, 'multiple games stride')
+        for rows in level_rows:
+            util_common.check(rows % 11 == 0, 'level height must be multiple of 11')
+        desired_stride[0] = 11
+        return [([(rr, 0) for rr in range(11)],
+                 [(rr, 1) for rr in range(11)]),
+                ([(10, 0)],
+                 [(11, 0)])]
+
+    elif patternopt_name == PATTERN_CGRAM_NOOUT:
+        util_common.check(len(patternopt_params) == 1, 'patternopt_params')
+        util_common.check(game_count == 1, 'multiple games stride')
+        util_common.check(len(set(level_rows)) == 1, 'all levels must be same height')
+        gram_rows = level_rows[0]
+        size = patternopt_params[0]
+        util_common.check(size >= 1, 'size')
+        desired_stride[0] = 0
+        return [([(rr, cc) for rr in range(gram_rows) for cc in range(size)], None)]
+
+    else:
+        util_common.check(False, 'patternopt_name')
 
 
 
@@ -88,7 +147,9 @@ def normalize(tile_dict):
             for tile in tile_dict[key]:
                 tile_dict[key][tile] = tile_dict[key][tile] / total
 
-def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
+
+
+def tiles2scheme(tile_info, divs_size, game_to_patternopt, level_rotate):
     ti = tile_info
     si = util_common.SchemeInfo()
 
@@ -107,76 +168,35 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
             for cc_divs in range(si.count_info.divs_size[1]):
                 si.count_info.divs_to_game_to_tag_to_tile_count[(rr_divs, cc_divs)] = {}
 
-    if game_to_patterns_delta is None:
+    if game_to_patternopt is None:
         si.pattern_info = None
     else:
         si.pattern_info = util_common.SchemePatternInfo()
 
         si.pattern_info.game_to_patterns = {}
 
-        si.pattern_info.stride_rows = 1
-        si.pattern_info.stride_cols = 1
         si.pattern_info.dr_lo = 0
         si.pattern_info.dr_hi = 0
         si.pattern_info.dc_lo = 0
         si.pattern_info.dc_hi = 0
+        si.pattern_info.stride_rows = None
+        si.pattern_info.stride_cols = None
 
-        for game, patterns_delta in game_to_patterns_delta.items():
-            if patterns_delta == PATTERN_DYN_NO_OUT_2GRAM_COLS:
-                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
+        level_rows = [len(tli.tiles) for tli in ti.levels]
+        level_cols = [len(tli.tiles[0]) for tli in ti.levels]
 
-                gram_rows = [len(tli.tiles) for tli in ti.levels]
-                util_common.check(len(set(gram_rows)) == 1, 'all levels must be same height')
-                gram_rows = gram_rows[0]
+        game_to_patterns_delta = {}
+        for game, (patternopt_name, patternopt_split) in game_to_patternopt.items():
+            desired_stride = [1, 1]
 
-                si.pattern_info.stride_rows = 0
-                patterns_delta = [([(rr, cc) for rr in range(gram_rows) for cc in range(2)], None)]
-                game_to_patterns_delta[game] = patterns_delta
-            elif patterns_delta == PATTERN_DYN_3GRAM_COLS:
-                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
+            game_to_patterns_delta[game] = patternopts_to_deltas(patternopt_name, patternopt_split, level_rows, level_cols, len(game_to_patternopt), desired_stride)
 
-                gram_rows = [len(tli.tiles) for tli in ti.levels]
-                util_common.check(len(set(gram_rows)) == 1, 'all levels must be same height')
-                gram_rows = gram_rows[0]
-
-                si.pattern_info.stride_rows = 0
-                patterns_delta = [([(rr, cc) for rr in range(gram_rows) for cc in range(2)],
-                                   [(rr, 2) for rr in range(gram_rows)])]
-                game_to_patterns_delta[game] = patterns_delta
-            elif patterns_delta == PATTERN_DYN_2GRAM_ROWS:
-                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
-
-                gram_cols = [len(tli.tiles[0]) for tli in ti.levels]
-                util_common.check(len(set(gram_cols)) == 1, 'all levels must be same width')
-                gram_cols = gram_cols[0]
-
-                si.pattern_info.stride_cols = 0
-                patterns_delta = [([(rr, cc) for rr in [0] for cc in range(gram_cols)],
-                                   [(1, cc) for cc in range(gram_cols)])]
-                game_to_patterns_delta[game] = patterns_delta
-            elif patterns_delta == PATTERN_DYN_ZGRAM_COLS:
-                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
-
-                si.pattern_info.stride_rows = 11
-                patterns_delta = [([(rr, 0) for rr in range(11)],
-                                   [(rr, 1) for rr in range(11)]),
-                                  ([(10, 0)],
-                                   [(11, 0)])]
-                game_to_patterns_delta[game] = patterns_delta
-            elif patterns_delta == PATTERN_DYN_ROOMS:
-                util_common.check(len(game_to_patterns_delta) == 1, 'multiple games stride')
-
-                si.pattern_info.stride_rows = 11
-                si.pattern_info.stride_cols = 3
-                patterns_delta = [
-                    ([(rr, cc) for rr in range(11) for cc in range(3)],
-                     None),
-                    ([(rr, 2) for rr in range(11)],
-                     [(rr, 3) for rr in range(11)]),
-                    ([(10, cc) for cc in range(3)],
-                     [(11, cc) for cc in range(3)])
-                ]
-                game_to_patterns_delta[game] = patterns_delta
+            if si.pattern_info.stride_rows is not None:
+                util_common.check(si.pattern_info.stride_rows == desired_stride[0], 'different row strides')
+            si.pattern_info.stride_rows = desired_stride[0]
+            if si.pattern_info.stride_cols is not None:
+                util_common.check(si.pattern_info.stride_cols == desired_stride[1], 'different col strides')
+            si.pattern_info.stride_cols = desired_stride[1]
 
         for game, patterns_delta in game_to_patterns_delta.items():
             si.pattern_info.game_to_patterns[game] = {}
@@ -200,9 +220,9 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
 
         if level_rotate:
             for ii in range(3):
-                tile_level = util_common.rotate_grid_cw(tile_level)
-                tag_level = util_common.rotate_grid_cw(tag_level)
-                game_level = util_common.rotate_grid_cw(game_level)
+                tile_level = util_common.xform_grid_rotate_cw(tile_level)
+                tag_level = util_common.xform_grid_rotate_cw(tag_level)
+                game_level = util_common.xform_grid_rotate_cw(game_level)
 
                 tile_levels.append(tile_level)
                 tag_levels.append(tag_level)
@@ -317,23 +337,7 @@ def tiles2scheme(tile_info, divs_size, game_to_patterns_delta, level_rotate):
             for game in si.count_info.divs_to_game_to_tag_to_tile_count[grc]:
                 normalize(si.count_info.divs_to_game_to_tag_to_tile_count[grc][game])
 
-    printer = pprint.PrettyPrinter(width=200)
-    printer.pprint(si.game_to_tag_to_tiles)
-
-    print()
-    if si.count_info is not None:
-        print('Counts:')
-        printer.pprint(si.count_info.divs_to_game_to_tag_to_tile_count)
-    else:
-        print('No counts.')
-
-    print()
-    if si.pattern_info is not None:
-        print('Patterns:')
-        print(si.pattern_info.dr_lo, si.pattern_info.dr_hi, si.pattern_info.dc_lo, si.pattern_info.dc_hi, si.pattern_info.stride_rows, si.pattern_info.stride_cols)
-        printer.pprint(si.pattern_info.game_to_patterns)
-    else:
-        print('No patterns.')
+    util_common.summarize_scheme_info(si, sys.stdout)
 
     return si
 
@@ -346,7 +350,7 @@ if __name__ == '__main__':
     parser.add_argument('--outfile', required=True, type=str, help='Output scheme file.')
     parser.add_argument('--tilefile', required=True, type=str, help='Input tile file.')
     parser.add_argument('--count-divs', type=int, nargs=2, help='Count divisions.')
-    parser.add_argument('--pattern', type=str, nargs='+', help='Pattern template, from: ' + ','.join(PATTERN_DICT.keys()) + '.')
+    parser.add_argument('--pattern', type=str, nargs='+', help='Pattern template, from: ' + ','.join(PATTERN_LIST) + '.')
     parser.add_argument('--level-rotate', action='store_true', help='Rotate levels to create more patterns.')
     parser.add_argument('--quiet', action='store_true', help='Reduce output.')
     args = parser.parse_args()
@@ -358,13 +362,15 @@ if __name__ == '__main__':
         tile_info = pickle.load(f)
 
     if args.pattern is not None:
-        game_to_patterns_name = util_common.arg_list_to_dict_options(parser, '--pattern', args.pattern, PATTERN_DICT.keys())
-        game_to_patterns_delta = {}
-        for game, patterns_name in game_to_patterns_name.items():
-            game_to_patterns_delta[game] = PATTERN_DICT[patterns_name]
+        game_to_patternopt = util_common.arg_list_to_dict_text_options(parser, '--pattern', args.pattern, PATTERN_LIST, True)
+        for game, patternopt in game_to_patternopt.items():
+            patternopt_split = patternopt.split(',')
+            patternopt_name = patternopt_split[0]
+            patternopt_params = tuple([int(ee) for ee in patternopt_split[1:]])
+            game_to_patternopt[game] = (patternopt_name, patternopt_params)
     else:
-        game_to_patterns_delta = None
+        game_to_patternopt = None
 
-    scheme_info = tiles2scheme(tile_info, args.count_divs, game_to_patterns_delta, args.level_rotate)
+    scheme_info = tiles2scheme(tile_info, args.count_divs, game_to_patternopt, args.level_rotate)
     with util_common.openz(args.outfile, 'wb') as f:
         pickle.dump(scheme_info, f)
