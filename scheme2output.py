@@ -28,7 +28,7 @@ class scheme2output_Config:
 
         self.patterns_weight = None
         self.patterns_single = None
-        self.patterns_ignore_no_in = None
+        self.patterns_ignore_no_in_void = None
 
         self.counts_weight = None
         self.counts_scale = None
@@ -80,7 +80,7 @@ def scheme2output(cfg):
     if cfg.patterns_weight != 0:
         util_common.check(si.pattern_info is not None, 'pattern rules requested but not patterns')
         util_common.timer_section('add pattern rules')
-        gen.add_rules_patterns(cfg.patterns_single, cfg.patterns_ignore_no_in, cfg.patterns_weight)
+        gen.add_rules_patterns(cfg.patterns_single, cfg.patterns_ignore_no_in_void, cfg.patterns_weight)
     elif si.pattern_info is not None:
         print('scheme has patterns but not using pattern rules')
 
@@ -150,7 +150,7 @@ def scheme2output_argv2cfg(argv):
     parser.add_argument('--solver-portfolio-timeout', type=int, help='Force use of portfolio with given timeout (even for single solver).')
 
     parser.add_argument('--pattern-single', action='store_true', help='Use single pattern rules.')
-    parser.add_argument('--pattern-ignore-no-in', action='store_true', help='Ignore pattern template locations with no input pattern.')
+    parser.add_argument('--pattern-ignore-no-in-void', action='store_true', help='Ignore pattern template locations with no input pattern due to voids.')
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('--pattern-hard', action='store_true', help='Use hard pattern rules.')
     group.add_argument('--pattern-soft', type=int, nargs='?', const=WEIGHT_PATTERNS, help='Use soft pattern rules, with weight if provided.')
@@ -241,7 +241,7 @@ def scheme2output_argv2cfg(argv):
         cfg.patterns_weight = 0
 
     cfg.patterns_single = args.pattern_single
-    cfg.patterns_ignore_no_in = args.pattern_ignore_no_in
+    cfg.patterns_ignore_no_in_void = args.pattern_ignore_no_in_void
 
     if args.pattern_range is not None:
         pi = cfg.scheme_info.pattern_info

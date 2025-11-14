@@ -4,19 +4,53 @@ import networkx as nx
 
 
 
-EX_VISIT_NODE          = 'visit-node'
-EX_VISIT_EDGE          = 'visit-edge'
-EX_COLOR               = 'color'
-EX_PEBBLE              = 'pebble'
-EX_LIGHTS              = 'lightsout'
-EX_MAZE                = 'maze'
-EX_SOKO                = 'soko'
-EX_ADVENTURE_A         = 'adventure-a'
-EX_ADVENTURE_B         = 'adventure-b'
-EX_CODEMASTER_NOBRANCH = 'codemaster-nobranch'
-EX_CODEMASTER_BRANCH   = 'codemaster-branch'
+EX_DORMANS               = 'dormans'
+EX_DORMANS_RUN           = 'dormans-run'
+EX_DORMANS_SLOT_RUN      = 'dormans-slot-run'
+EX_DORMANS_MINI_RUN      = 'dormans-mini-run'
+EX_GEN_DAG               = 'gen-dag'
+EX_GEN_RUN_DAG           = 'gen-run-dag'
+EX_GEN_DAG_CHAIN         = 'gen-dag-chain'
+EX_GEN_DAG_MULTI         = 'gen-dag-multi'
+EX_GEN_DAG_FORCE         = 'gen-dag-force'
+EX_GEN_DAG_INTER_HINT    = 'gen-dag-inter-hint'
+EX_GEN_DAG_INTER_NOHINT  = 'gen-dag-inter-nohint'
 
-EXAMPLES = [EX_VISIT_NODE, EX_VISIT_EDGE, EX_COLOR, EX_PEBBLE, EX_LIGHTS, EX_MAZE, EX_SOKO, EX_ADVENTURE_A, EX_ADVENTURE_B, EX_CODEMASTER_NOBRANCH, EX_CODEMASTER_BRANCH]
+EX_VISIT_NODE            = 'visit-node'
+EX_VISIT_EDGE            = 'visit-edge'
+EX_COLOR                 = 'color'
+EX_PEBBLE                = 'pebble'
+EX_GEN_PEBBLE            = 'gen-pebble'
+EX_LIGHTS                = 'lightsout'
+EX_MAZE                  = 'maze'
+EX_SOKO                  = 'soko'
+EX_ADVENTURE_A           = 'adventure-a'
+EX_ADVENTURE_B           = 'adventure-b'
+EX_CODEMASTER_NOBRANCH   = 'codemaster-nobranch'
+EX_CODEMASTER_BRANCH     = 'codemaster-branch'
+
+EXAMPLES = [
+    EX_DORMANS, EX_DORMANS_RUN, EX_DORMANS_SLOT_RUN, EX_DORMANS_MINI_RUN,
+    EX_GEN_DAG, EX_GEN_RUN_DAG, EX_GEN_DAG_CHAIN, EX_GEN_DAG_MULTI, EX_GEN_DAG_FORCE, EX_GEN_DAG_INTER_HINT, EX_GEN_DAG_INTER_NOHINT,
+    EX_VISIT_NODE, EX_VISIT_EDGE,
+    EX_COLOR, EX_PEBBLE, EX_GEN_PEBBLE, EX_LIGHTS, EX_MAZE, EX_SOKO, EX_ADVENTURE_A, EX_ADVENTURE_B, EX_CODEMASTER_NOBRANCH, EX_CODEMASTER_BRANCH
+]
+
+
+
+LABEL_GEN_STATIC    = util_graph.LABEL_GEN_STATIC
+LABEL_GEN_DYN_START = util_graph.LABEL_GEN_DYN_START
+LABEL_GEN_DYN_NIL   = util_graph.LABEL_GEN_DYN_NIL
+
+LABEL_GEN_START     = LABEL_GEN_STATIC + ':' + LABEL_GEN_DYN_START
+LABEL_GEN_NIL       = LABEL_GEN_STATIC + ':' + LABEL_GEN_DYN_NIL
+
+LABEL_RULE_NOT      = util_graph.LABEL_RULE_NOT
+
+
+
+RULE_LAYER          = '__LAYER'
+RULE_CHAIN          = '__CHAIN'
 
 
 
@@ -28,47 +62,104 @@ class MKIVSetup:
 class MKIVInfo:
     def __init__(self):
         self.rep_rules = None
-        self.directed = None
+
         self.layers = None
+
+        self.layer_hint_labels_node = None
+        self.id_hint_labels_node = None
+
+        self.directed = None
+
+        self.multi_allow = None
+        self.multi_layer_allow_none = None
+        self.multi_layer_force_any = None
+
+        self.static_label_all = None
+
         self.static_node_count = None
         self.dynamic_node_init_count = None
+        self.dynamic_node_step_count = None
         self.dynamic_node_fini_count = None
         self.dynamic_edge_fini_count = None
+
         self.static_implies_dynamic_fini = None
         self.dynamic_implies_static_fini = None
 
 def get_example_info(mkiv_setup):
     ei = MKIVInfo()
 
+    ei.rep_rules = []
+
     ei.layers = mkiv_setup.layers
+
+    ei.layer_hint_labels_node = None
+    ei.id_hint_labels_node = None
 
     ei.directed = False
 
+    ei.multi_allow = False
+    ei.multi_layer_allow_none = {}
+    ei.multi_layer_force_any = {}
+
+    ei.static_label_all = None
+
     ei.static_node_count = {}
     ei.dynamic_node_init_count = {}
+    ei.dynamic_node_step_count = {}
     ei.dynamic_node_fini_count = {}
     ei.dynamic_edge_fini_count = {}
+
     ei.static_implies_dynamic_fini = {}
     ei.dynamic_implies_static_fini = {}
 
+    def _organize_rep_rules(_rep_rules, _static_label_all):
+        _rules = []
 
-    def _organize_rep_rules(_rep_rules):
-        _ret = []
+        _layer_hint_lo, _layer_hint_hi = None, None
+        _chain = None
 
-        for _nodes0, _edges0, _nodes1, _edges1 in _rep_rules:
-            _nodes, _edges = [], []
+        for _rule in _rep_rules:
+            if _rule[0] == RULE_LAYER:
+                _layer_hint_lo = _rule[1]
+                _layer_hint_hi = _rule[2]
+                util_common.check(_layer_hint_lo is None or _layer_hint_lo >= 0, 'layer')
+                util_common.check(_layer_hint_hi is None or _layer_hint_hi >= 1, 'layer')
+                util_common.check(_layer_hint_lo is None or _layer_hint_hi is None or _layer_hint_lo < _layer_hint_hi, 'layer')
 
-            util_common.check(len(_nodes0) == len(_nodes1), 'length mismatch')
-            for (_static_node_label, _dynamic_node_label0), _dynamic_node_label1 in zip(_nodes0, _nodes1):
-                _nodes.append((_static_node_label, _dynamic_node_label0, _dynamic_node_label1))
+            elif _rule[0] == RULE_CHAIN:
+                _chain = _rule[1]
 
-            util_common.check(len(_edges0) == len(_edges1), 'length mismatch')
-            for (_fra, _til, _static_edge_label, _dynamic_edge_label0), _dynamic_edge_label1 in zip(_edges0, _edges1):
-                _edges.append((_fra, _til, _static_edge_label, _dynamic_edge_label0, _dynamic_edge_label1))
+            else:
+                _nodes0, _edges0, _nodes1, _edges1 = _rule
+                _nodes, _edges = [], []
 
-            _ret.append((_nodes, _edges))
+                util_common.check(len(_nodes0) == len(_nodes1), 'length mismatch')
+                for _node_label0, _dynamic_node_label1 in zip(_nodes0, _nodes1):
+                    if _static_label_all is None:
+                        _static_node_label, _dynamic_node_label0 = _node_label0
+                    else:
+                        _static_node_label = _static_label_all
+                        _dynamic_node_label0 = _node_label0
+                    _nodes.append((_static_node_label, _dynamic_node_label0, _dynamic_node_label1))
 
-        return _ret
+                util_common.check(len(_edges0) == len(_edges1), 'length mismatch')
+                for edge_fra_til_label0, _dynamic_edge_label1 in zip(_edges0, _edges1):
+                    if _static_label_all is None:
+                        _fra, _til, _static_edge_label, _dynamic_edge_label0 = edge_fra_til_label0
+                        _ind_hint_lo, _ind_hint_hi = None, None
+                    else:
+                        _static_edge_label = _static_label_all
+                        if len(edge_fra_til_label0) == 3:
+                            _fra, _til, _dynamic_edge_label0 = edge_fra_til_label0
+                            _ind_hint_lo, _ind_hint_hi = None, None
+                        else:
+                            _fra, _til, _ind_hint_lo, _ind_hint_hi, _dynamic_edge_label0 = edge_fra_til_label0
+                    _edges.append((_fra, _til, _ind_hint_lo, _ind_hint_hi, _static_edge_label, _dynamic_edge_label0, _dynamic_edge_label1))
+
+                _rules.append((_layer_hint_lo, _layer_hint_hi, _chain, _nodes, _edges))
+                _chain = None
+
+        return _rules
 
     def _check_rep_rules_subiso(_directed, _rep_rules):
         _nm = nx.algorithms.isomorphism.categorical_node_match([util_graph.GATTR_LABEL], [None])
@@ -82,12 +173,12 @@ def get_example_info(mkiv_setup):
             _class_match = nx.algorithms.isomorphism.GraphMatcher
 
         _graphs = []
-        for _nodes, _edges in _rep_rules:
+        for _layer_hint_lo, _layer_hint_hi, _chain, _nodes, _edges in _rep_rules:
             _gr = _class_graph()
             for _node, (_static_node_label, _dynamic_node_label0, _dynamic_node_label1) in enumerate(_nodes):
                 _gr.add_node(_node)
                 _gr.nodes[_node][util_graph.GATTR_LABEL] = (_static_node_label, _dynamic_node_label0, _dynamic_node_label1)
-            for _fra, _til, _static_edge_label, _dynamic_edge_label0, _dynamic_edge_label1 in _edges:
+            for _fra, _til, _ind_hint_lo, _ind_hint_hi, _static_edge_label, _dynamic_edge_label0, _dynamic_edge_label1 in _edges:
                 _gr.add_edge(_fra, _til)
                 _gr.edges[(_fra, _til)][util_graph.GATTR_LABEL] = (_static_edge_label, _dynamic_edge_label0, _dynamic_edge_label1)
             _graphs.append(_gr)
@@ -105,10 +196,510 @@ def get_example_info(mkiv_setup):
 
 
 
-    if mkiv_setup.example == EX_VISIT_NODE:
+    STR = LABEL_GEN_DYN_START
+    NIL = LABEL_GEN_DYN_NIL
+
+
+
+    if mkiv_setup.example in [EX_DORMANS, EX_DORMANS_RUN, EX_DORMANS_SLOT_RUN, EX_DORMANS_MINI_RUN]:
+        ei.directed = True
+        ei.multi_allow = True
+
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        use_mini = mkiv_setup.example in [EX_DORMANS_MINI_RUN]
+        use_slot = mkiv_setup.example in [EX_DORMANS_SLOT_RUN]
+
+        TBL = 'bl'
+        TBM = 'bm'
+        TIB = 'ib'
+        TN_ = 'n'
+        TT_ = 't'
+        TTS = 'ts'
+
+        TK_ = 'k'
+        TKF = 'kf'
+        TKM = 'km'
+        TL_ = 'l'
+        TLF = 'lf'
+        TLM = 'lm'
+
+        TIQ = 'iq'
+        TTI = 'ti'
+
+        TE_ = 'e'
+        TG_ = 'g'
+
+        NC_ = 'C'
+        NCF = 'CF'
+        NCL = 'CL'
+        NCP = 'CP'
+        NF_ = 'F'
+        NG_ = 'G'
+        NH_ = 'H'
+
+        NXX = 'XX'
+
+        NSL = 'SL'
+
+        if use_mini:
+            NODES_TERM_GENERIC = [TN_]
+            NODES_TERM = NODES_TERM_GENERIC + [TK_, TL_] + [TE_, TG_]
+            NODES_NONTERM = [NC_, NSL]
+        else:
+            NODES_TERM_GENERIC = [TBL, TBM, TIB, TN_, TT_, TTS]
+            NODES_TERM = NODES_TERM_GENERIC + [TK_, TKF, TL_, TLF, TLM] + [TIQ, TTI] + [TE_, TG_] + ([TKM] if not use_slot else [])
+            NODES_NONTERM = [NC_, NCF, NCL, NCP, NF_, NG_, NH_] + [NXX]
+
+        if use_slot:
+            SN_ = NSL
+            SK_ = NSL
+            SKM = NSL
+            SKF = NSL
+            SIQ = NSL
+
+            RESOLVE_SLOTS = [TN_, TK_, TKF, TIQ]
+            NODES_NONTERM.append(NSL)
+
+        else:
+            SN_ = TN_
+            SK_ = TK_
+            SKM = TKM
+            SKF = TKF
+            SIQ = TIQ
+
+        ED1 = '-'
+        ED2 = '='
+
+        if mkiv_setup.example in [EX_DORMANS]:
+            layer_gen_max = None
+
+            ei.dynamic_node_fini_count[STR] = 0
+            for label in NODES_NONTERM:
+                ei.dynamic_node_fini_count[label] = 0
+
+        else:
+            if use_mini:
+                layer_gen_max = 3
+            else:
+                layer_gen_max = 7
+
+            ei.dynamic_node_step_count[(STR, layer_gen_max)] = 0
+            for label in NODES_NONTERM:
+                ei.dynamic_node_step_count[(label, layer_gen_max)] = 0
+
+            for layer in range(layer_gen_max + 1):
+                ei.multi_layer_allow_none[layer] = None
+
+        if use_mini:
+            ei.rep_rules.append((RULE_LAYER, 0, 1))
+
+            ei.rep_rules.append(([STR, NIL, NIL, NIL, NIL, NIL],
+                                 [(0, 1, 1, 1, NIL), (1, 2, 4, 6, NIL), (2, 3,  1,  1, NIL), (3, 4, 4, 6, NIL), (4, 5, 1, 1, NIL)],
+                                 [TE_, NC_, TL_, NC_, TL_, TG_],
+                                 [ED1, ED1, ED2, ED1, ED2]))
+
+            ei.rep_rules.append((RULE_LAYER, 1, layer_gen_max))
+
+            ei.rep_rules.append(([NC_, NIL, TL_], [(0, 2, 4, 6, ED1), (0, 1, 2, 4, NIL), (1, 2, 2, 4, NIL)],
+                                 [NSL, NSL, TL_], [             NIL,               ED2,               ED2 ]))
+            ei.rep_rules.append(([NC_, NIL, NIL, NIL, TL_],
+                                 [(0, 4, 4, 6, ED1),
+                                  (0, 1, 1, 4, NIL), (1, 4, 1, 4, NIL), (0, 2, 1, 4, NIL), (2, 4, 1, 4, NIL), (0, 3, 1, 4, NIL), (3, 4, 1, 4, NIL)],
+                                 [NSL, NSL, NSL, NSL, TL_],
+                                 [NIL, ED1, ED1, ED1, ED1, ED1, ED2]))
+
+            ei.rep_rules.append(([NSL], [],
+                                 [TK_], []))
+            ei.rep_rules.append(([NSL], [],
+                                 [TN_], []))
+
+        else:
+            # from https://dl.acm.org/doi/10.1145/1814256.1814257
+
+            # start rule
+            ei.rep_rules.append((RULE_LAYER, 0, 1))
+
+            ei.rep_rules.append(([STR, NIL, NIL, NIL, NIL, NIL, NIL, NIL],
+                                 [(0, 1, 1, 1, NIL), (1, 2, 14, 14, NIL), (2, 3,  1,  1, NIL), (3, 4, 1, 1, NIL),
+                                  (4, 5, 1, 1, NIL), (5, 6,  1,  1, NIL), (6, 7, 21, 21, NIL)],
+                                 [TE_, NC_, NG_, TBM, SIQ, TTI, NCF, TG_],
+                                 [ED1, ED1, ED2, ED2, ED2, ED2, ED1]))
+
+            # create final chain
+            ei.rep_rules.append((RULE_LAYER, 1, 2))
+
+            ei.rep_rules.append(([NCF, NIL, NIL, NIL, NIL, NIL, NIL, NIL, TG_],
+                                 [(0, 8, 21, 21, ED1),
+                                  (0, 1, 15, 15, NIL), (0, 2, 17, 17, NIL), (0, 3, 14, 14, NIL),
+                                  (2, 4, 1, 5, NIL), (2, 5, 1, 5, NIL),
+                                  (3, 6, 1, 5, NIL),
+                                  (4, 6, 1, 5, NIL),
+                                  (6, 7, 1, 1, NIL),
+                                  (7, 8, 1, 1, NIL)],
+                                 [NC_, NH_, TT_, NG_, SKF, NH_, TLF, TBL, TG_],
+                                 [NIL,
+                                  ED1, ED1, ED1,
+                                  ED2, ED1,
+                                  ED2,
+                                  ED1,
+                                  ED2,
+                                  ED2]))
+
+            # remaining gen rules
+            ei.rep_rules.append((RULE_LAYER, 2, layer_gen_max))
+
+            # create linear chain
+            ei.rep_rules.append(([NC_, NIL, NG_], [(0, 2, 14, 14, ED1), (0, 1, 6, 8, NIL), (1, 2, 6, 8, NIL)],
+                                 [NCL, NCL, NCL], [               NIL,               ED2,               ED2]))
+            ei.rep_rules.append(([NC_, NIL, NIL, NG_], [(0, 3, 14, 14, ED1), (0, 1, 3, 5, NIL), (1, 2, 3, 5, NIL), (2, 3, 3, 5, NIL)],
+                                 [NCL, NCL, NCL, NCL], [               NIL,               ED2,               ED2,               ED2]))
+            ei.rep_rules.append(([NC_, NIL, NIL, NIL, NG_],
+                                 [(0, 4, 14, 14, ED1), (0, 1, 2, 4, NIL), (1, 2, 2, 4, NIL), (2, 3, 2, 4, NIL), (3, 4, 2, 4, NIL)],
+                                 [NCL, NCL, NCL, NCL, NCL],
+                                 [NIL, ED2, ED2, ED2, ED2]))
+
+            ei.rep_rules.append(([NCL], [],
+                                 [NXX], []))
+            ei.rep_rules.append(([NXX], [], # remove subgraph isomorphism
+                                 [TT_], []))
+            ei.rep_rules.append(([NCL, NIL, NIL], [(0, 1, 1, 2, NIL), (1, 2, 1, 2, NIL)],
+                                 [TT_, TT_, TIB], [             ED2,               ED2]))
+            ei.rep_rules.append(([NCL], [],
+                                 [TTS], []))
+            ei.rep_rules.append(([NCL, NCL], [(0, 1, 2, 6, ED2)],
+                                 [SK_, TL_], [             ED2]))
+            ei.rep_rules.append(([NCL, NIL, NCL], [(0, 2, 2, 6, ED2), (0, 1, 1, 2, NIL), (1, 2, 1, 2, NIL)],
+                                 [SK_, TL_, NCL], [             NIL,               ED2,               ED2]))
+
+            # create parallel chain
+            ei.rep_rules.append(([NC_, NG_], [(0, 1, 14, 14, ED1)],
+                                 [NCP, NG_], [               ED1]))
+            ei.rep_rules.append(([NCP, NIL, NIL, NIL, NG_],
+                                 [(0, 4, 14, 14, ED1),
+                                  (0, 1, 5, 9, NIL), (1, 4, 5, 9, NIL), (0, 2, 5, 9, NIL), (2, 4, 5, 9, NIL), (0, 3, 5, 9, NIL), (3, 4, 5, 9, NIL)],
+                                 [NF_, SKM, SKM, SKM, TLM],
+                                 [NIL, ED1, ED1, ED1, ED1, ED1, ED1 if not use_slot else ED2]))
+            ei.rep_rules.append(([NF_, NIL, NIL, NIL, SKM], [(0, 3, 5, 9, ED1), (0, 1, 1, 2, NIL), (1, 2, 1, 2, NIL), (2, 4, 4, 7, NIL), (2, 3, 1, 2, NIL)],
+                                 [NF_, SK_, TL_, NH_, SKM], [             NIL,               ED1,               ED1,               ED2,               ED2]))
+
+            if not use_slot:
+                ei.rep_rules.append(([NF_, NIL, SKM], [(0, 2, 5, 9, ED1), (0, 1, 1, 2, NIL), (1, 2, 1, 2, NIL)],
+                                     [NF_, TT_, SKM], [             NIL,               ED1,               ED2]))
+                ei.rep_rules.append(([NF_, NIL, SKM], [(0, 2, 5, 9, ED1), (0, 1, 1, 2, NIL), (1, 2, 1, 2, NIL)],
+                                     [NF_, TTS, SKM], [             NIL,               ED1,               ED2]))
+            ei.rep_rules.append(([NF_, NIL, SK_], [(0, 2, 5, 9, ED1), (0, 1, 1, 2, NIL), (1, 2, 1, 2, NIL)],
+                                 [NF_, TT_, SK_], [             NIL,               ED1,               ED2]))
+            ei.rep_rules.append(([NF_, NIL, SK_], [(0, 2, 5, 9, ED1), (0, 1, 1, 2, NIL), (1, 2, 1, 2, NIL)],
+                                 [NF_, TTS, SK_], [             NIL,               ED1,               ED2]))
+            ei.rep_rules.append(([NF_, NIL, NIL], [(0, 1, 1, 5, NIL), (0, 2, 1, 5, NIL)],
+                                 [SN_, NH_, NH_], [             ED1,               ED1]))
+
+            # resolve hooks
+            ei.rep_rules.append(([NH_], [],
+                                 [SN_], []))
+            ei.rep_rules.append(([NH_, NIL], [(0, 1, 1, 2, NIL)],
+                                 [TT_, TIB], [             ED2]))
+            ei.rep_rules.append(([NH_, NIL], [(0, 1, 1, 2, NIL)],
+                                 [TTS, TIB], [             ED2]))
+
+            if use_slot:
+                # resolve slots
+                for slt in RESOLVE_SLOTS:
+                    ei.rep_rules.append(([NSL], [],
+                                         [slt], []))
+
+        if mkiv_setup.example in [EX_DORMANS_RUN, EX_DORMANS_SLOT_RUN, EX_DORMANS_MINI_RUN]:
+            EKR = -0
+            EKF = -1
+            EIQ = -2
+            INV_MAX = 2
+
+            EDI = 'i'
+            EDO = '.'
+            EDX = 'x'
+
+            if not use_mini:
+                KEY_SLOTS = ['_', '1', '2', '3', '4']
+            else:
+                KEY_SLOTS = ['_', '1', '2']
+            ITEM_SLOTS = ['_', 'X']
+
+            NODES_RUN_MOVE = []
+            NODES_RUN_MOVE.append('_')
+            NODES_RUN_MOVE.append('@')
+
+            NODES_RUN_INV = []
+            for sl in KEY_SLOTS:
+                NODES_RUN_INV.append('k:' + sl)
+            if not use_mini:
+                for sl in ITEM_SLOTS:
+                    NODES_RUN_INV.append('kf:' + sl)
+                for sl in ITEM_SLOTS:
+                    NODES_RUN_INV.append('iq:' + sl)
+
+            # mark edges parallel to double edges
+            ei.rep_rules.append((RULE_LAYER, layer_gen_max, layer_gen_max + 1))
+            ei.multi_layer_allow_none[layer_gen_max] = None
+            ei.multi_layer_force_any[layer_gen_max] = None
+
+            ei.rep_rules.append(([None, None, None], [(0, 2, 1, 20, ED1), (1, 2, 1, 20, ED2)],
+                                 [None, None, None], [              EDX,                ED2]))
+
+            # mark other edges
+            ei.rep_rules.append((RULE_LAYER, layer_gen_max + 1, layer_gen_max + 2))
+            ei.multi_layer_allow_none[layer_gen_max + 1] = None
+            ei.multi_layer_force_any[layer_gen_max + 1] = None
+
+            ei.rep_rules.append(([None, None], [(0, 1, 1, 20, ED1)],
+                                 [None, None], [              EDO]))
+            ei.rep_rules.append(([None, None], [(0, 1, 1, 20, ED2)],
+                                 [None, None], [              EDO]))
+
+            # enter dungeon
+            if not use_mini:
+                ei.rep_rules.append((RULE_LAYER, layer_gen_max + 2, layer_gen_max + 3))
+                ei.rep_rules.append(([NIL,   NIL,    NIL,    TE_], [(0, 3, EKR, None, NIL), (1, 3, EKF, None, NIL), (2, 3, EIQ, None, NIL)],
+                                     ['k:_', 'kf:_', 'iq:_', '@'], [                  EDI,                    EDI,                    EDI]))
+            else:
+                ei.rep_rules.append((RULE_LAYER, layer_gen_max + 2, layer_gen_max + 3))
+                ei.rep_rules.append(([NIL,   TE_], [(0, 1, EKR, None, NIL)],
+                                     ['k:_', '@'], [                  EDI ]))
+
+            # remaining run rules
+            ei.rep_rules.append((RULE_LAYER, layer_gen_max + 3, None))
+
+            NODES_RUN_GENERIC = ['_'] + NODES_TERM_GENERIC
+
+            # move onto standard nodes
+            for nd0 in NODES_RUN_GENERIC:
+                ei.rep_rules.append((['@', nd0], [(0, 1, 1, 20, EDO)],
+                                     ['_', '@'], [              EDO]))
+
+            # move onto goal
+            ei.rep_rules.append((['@', TG_], [(0, 1, 1, 20, EDO)],
+                                 ['_', '@'], [              EDO]))
+
+            # move back onto blank
+            ei.rep_rules.append((['_', '@'], [(0, 1, 1, 20, EDO)],
+                                 ['@', '_'], [              EDO]))
+
+            # key/item pickup
+            for ini in range(len(KEY_SLOTS) - 1):
+                in0 = 'k:' + KEY_SLOTS[ini]
+                in1 = 'k:' + KEY_SLOTS[ini + 1]
+                ei.rep_rules.append(([in0, '@', TK_], [(0, 1, EKR, None, NIL), (1, 2, 1, 20, EDO)],
+                                     [in1, '_', '@'], [                  NIL,                EDO]))
+                if not use_mini and not use_slot:
+                    ei.rep_rules.append(([in0, '@', TKM], [(0, 1, EKR, None, NIL), (1, 2, 1, 20, EDO)],
+                                         [in1, '_', '@'], [                  NIL,                EDO]))
+
+            if not use_mini:
+                for ini in range(len(ITEM_SLOTS) - 1):
+                    in0 = 'kf:' + ITEM_SLOTS[ini]
+                    in1 = 'kf:' + ITEM_SLOTS[ini + 1]
+                    ei.rep_rules.append(([in0, '@', TKF], [(0, 1, EKF, None, NIL), (1, 2, 1, 20, EDO)],
+                                         [in1, '_', '@'], [                  NIL,                EDO]))
+
+                for ini in range(len(ITEM_SLOTS) - 1):
+                    in0 = 'iq:' + ITEM_SLOTS[ini]
+                    in1 = 'iq:' + ITEM_SLOTS[ini + 1]
+                    ei.rep_rules.append(([in0, '@', TIQ], [(0, 1, EIQ, None, NIL), (1, 2, 1, 20, EDO)],
+                                         [in1, '_', '@'], [                  NIL,                EDO]))
+
+            # key/item use
+            for ini in range(1, len(KEY_SLOTS)):
+                in0 = 'k:' + KEY_SLOTS[ini]
+                in1 = 'k:' + KEY_SLOTS[ini - 1]
+                ei.rep_rules.append(([in0, '@', TL_], [(0, 1, EKR, None, NIL), (1, 2, 1, 20, EDO)],
+                                     [in1, '_', '@'], [                  NIL,                EDO]))
+
+            if not use_mini:
+                for ini in range(3, len(KEY_SLOTS)):
+                    in0 = 'k:' + KEY_SLOTS[ini]
+                    in1 = 'k:' + KEY_SLOTS[ini - 3]
+                    ei.rep_rules.append(([in0, '@', TLM], [(0, 1, EKR, None, NIL), (1, 2, 1, 20, EDO)],
+                                         [in1, '_', '@'], [                  NIL,                EDO]))
+
+                for ini in range(1, len(ITEM_SLOTS)):
+                    in0 = 'kf:' + ITEM_SLOTS[ini]
+                    in1 = 'kf:' + ITEM_SLOTS[ini - 1]
+                    ei.rep_rules.append(([in0, '@', TLF], [(0, 1, EKF, None, NIL), (1, 2, 1, 20, EDO)],
+                                         [in1, '_', '@'], [                  NIL,                EDO]))
+
+                for ini in range(1, len(ITEM_SLOTS)):
+                    in0 = 'iq:' + ITEM_SLOTS[ini]
+                    in1 = 'iq:' + ITEM_SLOTS[ini] # keep item
+                    ei.rep_rules.append(([in0, '@', TTI], [(0, 1, EIQ, None, NIL), (1, 2, 1, 20, EDO)],
+                                         [in1, '_', '@'], [                  NIL,                EDO]))
+
+            # setup node labels
+            ei.layer_hint_labels_node = {}
+            ei.layer_hint_labels_node[STR] = (0, 1)
+            for label in NODES_NONTERM:
+                ei.layer_hint_labels_node[label] = (0, layer_gen_max)
+
+            ei.id_hint_labels_node = {}
+            for label in NODES_RUN_INV:
+                ei.id_hint_labels_node[label] = (0, INV_MAX)
+            for label in NODES_RUN_MOVE + NODES_TERM + NODES_NONTERM + [STR]:
+                ei.id_hint_labels_node[label] = (INV_MAX + 1, None)
+
+            # setup run counts
+            ei.dynamic_node_fini_count[TG_] = 0
+
+    elif mkiv_setup.example == EX_GEN_DAG:
         ei.directed = True
 
-        ei.rep_rules = []
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        ei.rep_rules.append(([STR, NIL], [(0, 1, NIL)],
+                             ['_', '_'], [       '_' ]))
+        ei.rep_rules.append((['_', '_', NIL], [(0, 1, '_'), (0, 2, NIL), (2, 1, NIL)],
+                             ['_', '_', '_'], [       NIL,         '_',         '_' ]))
+        ei.rep_rules.append((['_', '_', NIL, NIL], [(0, 1, '_'), (1, 3, NIL), (0, 2, NIL), (2, 3, NIL)],
+                             ['_', '_', '_', '_'], [       '_',         '_',         '_',         '_' ]))
+        ei.dynamic_node_fini_count = {'_':lambda nvars: nvars}
+
+    elif mkiv_setup.example == EX_GEN_RUN_DAG:
+        ei.directed = True
+
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        switch_layer = 4
+
+        ei.rep_rules.append((RULE_LAYER, 0, 1))
+        ei.rep_rules.append(([STR, NIL], [(0, 1, NIL)],
+                             ['P', '*'], [       '_' ]))
+
+        ei.rep_rules.append((RULE_LAYER, 1, switch_layer))
+        for src in ['P', '*', '_']:
+            for dst in ['*', '_']:
+                ei.rep_rules.append(([src, dst, NIL], [(0, 1, '_'), (0, 2, NIL), (2, 1, NIL)],
+                                     [src, dst, '*'], [       NIL,         '_',         '_' ]))
+                ei.rep_rules.append(([src, dst, NIL, NIL], [(0, 1, '_'), (1, 3, NIL), (0, 2, NIL), (2, 3, NIL)],
+                                     [src, '*', '_', dst], [       '_',         '_',         '_',         '_' ]))
+
+        ei.rep_rules.append((RULE_LAYER, switch_layer, None))
+        ei.rep_rules.append((['P', '_'], [(0, 1, '_')],
+                             ['=', 'P'], [       '_' ]))
+        ei.rep_rules.append((['P', '*'], [(0, 1, '_')],
+                             ['=', 'P'], [       '_' ]))
+
+        ei.layer_hint_labels_node = {}
+        ei.layer_hint_labels_node[STR] = (0, 1)
+        ei.layer_hint_labels_node['='] = (switch_layer, None)
+
+        ei.dynamic_node_fini_count = {('_', '='):lambda nvars: (nvars // 2 - 1, None), '*':0}
+
+    elif mkiv_setup.example == EX_GEN_DAG_CHAIN:
+        ei.directed = True
+
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        ei.rep_rules.append(([STR, NIL], [(0, 1, NIL)],
+                             ['A', 'X'], [       '_' ]))
+        ei.rep_rules.append((RULE_CHAIN, 1))
+        ei.rep_rules.append((['X', NIL], [(0, 1, NIL)],
+                             ['B', 'X'], [       '_' ]))
+        ei.rep_rules.append((RULE_CHAIN, 1))
+        ei.rep_rules.append((['X', NIL], [(0, 1, NIL)],
+                             ['C', 'X'], [       '_' ]))
+        ei.rep_rules.append((RULE_CHAIN, 1))
+        ei.rep_rules.append((['X', NIL], [(0, 1, NIL)],
+                             ['D', 'X'], [       '_' ]))
+        ei.rep_rules.append((RULE_CHAIN, 1))
+        ei.rep_rules.append((['X'], [],
+                             ['E'], []))
+
+        ei.dynamic_node_fini_count[STR] = 0
+        ei.dynamic_node_fini_count['X'] = 0
+
+    elif mkiv_setup.example == EX_GEN_DAG_MULTI:
+        ei.directed = True
+        ei.multi_allow = True
+
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        ei.rep_rules.append(([STR,  NIL,  NIL,  NIL],  [(0, 1, NIL), (1, 2, NIL), (2, 3, NIL)],
+                             ['X1', 'X2', 'X3', 'X4'], [       '_',         '_',         '_' ]))
+        ei.rep_rules.append((RULE_CHAIN, 1))
+        ei.rep_rules.append(([NIL, 'X1'], [(0, 1, NIL)],
+                             ['A', 'B'], [       '_' ]))
+        ei.rep_rules.append((RULE_CHAIN, 2))
+        ei.rep_rules.append((['X2'], [],
+                             ['C'],  []))
+        ei.rep_rules.append((RULE_CHAIN, 3))
+        ei.rep_rules.append((['X3'], [],
+                             ['D'],  []))
+        ei.rep_rules.append((RULE_CHAIN, 4))
+        ei.rep_rules.append((['X4', NIL], [(0, 1, NIL)],
+                             ['E',  'F'], [       '_' ]))
+
+        ei.dynamic_node_fini_count[STR] = 0
+        ei.dynamic_node_fini_count['X1'] = 0
+        ei.dynamic_node_fini_count['X2'] = 0
+        ei.dynamic_node_fini_count['X3'] = 0
+        ei.dynamic_node_fini_count['X4'] = 0
+
+    elif mkiv_setup.example == EX_GEN_DAG_FORCE:
+        ei.directed = True
+        ei.multi_allow = True
+
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        ei.rep_rules.append((RULE_LAYER, 0, 1))
+        ei.rep_rules.append(([NIL, STR], [(0, 1, NIL)],
+                             ['X', 'Y'], [       '-' ]))
+        ei.multi_layer_force_any[0] = None
+
+        ei.rep_rules.append((RULE_LAYER, 1, 2))
+        ei.rep_rules.append((['X', 'Y'], [(0, 1, '-')],
+                             ['X', 'Y'], [       '=' ]))
+
+        ei.rep_rules.append((RULE_LAYER, 2, None))
+        ei.rep_rules.append(([None, None, None], [(0, 2, '='), (1, 2, '-')],
+                             [None, None, None], [       '.',         'x' ]))
+        ei.multi_layer_force_any[2] = None
+
+        ei.dynamic_node_fini_count['X'] = lambda nvars: nvars - 1
+
+    elif mkiv_setup.example in [EX_GEN_DAG_INTER_HINT, EX_GEN_DAG_INTER_NOHINT]:
+        ei.directed = True
+        ei.multi_allow = True
+
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        if mkiv_setup.example == EX_GEN_DAG_INTER_HINT:
+            ei.rep_rules.append(([STR,  NIL ],
+                                 [(0, 1, 7, 9, NIL)],
+                                 ['X1', 'X2'],
+                                 ['_']))
+            ei.rep_rules.append((['X1', NIL, NIL, NIL, NIL, NIL, NIL, 'X2'],
+                                 [(0, 7, 7, 9, '_'),
+                                  (0, 1, 1, 3, NIL), (1, 2, 1, 3, NIL), (2, 3, 1, 3, NIL), (3, 7, 1, 3, NIL),
+                                  (0, 4, 1, 3, NIL), (4, 5, 1, 3, NIL), (5, 6, 1, 3, NIL), (6, 7, 1, 3, NIL)],
+                                 ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+                                 [NIL, '_', '_', '_', '_', '_', '_', '_', '_']))
+        else:
+            ei.rep_rules.append(([STR,  NIL ],
+                                 [(0, 1, NIL)],
+                                 ['X1', 'X2'],
+                                 ['_']))
+            ei.rep_rules.append((['X1', NIL, NIL, NIL, NIL, NIL, NIL, 'X2'],
+                                 [(0, 7, '_'),
+                                  (0, 1, NIL), (1, 2, NIL), (2, 3, NIL), (3, 7, NIL),
+                                  (0, 4, NIL), (4, 5, NIL), (5, 6, NIL), (6, 7, NIL)],
+                                 ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+                                 [NIL, '_', '_', '_', '_', '_', '_', '_', '_']))
+
+        ei.dynamic_node_fini_count[STR] = 0
+        ei.dynamic_node_fini_count['X1'] = 0
+        ei.dynamic_node_fini_count['X2'] = 0
+
+    elif mkiv_setup.example == EX_VISIT_NODE:
+        ei.directed = True
+
         ei.rep_rules.append(([('S', 'P'), ('_', '_')], [(0, 1, None, '_')],
                              [      '_',        'P' ], [             '_']))
         ei.rep_rules.append(([('_', 'P'), ('_', '_')], [(0, 1, None, '_')],
@@ -124,7 +715,6 @@ def get_example_info(mkiv_setup):
     elif mkiv_setup.example == EX_VISIT_EDGE:
         ei.directed = True
 
-        ei.rep_rules = []
         ei.rep_rules.append(([(None, 'P'), (None, '_')], [(0, 1, None, '_')],
                              [       '_',         'P' ], [             '*']))
 
@@ -135,8 +725,6 @@ def get_example_info(mkiv_setup):
 
     elif mkiv_setup.example == EX_COLOR:
         ei.directed = True
-
-        ei.rep_rules = []
 
         ei.rep_rules.append(([('_', 'PR'), ('_', '_')], [(0, 1, 'R', '_')],
                              [      '*',         'PG'], [            '*']))
@@ -176,10 +764,49 @@ def get_example_info(mkiv_setup):
         ei.dynamic_node_init_count[_pstr(0)] = lambda nvars: nvars // 2
         ei.dynamic_node_fini_count[_pstr(0)] = 0
 
+    elif mkiv_setup.example == EX_GEN_PEBBLE:
+        ei.directed = False
+        ei.multi_allow = True
+
+        ei.static_label_all = LABEL_GEN_STATIC
+
+        GEN_LAYERS = 5
+        MAX_PEBBLE = 6
+
+        def _pstr(_num):
+            return str(_num)
+
+        ei.rep_rules.append((RULE_LAYER, 0, GEN_LAYERS))
+        ei.rep_rules.append(([STR, NIL], [(0, 1, NIL)],
+                             ['X', 'X'], [       '_' ]))
+        ei.rep_rules.append((['X', NIL, 'X'], [(0, 2, '_'), (0, 1, NIL), (1, 2, NIL)],
+                             ['X', 'X', 'X'], [       NIL,         '_',         '_' ]))
+        ei.rep_rules.append((['X', NIL, 'X'], [(0, 2, '_'), (0, 1, NIL), (1, 2, NIL)],
+                             ['X', 'X', 'X'], [       '_',         '_',         '_' ]))
+        ei.rep_rules.append((['X', NIL, 'X'], [(0, 2, '_'), (0, 1, NIL), (1, 2, NIL)],
+                             ['Z', 'Z', 'Z'], [       '_',         '_',         '_' ]))
+
+        ei.rep_rules.append((RULE_LAYER, GEN_LAYERS, GEN_LAYERS + 1))
+        ei.rep_rules.append((['Z'],      [],
+                             [_pstr(0)], []))
+        for num in range(MAX_PEBBLE + 1):
+            ei.rep_rules.append((['X'],        [],
+                                 [_pstr(num)], []))
+
+        ei.rep_rules.append((RULE_LAYER, GEN_LAYERS + 1, None))
+
+        for src in range(MAX_PEBBLE + 1):
+            for dst in range(MAX_PEBBLE):
+                if src >= 2:
+                    ei.rep_rules.append(([_pstr(src),     _pstr(dst)],     [(0, 1, '_')],
+                                         [_pstr(src - 2), _pstr(dst + 1)], [       '_' ]))
+
+        ei.dynamic_node_step_count[(('X', 'Z'), GEN_LAYERS)]     = lambda nvars: nvars // 2
+        ei.dynamic_node_step_count[(('X', 'Z'), GEN_LAYERS + 1)] = 0
+        ei.dynamic_node_fini_count[_pstr(0)] = 0
+
     elif mkiv_setup.example == EX_LIGHTS:
         ei.directed = False
-
-        ei.rep_rules = []
 
         xx = None
 
@@ -213,7 +840,6 @@ def get_example_info(mkiv_setup):
     elif mkiv_setup.example == EX_MAZE:
         ei.directed = False
 
-        ei.rep_rules = []
         ei.rep_rules.append(([(None, 'P'), (None, '_')], [(0, 1, '_', '_')],
                              [       '_',         'P' ], [            '_']))
 
@@ -224,7 +850,6 @@ def get_example_info(mkiv_setup):
     elif mkiv_setup.example == EX_SOKO:
         ei.directed = True
 
-        ei.rep_rules = []
         for lbl in ['e', 's']:
             ei.rep_rules.append(([(None, 'P'), (None, '_')],              [(0, 1, lbl, '_')],
                                  [       '_',         'P' ],              [            '_']))
@@ -270,7 +895,6 @@ def get_example_info(mkiv_setup):
             if _rule not in _rep_rules:
                 _rep_rules.append(_rule)
 
-        ei.rep_rules = []
         for keys in _powerset(all_keys):
             for pows in _powerset(all_pows):
                 pla = _pstring(keys + pows)
@@ -301,7 +925,6 @@ def get_example_info(mkiv_setup):
 
         MAX_CRYSTAL_PLAYER = 2
 
-        ei.rep_rules = []
         for mclr1 in ['R', 'G', 'B', 'RG', 'RB', 'GB']:
             for sclr1 in 'RGB':
                 if sclr1 not in mclr1:
@@ -369,7 +992,7 @@ def get_example_info(mkiv_setup):
     else:
         util_common.check(False, 'mkiv_setup example ' + mkiv_setup.example)
 
-    ei.rep_rules = _organize_rep_rules(ei.rep_rules)
+    ei.rep_rules = _organize_rep_rules(ei.rep_rules, ei.static_label_all)
     _check_rep_rules_subiso(ei.directed, ei.rep_rules)
 
     return ei
@@ -416,7 +1039,7 @@ def write_graph_dot_lightsout(grs, outstream):
     grs_out.colors = {' ':'00FF00', '':'006600'}
     grs_out.graphs = [gr]
 
-    util_graph.write_graph_dot(grs_out, True, False, 1.0, outstream)
+    util_graph.write_graph_dot(grs_out, True, False, False, 1.0, outstream)
 
 def write_graph_dot_soko(grs, outstream):
     util_common.check(len(grs.graphs) == 1, 'can only write single graph')
@@ -436,7 +1059,7 @@ def write_graph_dot_soko(grs, outstream):
     grs_out.colors = {'X':'AAAAAA', 'P':'AAAAFF', 'C':'FFFFAA', 'o':'AAFFFF', 'O':'AAFFAA'}
     grs_out.graphs = [gr]
 
-    util_graph.write_graph_dot(grs_out, True, False, 1.0, outstream)
+    util_graph.write_graph_dot(grs_out, True, False, False, 1.0, outstream)
 
 def write_graph_dot_codemaster(grs, outstream):
     util_common.check(len(grs.graphs) == 1, 'can only write single graph')
@@ -486,7 +1109,7 @@ def write_graph_dot_codemaster(grs, outstream):
                 fontsize_disp = max(fontsize_min, fontsize - fontsize_per * (len(display_label) - 1))
                 attrs += f' fontsize="{fontsize_disp}"'
 
-            if central:
+            if util_graph.is_central(central):
                 attrs += f' penwidth="4"'
                 attrs += f' color="#000000"'
 
@@ -521,7 +1144,7 @@ def write_graph_dot_codemaster(grs, outstream):
                 fontsize_disp = max(fontsize_min, fontsize - fontsize_per * (len(display_label) - 1))
                 attrs += f' fontsize="{fontsize_disp}"'
 
-            if central:
+            if util_graph.is_central(central):
                 attrs += f' penwidth="4"'
                 attrs += f' color="#000000"'
 
@@ -554,11 +1177,11 @@ def write_graph_dot_codemaster(grs, outstream):
         elif label in ['map:_', 'scroll:_']:
             root_scroll_edges[(fra, til)] = None
         elif label in ['sN:_', 'sN:*']:
-            scroll_edges[(fra, til)] = (None, central)
+            scroll_edges[(fra, til)] = (None, util_graph.is_central(central))
         elif label in ['sT:_', 'sT:*']:
-            scroll_edges[(fra, til)] = (True, central)
+            scroll_edges[(fra, til)] = (True, util_graph.is_central(central))
         elif label in ['sF:_', 'sF:*']:
-            scroll_edges[(fra, til)] = (False, central)
+            scroll_edges[(fra, til)] = (False, util_graph.is_central(central))
         elif label in ['mR:_', 'mG:_', 'mB:_', 'mRG:_', 'mRB:_', 'mGB:_']:
             colors = None
             if label == 'mR:_':
@@ -575,9 +1198,9 @@ def write_graph_dot_codemaster(grs, outstream):
                 colors = 'GB'
             for color in colors:
                 if (til, fra, color) in map_edges:
-                    map_edges[(til, fra, color)] = (True, central or map_edges[(til, fra, color)][1])
+                    map_edges[(til, fra, color)] = (True, util_graph.is_central(central) or map_edges[(til, fra, color)][1])
                 else:
-                    map_edges[(fra, til, color)] = (False, central)
+                    map_edges[(fra, til, color)] = (False, util_graph.is_central(central))
 
         else:
             util_common.check(False, 'edge label: ' + label)
@@ -588,29 +1211,29 @@ def write_graph_dot_codemaster(grs, outstream):
         attrs += f' style="invis"'
         outstream.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
 
-    for (fra, til, color), (both, central) in map_edges.items():
+    for (fra, til, color), (both, highlight) in map_edges.items():
         attrs = ''
-        if central:
+        if highlight:
             attrs += f' penwidth="8"'
         else:
             attrs += f' penwidth="5"'
         if color == 'R':
-            attrs += (f' color="#aa0000"' if central else f' color="#ffaaaa"')
+            attrs += (f' color="#aa0000"' if highlight else f' color="#ffaaaa"')
         elif color == 'G':
-            attrs += (f' color="#00aa00"' if central else f' color="#aaffaa"')
+            attrs += (f' color="#00aa00"' if highlight else f' color="#aaffaa"')
         elif color == 'B':
-            attrs += (f' color="#0000aa"' if central else f' color="#aaaaff"')
+            attrs += (f' color="#0000aa"' if highlight else f' color="#aaaaff"')
         if both:
             attrs += f' arrowhead="none"'
         outstream.write(f'  "{fra}" -> "{til}" [{attrs.strip()}]\n')
 
-    for (fra, til), (what, central) in scroll_edges.items():
+    for (fra, til), (what, highlight) in scroll_edges.items():
         attrs = ''
-        if central:
+        if highlight:
             attrs += f' penwidth="5"'
         else:
             attrs += f' penwidth="2"'
-        attrs += (f' color="#000000"' if central else f' color="#aaaaaa"')
+        attrs += (f' color="#000000"' if highlight else f' color="#aaaaaa"')
         if what is None:
             attrs += f' label=""'
         elif what is True:
@@ -642,7 +1265,7 @@ def get_static_dynamic_label(label):
 
 
 
-def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc, vars_edge_by_id_by_label_etc):
+def add_mkiv(mkiv_info, s, gtype, mkiv_start_nil, mkiv_rule_index_count, mkiv_label_count_layer, mkiv_match_graph_layer, node_labels, vars_node_by_id, edge_labels_etc, vars_edge_by_id_by_label_etc):
     # determine static and dynamic labels from graph description
     def find_static_dynamic_labels(_label, _static_labels, _dynamic_labels):
         _static_label, _dynamic_label = get_static_dynamic_label(_label)
@@ -674,61 +1297,49 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
             if _dynamic_label0 is not None:
                 _dynamic_labels[_dynamic_label0] = None
         if _dynamic_label1 not in _dynamic_labels:
-            util_common.check(_dynamic_label1 is not None, 'label')
-            _dynamic_labels[_dynamic_label1] = None
+            if _dynamic_label1 is not None:
+                _dynamic_labels[_dynamic_label1] = None
 
-    for nodes, edges in mkiv_info.rep_rules:
+    for layer_hint_lo, layer_hint_hi, chain, nodes, edges in mkiv_info.rep_rules:
         for static_node_label, dynamic_node_label0, dynamic_node_label1 in nodes:
             update_static_dynamic_labels(static_node_label, dynamic_node_label0, dynamic_node_label1, static_node_labels, dynamic_node_labels)
 
-        for fra, til, static_edge_label, dynamic_edge_label0, dynamic_edge_label1 in edges:
+        for fra, til, ind_hint_lo, ind_hint_hi, static_edge_label, dynamic_edge_label0, dynamic_edge_label1 in edges:
             update_static_dynamic_labels(static_edge_label, dynamic_edge_label0, dynamic_edge_label1, static_edge_labels, dynamic_edge_labels)
 
-    static_node_labels[None] = [None]
-    dynamic_node_labels[None] = [None]
-    static_edge_labels[None] = [None]
-    dynamic_edge_labels[None] = [None]
+    if not mkiv_start_nil:
+        static_node_labels[None] = [None]
+        dynamic_node_labels[None] = [None]
+        static_edge_labels[None] = [None]
+        dynamic_edge_labels[None] = [None]
 
 
 
-    # make_conj duplicate helper
-    conjs = {}
-    def _check_duple_conj(_vvs):
-        nonlocal s, conjs
-
-        util_common.check(len(_vvs) > 0, 'empty conj')
-
-        _key = tuple(sorted([str(_vv) for _vv in _vvs]))
-
-        if _key not in conjs:
-            if len(_vvs) == 1:
-                conjs[_key] = _vvs[0]
-            else:
-                conjs[_key] = s.make_conj(_vvs, True)
-            return conjs[_key]
-        else:
+    # conj and disj caches
+    def _make_conj_check_dupl(_vvs_and_settings, _cache):
+        nonlocal s
+        _vvs, _settings = zip(*_vvs_and_settings)
+        conj, dupl = util_solvers.make_conj_cache(s, _cache, _vvs, _settings)
+        if dupl:
             return None
+        else:
+            return conj
 
-    # disj duplicate helper
-    disjs = {}
-    def _make_disj(_vvs):
-        nonlocal s, disjs
+    conj_cache = {}
+    def _make_conj(_vvs_and_settings):
+        nonlocal s, conj_cache
+        _vvs, _settings = zip(*_vvs_and_settings)
+        conj, dupl = util_solvers.make_conj_cache(s, conj_cache, _vvs, _settings)
+        return conj
 
-        util_common.check(len(_vvs) > 0, 'empty disj')
+    disj_cache = {}
+    def _make_disj(_vvs_and_settings):
+        nonlocal s, disj_cache
+        _vvs, _settings = zip(*_vvs_and_settings)
+        disj, dupl = util_solvers.make_disj_cache(s, disj_cache, _vvs, _settings)
+        return disj
 
-        _key = tuple(sorted([str(_vv) for _vv in _vvs]))
 
-        if _key not in disjs:
-            if len(_vvs) == 1:
-                disjs[_key] = _vvs[0]
-            else:
-                _disj = s.make_var()
-                for _vv in _vvs:
-                    s.cnstr_implies_disj(_vv, True, [_disj], True, None)
-                s.cnstr_implies_disj(_disj, True, _vvs, True, None)
-                disjs[_key] = _disj
-
-        return disjs[_key]
 
     # always false
     var_false = s.make_var()
@@ -752,7 +1363,7 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
                     if _check_label == _label:
                         _ret[_vv] = None
         util_common.check(len(_ret) != 0, 'no vars')
-        return list(_ret.keys())
+        return [(_vv, True) for _vv in _ret.keys()]
 
     # static node variables
     vars_node_static_by_id = {}
@@ -761,7 +1372,7 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
         vars_node_static_by_id[node] = {}
         for static_node_label, labels in static_node_labels.items():
             if labels is not None:
-                vars_node_static_by_id[node][static_node_label] = _make_disj([vars_node_by_id[node][label] for label in labels])
+                vars_node_static_by_id[node][static_node_label] = _make_disj([(vars_node_by_id[node][label], True) for label in labels])
             else:
                 vars_node_static_by_id[node][static_node_label] = var_false
 
@@ -788,11 +1399,25 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
             if layer == 0:
                 for dynamic_node_label, labels in dynamic_node_labels.items():
                     if labels is not None:
-                        vars_node_dynamic_by_layer_by_id[layer][node][dynamic_node_label] = _make_disj([vars_node_by_id[node][label] for label in labels])
+                        vars_node_dynamic_by_layer_by_id[layer][node][dynamic_node_label] = _make_disj([(vars_node_by_id[node][label], True) for label in labels])
                     else:
                         vars_node_dynamic_by_layer_by_id[layer][node][dynamic_node_label] = var_false
             else:
                 for dynamic_node_label in dynamic_node_labels:
+                    if mkiv_info.layer_hint_labels_node is not None and dynamic_node_label in mkiv_info.layer_hint_labels_node:
+                        layer_hint_lo, layer_hint_hi = mkiv_info.layer_hint_labels_node[dynamic_node_label]
+                        if layer_hint_lo is not None and layer < layer_hint_lo:
+                            continue
+                        if layer_hint_hi is not None and layer > layer_hint_hi:
+                            continue
+
+                    if mkiv_info.id_hint_labels_node is not None and dynamic_node_label in mkiv_info.id_hint_labels_node:
+                        id_hint_lo, id_hint_hi = mkiv_info.id_hint_labels_node[dynamic_node_label]
+                        if id_hint_lo is not None and node < id_hint_lo:
+                            continue
+                        if id_hint_hi is not None and node > id_hint_hi:
+                            continue
+
                     vv = s.make_var()
                     vars_node_dynamic_by_layer_by_id[layer][node][dynamic_node_label] = vv
                 s.cnstr_count(list(vars_node_dynamic_by_layer_by_id[layer][node].values()), True, 1, 1, None)
@@ -825,7 +1450,7 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
         vars_term.append(s.make_var())
 
     # for checking what changed
-    changes_by_layer = {}
+    changes_by_layer = []
 
     for layer in range(mkiv_info.layers - 1):
         # terminal stays set
@@ -833,7 +1458,7 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
             s.cnstr_implies_disj(vars_term[layer], True, [vars_term[layer + 1]], True, None)
 
         # keep track of change vars
-        layer_changes = []
+        layer_changes = {}
 
         # keep track of possible changes at this layer
         layer_changes_by_node = {}
@@ -844,96 +1469,257 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
         for edge in vars_edge_by_id_by_label_etc:
             layer_changes_by_edge[edge] = []
 
-        changes_by_layer[layer] = []
+        changes_by_layer.append({})
+
+        def _node_perm_helper(_node_ids, _num, _directed, _edges, _edges_possible, _curr_perm):
+            _perm_ok_so_far = True
+            _edge_perm = []
+            for _fra, _til, _ind_hint_lo, _ind_hint_hi in _edges:
+                if _fra < len(_curr_perm) and _til < len(_curr_perm):
+                    if _directed:
+                        _fra_ind = _curr_perm[_fra]
+                        _til_ind = _curr_perm[_til]
+                    else:
+                        _fra_ind = min(_curr_perm[_fra], _curr_perm[_til])
+                        _til_ind = max(_curr_perm[_fra], _curr_perm[_til])
+                    if _ind_hint_lo is not None:
+                        if (_ind_hint_lo > 0) and (_til_ind - _fra_ind < _ind_hint_lo):
+                            _perm_ok_so_far = False
+                            break
+                        if (_ind_hint_lo <= 0) and (_fra_ind != -_ind_hint_lo):
+                            _perm_ok_so_far = False
+                            break
+                    if _ind_hint_hi is not None:
+                        if (_ind_hint_hi > 0) and (_til_ind - _fra_ind > _ind_hint_hi):
+                            _perm_ok_so_far = False
+                            break
+                        if (_ind_hint_hi <= 0) and (_til_ind != -_ind_hint_hi):
+                            _perm_ok_so_far = False
+                            break
+                    if (_fra_ind, _til_ind) not in _edges_possible:
+                        _perm_ok_so_far = False
+                        break
+                    _edge_perm.append((_fra_ind, _til_ind))
+
+            if _perm_ok_so_far:
+                if _num == 0:
+                    util_common.check(len(_edges) == len(_edge_perm), 'edge list length')
+                    yield (_curr_perm, _edge_perm)
+                else:
+                    for _node_id in _node_ids:
+                        if _node_id not in _curr_perm:
+                            yield from _node_perm_helper(_node_ids, _num - 1, _directed, _edges, _edges_possible, _curr_perm + (_node_id,))
+
+        def _node_perm(_node_ids, _num, _directed, _edges, _edges_possible):
+            yield from _node_perm_helper(_node_ids, _num, _directed, _edges, _edges_possible, ())
+
+        def _label_and_setting(_label):
+            if _label.startswith(LABEL_RULE_NOT):
+                return (_label[len(LABEL_RULE_NOT):], False)
+            else:
+                return (_label, True)
+
+        use_directed = util_graph.gtype_directed(gtype) and mkiv_info.directed
 
         # connect layers
-        for nodes, edges in mkiv_info.rep_rules:
-            for node_indices in itertools.permutations(vars_node_by_id, len(nodes)):
+        for rule_index, (layer_hint_lo, layer_hint_hi, chain, nodes, edges) in enumerate(mkiv_info.rep_rules):
+            changes_by_layer[layer][rule_index] = []
+
+            # skip if needs to chain from previous
+            if chain is not None and layer == 0:
+                continue
+
+            # layer hints
+            if layer_hint_lo is not None and layer < layer_hint_lo:
+                continue
+            if layer_hint_hi is not None and layer + 1 > layer_hint_hi:
+                continue
+
+            edges_fra_til = [(fra, til, ind_hint_lo, ind_hint_hi) for fra, til, ind_hint_lo, ind_hint_hi, static_edge_label, dynamic_edge_label0, dynamic_edge_label1 in edges]
+            for node_indices, edge_indices in _node_perm(vars_node_by_id, len(nodes), use_directed, edges_fra_til, vars_edge_by_id_by_label_etc):
+                if mkiv_info.id_hint_labels_node is not None:
+                    change_ok = True
+                    for node_ind, (static_node_label, dynamic_node_label0, dynamic_node_label1) in zip(node_indices, nodes):
+                        if not change_ok:
+                            break
+                        for dynamic_node_label in [dynamic_node_label0, dynamic_node_label1]:
+                            if not change_ok:
+                                break
+                            if dynamic_node_label in mkiv_info.id_hint_labels_node:
+                                id_hint_lo, id_hint_hi = mkiv_info.id_hint_labels_node[dynamic_node_label]
+                                if id_hint_lo is not None and node_ind < id_hint_lo:
+                                    change_ok = False
+                                if id_hint_hi is not None and node_ind > id_hint_hi:
+                                    change_ok = False
+                    if not change_ok:
+                        continue
+
                 change_edges, ved_st, ved_in, ved_ou  = [], [], [], []
-                for fra, til, static_edge_label, dynamic_edge_label0, dynamic_edge_label1 in edges:
-                    if util_graph.gtype_directed(gtype) and mkiv_info.directed:
-                        fra_ind = node_indices[fra]
-                        til_ind = node_indices[til]
-                    else:
-                        fra_ind = min(node_indices[fra], node_indices[til])
-                        til_ind = max(node_indices[fra], node_indices[til])
-                    if (fra_ind, til_ind) in vars_edge_by_id_by_label_etc:
+                util_common.check(len(edge_indices) == len(edges), 'edge perm')
+                for (fra_ind, til_ind), (fra, til, ind_hint_lo, ind_hint_hi, static_edge_label, dynamic_edge_label0, dynamic_edge_label1) in zip(edge_indices, edges):
+                    if static_edge_label is not None:
+                        ved_st.append((vars_edge_static_by_id[(fra_ind, til_ind)][static_edge_label], True))
+                    if dynamic_edge_label0 is not None:
+                        dynamic_edge_label0, setting = _label_and_setting(dynamic_edge_label0)
+                        ved_in.append((vars_edge_dynamic_by_layer_by_id[layer+0][(fra_ind, til_ind)][dynamic_edge_label0], setting))
+                    if dynamic_edge_label1 is not None:
+                        ved_ou.append((vars_edge_dynamic_by_layer_by_id[layer+1][(fra_ind, til_ind)][dynamic_edge_label1], True))
                         change_edges.append((fra_ind, til_ind))
-                        if static_edge_label is not None:
-                            ved_st.append(vars_edge_static_by_id[(fra_ind, til_ind)][static_edge_label])
-                        if dynamic_edge_label0 is not None:
-                            ved_in.append(vars_edge_dynamic_by_layer_by_id[layer+0][(fra_ind, til_ind)][dynamic_edge_label0])
-                        util_common.check(dynamic_edge_label1 is not None, 'label')
-                        ved_ou.append(vars_edge_dynamic_by_layer_by_id[layer+1][(fra_ind, til_ind)][dynamic_edge_label1])
-                if len(edges) != len(change_edges):
-                    continue
+                    else:
+                        util_common.check(static_edge_label in [None, LABEL_GEN_STATIC], 'label')
+                        util_common.check(dynamic_edge_label0 is None, 'label')
 
                 change_nodes, vnd_st, vnd_in, vnd_ou = [], [], [], []
+                util_common.check(len(node_indices) == len(nodes), 'node perm')
                 for node_ind, (static_node_label, dynamic_node_label0, dynamic_node_label1) in zip(node_indices, nodes):
-                    change_nodes.append(node_ind)
                     if static_node_label is not None:
-                        vnd_st.append(vars_node_static_by_id[node_ind][static_node_label])
+                        vnd_st.append((vars_node_static_by_id[node_ind][static_node_label], True))
                     if dynamic_node_label0 is not None:
-                        vnd_in.append(vars_node_dynamic_by_layer_by_id[layer+0][node_ind][dynamic_node_label0])
-                    util_common.check(dynamic_node_label1 is not None, 'label')
-                    vnd_ou.append(vars_node_dynamic_by_layer_by_id[layer+1][node_ind][dynamic_node_label1])
+                        dynamic_node_label0, setting = _label_and_setting(dynamic_node_label0)
+                        vnd_in.append((vars_node_dynamic_by_layer_by_id[layer+0][node_ind][dynamic_node_label0], True))
+                    if dynamic_node_label1 is not None:
+                        vnd_ou.append((vars_node_dynamic_by_layer_by_id[layer+1][node_ind][dynamic_node_label1], True))
+                        change_nodes.append(node_ind)
+                    else:
+                        util_common.check(static_node_label in [None, LABEL_GEN_STATIC], 'label')
+                        util_common.check(dynamic_node_label0 is None, 'label')
 
                 change_vars = ved_st + ved_in + ved_ou + vnd_st + vnd_in + vnd_ou
-                change = _check_duple_conj(change_vars)
+                change = _make_conj_check_dupl(change_vars, layer_changes)
 
-                if change is None:
+                if change == None: # prevent the same change from being counted as more than one change
                     continue
 
-                changes_by_layer[layer].append((change_vars, change_nodes, change_edges))
-                layer_changes.append(change)
+                if layer in mkiv_info.multi_layer_force_any:
+                    change_lhs = _make_conj(ved_st + ved_in + vnd_st + vnd_in)
+                    s.cnstr_implies_disj(change_lhs, True, [change], True, None)
+
+                changes_by_layer[layer][rule_index].append((change, change_vars, change_nodes, change_edges))
                 for node_ind in change_nodes:
                     layer_changes_by_node[node_ind].append(change)
                 for edge_ind in change_edges:
                     layer_changes_by_edge[edge_ind].append(change)
 
-        # exactly one change or terminal
-        changes_or_term = layer_changes + [vars_term[layer + 1]]
-        s.cnstr_count(changes_or_term, True, 1, 1, None)
+            # chain from previous
+            if chain is not None:
+                these_changes = [change for change, change_vars, change_nodes, change_edges in changes_by_layer[layer][rule_index]]
+                chain_changes = [change for change, change_vars, change_nodes, change_edges in changes_by_layer[layer - 1][rule_index - chain]]
+                for chain_change in chain_changes:
+                    s.cnstr_implies_disj(chain_change, True, these_changes, True, None)
+                for these_change in these_changes:
+                    s.cnstr_implies_disj(these_change, True, chain_changes, True, None)
+
+        if mkiv_info.multi_allow:
+            if layer not in mkiv_info.multi_layer_allow_none:
+                # at least one change or terminal
+                changes_or_term = list(layer_changes.values()) + [vars_term[layer + 1]]
+                s.cnstr_count(changes_or_term, True, 1, len(changes_or_term), None)
+
+            if layer not in mkiv_info.multi_layer_force_any:
+                # each node part of at most one change
+                for node, changes in layer_changes_by_node.items():
+                    if len(changes) > 0:
+                        s.cnstr_count(changes, True, 0, 1, None)
+
+                # each edge part of at most one change
+                for edge, changes in layer_changes_by_edge.items():
+                    if len(changes) > 0:
+                        s.cnstr_count(changes, True, 0, 1, None)
+
+            else:
+                s.cnstr_count([vars_term[layer + 1]], True, 0, 0, None)
+
+            # no changes during terminal, no terminal during change
+            for change in layer_changes.values():
+                s.cnstr_implies_disj(vars_term[layer + 1], True, [change], False, None)
+                s.cnstr_implies_disj(change, True, [vars_term[layer + 1]], False, None)
+
+        else:
+            # exactly one change or terminal
+            changes_or_term = list(layer_changes.values()) + [vars_term[layer + 1]]
+            s.cnstr_count(changes_or_term, True, 1, 1, None)
 
         # everything is either the same or part of a change
         for node in vars_node_by_id:
             for dynamic_node_label in dynamic_node_labels:
-                vv0 = vars_node_dynamic_by_layer_by_id[layer + 0][node][dynamic_node_label]
-                vv1 = vars_node_dynamic_by_layer_by_id[layer + 1][node][dynamic_node_label]
-                s.cnstr_implies_disj(vv0, True, [vv1] + layer_changes_by_node[node], True, None)
-                #s.cnstr_implies_disj(vv0, False, [vv1] + layer_changes_by_node[node], [False] + [True] * len(layer_changes_by_node[node]), None)
+                vv0 = vars_node_dynamic_by_layer_by_id[layer + 0][node].get(dynamic_node_label)
+                vv1 = vars_node_dynamic_by_layer_by_id[layer + 1][node].get(dynamic_node_label)
+                if vv0 is not None and vv1 is not None:
+                    s.cnstr_implies_disj(vv0, True, [vv1] + layer_changes_by_node[node], True, None)
+                    #s.cnstr_implies_disj(vv0, False, [vv1] + layer_changes_by_node[node], [False] + [True] * len(layer_changes_by_node[node]), None)
+                elif vv0 is not None:
+                    s.cnstr_count([vv0], True, 0, 0, None)
+                elif vv1 is not None:
+                    s.cnstr_count([vv1], True, 0, 0, None)
 
         for edge in vars_edge_by_id_by_label_etc:
             for dynamic_edge_label in dynamic_edge_labels:
-                vv0 = vars_edge_dynamic_by_layer_by_id[layer + 0][edge][dynamic_edge_label]
-                vv1 = vars_edge_dynamic_by_layer_by_id[layer + 1][edge][dynamic_edge_label]
-                s.cnstr_implies_disj(vv0, True, [vv1] + layer_changes_by_edge[edge], True, None)
-                #s.cnstr_implies_disj(vv0, False, [vv1] + layer_changes_by_edge[edge], [False] + [True] * len(layer_changes_by_edge[edge]), None)
+                vv0 = vars_edge_dynamic_by_layer_by_id[layer + 0][edge].get(dynamic_edge_label)
+                vv1 = vars_edge_dynamic_by_layer_by_id[layer + 1][edge].get(dynamic_edge_label)
+                if vv0 is not None and vv1 is not None:
+                    s.cnstr_implies_disj(vv0, True, [vv1] + layer_changes_by_edge[edge], True, None)
+                    #s.cnstr_implies_disj(vv0, False, [vv1] + layer_changes_by_edge[edge], [False] + [True] * len(layer_changes_by_edge[edge]), None)
+                elif vv0 is not None:
+                    s.cnstr_count([vv0], True, 0, 0, None)
+                elif vv1 is not None:
+                    s.cnstr_count([vv1], True, 0, 0, None)
 
+    # rule index variables
+    if mkiv_rule_index_count is not None:
+        vars_rule_index = {}
+        for rule_index in range(len(mkiv_info.rep_rules)):
+            vars_rule_index[rule_index] = []
 
+        for layer in range(mkiv_info.layers - 1):
+            for rule_index in range(len(mkiv_info.rep_rules)):
+                for change, change_vars, change_nodes, change_edges in changes_by_layer[layer][rule_index]:
+                    vars_rule_index[rule_index].append(change)
+
+        for rule_index, rule_count in mkiv_rule_index_count.items():
+            util_common.check(rule_count <= len(vars_rule_index[rule_index]), 'not enough rule counts')
+            s.cnstr_count(vars_rule_index[rule_index], True, rule_count, rule_count, None)
 
     # count constraints
-    def _add_count_cnstr(_ids, _vv_map, _labels, _count):
+    def _to_tuple(_labels):
         if type(_labels) == tuple:
-            _vvs = [_vv_map[_id][_label] for _id in _ids for _label in _labels]
+            return _labels
         else:
-            _vvs = [_vv_map[_id][_labels] for _id in _ids]
+            return (_labels,)
+
+    def _add_count_cnstr_var(_vvs, _count):
         _count = _count(len(_vvs)) if callable(_count) else _count
         _lo, _hi = _count if type(_count) == tuple else (_count, _count)
         _hi = len(_vvs) if _hi is None else _hi
         s.cnstr_count(_vvs, True, _lo, _hi, None)
 
+    def _add_count_cnstr_map(_vv_map, _layers, _ids, _labels, _count):
+        _vvs = []
+
+        if _layers is None:
+            _vv_map = {None: _vv_map}
+
+        for _layer in _to_tuple(_layers):
+            for _id in _ids:
+                for _label in _to_tuple(_labels):
+                    if _label in _vv_map[_layer][_id]:
+                        _vvs.append(_vv_map[_layer][_id][_label])
+
+        _add_count_cnstr_var(_vvs, _count)
+
     for static_labels, count in mkiv_info.static_node_count.items():
-        _add_count_cnstr(vars_node_by_id.keys(), vars_node_static_by_id, static_labels, count)
+        _add_count_cnstr_map(vars_node_static_by_id, None, vars_node_by_id.keys(), static_labels, count)
 
     for dynamic_labels, count in mkiv_info.dynamic_node_init_count.items():
-        _add_count_cnstr(vars_node_by_id.keys(), vars_node_dynamic_by_layer_by_id[0], dynamic_labels, count)
+        _add_count_cnstr_map(vars_node_dynamic_by_layer_by_id, 0, vars_node_by_id.keys(), dynamic_labels, count)
+
+    for (dynamic_labels, count_layers), count in mkiv_info.dynamic_node_step_count.items():
+        _add_count_cnstr_map(vars_node_dynamic_by_layer_by_id, count_layers, vars_node_by_id.keys(), dynamic_labels, count)
 
     for dynamic_labels, count in mkiv_info.dynamic_node_fini_count.items():
-        _add_count_cnstr(vars_node_by_id.keys(), vars_node_dynamic_by_layer_by_id[mkiv_info.layers - 1], dynamic_labels, count)
+        _add_count_cnstr_map(vars_node_dynamic_by_layer_by_id, mkiv_info.layers - 1, vars_node_by_id.keys(), dynamic_labels, count)
 
     for dynamic_labels, count in mkiv_info.dynamic_edge_fini_count.items():
-        _add_count_cnstr(vars_edge_by_id_by_label_etc.keys(), vars_edge_dynamic_by_layer_by_id[mkiv_info.layers - 1], dynamic_labels, count)
+        _add_count_cnstr_map(vars_edge_dynamic_by_layer_by_id, mkiv_info.layers - 1, vars_edge_by_id_by_label_etc.keys(), dynamic_labels, count)
 
     # implies constraints
     for static_label, dynamic_label in mkiv_info.static_implies_dynamic_fini:
@@ -948,13 +1734,48 @@ def add_mkiv(mkiv_info, s, gtype, node_labels, vars_node_by_id, edge_labels_etc,
             static_var = vars_node_static_by_id[node][static_label]
             s.cnstr_implies_disj(dynamic_var, True, [static_var], True, None)
 
+    # more count constraints
+    if mkiv_label_count_layer is not None:
+        label_count, label_layer = mkiv_label_count_layer
+        use_layer = label_layer if label_layer is not None else mkiv_info.layers - 1
+
+        for label, count in label_count.items():
+            vvs = [vars_node_dynamic_by_layer_by_id[use_layer][node][label] for node in vars_node_by_id if label in vars_node_dynamic_by_layer_by_id[use_layer][node]]
+            s.cnstr_count(vvs, True, count, count, None)
+
+    # match contraints
+    match_layer = None
+    match_nodes = {}
+    match_edges = {}
+    if mkiv_match_graph_layer is not None:
+        match_graph, match_layer = mkiv_match_graph_layer
+        gr = match_graph.graphs[0]
+        use_layer = match_layer if match_layer is not None else mkiv_info.layers - 1
+
+        for node in gr.nodes:
+            if util_graph.is_central(gr.nodes[node][util_graph.GATTR_CENTRAL]):
+                node_key = int(node)
+                dynamic_label = gr.nodes[node][util_graph.GATTR_LABEL]
+                s.cnstr_count([vars_node_dynamic_by_layer_by_id[use_layer][node_key][dynamic_label]], True, 1, 1, None)
+                match_nodes[node_key] = None
+
+        for edge in gr.edges:
+            if util_graph.is_central(gr.edges[edge][util_graph.GATTR_CENTRAL]):
+                edge_key = (int(edge[0]), int(edge[1]))
+                dynamic_label = gr.edges[edge][util_graph.GATTR_LABEL]
+                s.cnstr_count([vars_edge_dynamic_by_layer_by_id[use_layer][edge_key][dynamic_label]], True, 1, 1, None)
+                match_edges[edge_key] = None
+
     layers = mkiv_info.layers
-    return s, layers, vars_term, vars_node_static_by_id, vars_node_dynamic_by_layer_by_id, vars_edge_static_by_id, vars_edge_dynamic_by_layer_by_id, changes_by_layer
+    multi_allow = mkiv_info.multi_allow
+    static_label_all = mkiv_info.static_label_all
+
+    return s, layers, multi_allow, static_label_all, vars_term, vars_node_static_by_id, vars_node_dynamic_by_layer_by_id, vars_edge_static_by_id, vars_edge_dynamic_by_layer_by_id, changes_by_layer, match_layer, match_nodes, match_edges
 
 
 
 def update_result(mkiv_tuple, result_info):
-    s, layers, vars_term, vars_node_static_by_id, vars_node_dynamic_by_layer_by_id, vars_edge_static_by_id, vars_edge_dynamic_by_layer_by_id, changes_by_layer = mkiv_tuple
+    s, layers, multi_allow, static_label_all, vars_term, vars_node_static_by_id, vars_node_dynamic_by_layer_by_id, vars_edge_static_by_id, vars_edge_dynamic_by_layer_by_id, changes_by_layer, match_layer, match_nodes, match_edges = mkiv_tuple
 
     util_common.check(len(result_info.graphs.graphs) == 1, 'only one graph expected')
     util_common.check(result_info.playthrough_info is None, 'playthrough already set')
@@ -975,9 +1796,14 @@ def update_result(mkiv_tuple, result_info):
 
     prev_dynamic_node_labels = {}
     prev_dynamic_edge_labels = {}
-    prev_term = False
+    prev_term = None
+
     for layer in range(layers):
+        step = util_graph.GraphPlaythroughStepInfo()
+        result_info.playthrough_info.append(step)
+
         is_term = vars_term[layer] is not None and s.get_var(vars_term[layer])
+        next_term = layer + 1 == layers or (vars_term[layer + 1] is not None and s.get_var(vars_term[layer + 1]))
         util_common.check(not prev_term or is_term, 'term unset')
 
         mapping = {node:str(layer) + '__' + str(node) for node in vars_node_static_by_id}
@@ -990,15 +1816,15 @@ def update_result(mkiv_tuple, result_info):
         nx.set_edge_attributes(layer_graph, None, util_graph.GATTR_LABEL)
         nx.set_edge_attributes(layer_graph, False, util_graph.GATTR_CENTRAL)
 
-        step = util_graph.GraphPlaythroughStepInfo()
         step.term = is_term
         step.first_term = is_term and not prev_term
+
         step.graphs = util_graph.Graphs()
         step.graphs.gtype = result_info.graphs.gtype
         step.graphs.colors = result_info.graphs.colors
         step.graphs.graphs = [layer_graph]
 
-        result_info.playthrough_info.append(step)
+        change_index = 1
 
         for node, vvs in vars_node_dynamic_by_layer_by_id[layer].items():
             static_node_label = static_node_labels[node]
@@ -1007,16 +1833,28 @@ def update_result(mkiv_tuple, result_info):
             if dynamic_node_label != None:
                 util_common.check(node in first_graph.nodes, 'node appeared')
 
+                dynamic_node_label_disp = dynamic_node_label
+                if node in match_nodes:
+                    if match_layer is None and next_term:
+                        dynamic_node_label_disp = '[' + dynamic_node_label + ']'
+                    elif match_layer == layer:
+                        dynamic_node_label_disp = '(' + dynamic_node_label + ')'
+
                 if is_term:
                     if node in prev_dynamic_node_labels:
                         util_common.check(dynamic_node_label == prev_dynamic_node_labels[node], 'label changed after terminal')
-                    if not prev_term and is_term and relabel_first:
+                    if not prev_term and relabel_first:
                         first_graph.nodes[node][util_graph.GATTR_LABEL] += '|'
                 elif relabel_first:
                     first_graph.nodes[node][util_graph.GATTR_LABEL] += '\\n' if layer == 0 else ';'
-                    first_graph.nodes[node][util_graph.GATTR_LABEL] += dynamic_node_label
+                    first_graph.nodes[node][util_graph.GATTR_LABEL] += dynamic_node_label_disp
 
-                layer_graph.nodes[mapping[node]][util_graph.GATTR_LABEL] = make_label(static_node_label, dynamic_node_label)
+                if static_label_all is not None:
+                    util_common.check(static_node_label == static_label_all, 'static_label_all')
+                    node_label = dynamic_node_label_disp
+                else:
+                    node_label = make_label(static_node_label, dynamic_node_label_disp)
+                layer_graph.nodes[mapping[node]][util_graph.GATTR_LABEL] = node_label
 
             else:
                 util_common.check(node not in first_graph.nodes, 'node disappeared')
@@ -1030,16 +1868,28 @@ def update_result(mkiv_tuple, result_info):
             if dynamic_edge_label != None:
                 util_common.check(edge in first_graph.edges, 'edge appeared')
 
+                dynamic_edge_label_disp = dynamic_edge_label
+                if edge in match_edges:
+                    if match_layer is None and next_term:
+                        dynamic_edge_label_disp = '[' + dynamic_edge_label + ']'
+                    elif match_layer == layer:
+                        dynamic_edge_label_disp = '(' + dynamic_edge_label + ')'
+
                 if is_term:
                     if edge in prev_dynamic_edge_labels:
                         util_common.check(dynamic_edge_label == prev_dynamic_edge_labels[edge], 'label changed after terminal')
-                    if not prev_term and is_term and relabel_first:
+                    if not prev_term and relabel_first:
                         first_graph.edges[edge][util_graph.GATTR_LABEL] += '|'
                 elif relabel_first:
                     first_graph.edges[edge][util_graph.GATTR_LABEL] += '\\n' if layer == 0 else ';'
-                    first_graph.edges[edge][util_graph.GATTR_LABEL] += dynamic_edge_label
+                    first_graph.edges[edge][util_graph.GATTR_LABEL] += dynamic_edge_label_disp
 
-                layer_graph.edges[mapping[edge]][util_graph.GATTR_LABEL] = make_label(static_edge_label, dynamic_edge_label)
+                if static_label_all is not None:
+                    util_common.check(static_edge_label == static_label_all, 'static_label_all')
+                    edge_label = dynamic_edge_label_disp
+                else:
+                    edge_label = make_label(static_edge_label, dynamic_edge_label_disp)
+                layer_graph.edges[mapping[edge]][util_graph.GATTR_LABEL] = edge_label
 
             else:
                 util_common.check(edge not in first_graph.edges, 'edge disappeared')
@@ -1047,12 +1897,24 @@ def update_result(mkiv_tuple, result_info):
             prev_dynamic_edge_labels[edge] = dynamic_edge_label
 
         if layer != 0:
-            for change_vars, change_nodes, change_edges in changes_by_layer[layer - 1]:
-                if util_solvers.are_all_set(s, change_vars):
-                    for node in change_nodes:
-                        layer_graph.nodes[mapping[node]][util_graph.GATTR_CENTRAL] = True
-                    for fra, til in change_edges:
-                        layer_graph.edges[(mapping[fra], mapping[til])][util_graph.GATTR_CENTRAL] = True
+            for rule_index in changes_by_layer[layer - 1]:
+                for change, change_vars, change_nodes, change_edges in changes_by_layer[layer - 1][rule_index]:
+                    if util_solvers.are_all_set_to(s, change_vars):
+                        for node in change_nodes:
+                            layer_graph.nodes[mapping[node]][util_graph.GATTR_CENTRAL] = rule_index
+                        for fra, til in change_edges:
+                            layer_graph.edges[(mapping[fra], mapping[til])][util_graph.GATTR_CENTRAL] = rule_index
+
+        for fra, til in list(layer_graph.edges):
+            if layer_graph.edges[(fra, til)][util_graph.GATTR_LABEL] in [LABEL_GEN_NIL, LABEL_GEN_DYN_NIL]:
+                layer_graph.remove_edge(fra, til)
+            else:
+                util_common.check(layer_graph.nodes[fra][util_graph.GATTR_LABEL] not in [LABEL_GEN_NIL, LABEL_GEN_DYN_NIL], 'edge has nil node')
+                util_common.check(layer_graph.nodes[til][util_graph.GATTR_LABEL] not in [LABEL_GEN_NIL, LABEL_GEN_DYN_NIL], 'edge has nil node')
+
+        for node in list(layer_graph.nodes):
+            if layer_graph.nodes[node][util_graph.GATTR_LABEL] in [LABEL_GEN_NIL, LABEL_GEN_DYN_NIL]:
+                layer_graph.remove_node(node)
 
         prev_term = is_term
 
@@ -1068,9 +1930,9 @@ def save_graph_result_info_mkiv(result_info, prefix, no_dot):
     os.makedirs(play_folder)
 
     for ii, step_info in enumerate(result_info.playthrough_info):
-        descr = ['term' if step_info.term else 'step']
+        descr = 'term' if step_info.term else 'step'
 
-        step_prefix = play_folder + ('/%02d_' % ii) + '_'.join(descr) + '_play'
+        step_prefix = play_folder + ('/%02d_' % ii) + descr + '_step'
 
         util_graph.save_graph_gr_dot(step_info.graphs, step_prefix, no_dot)
 

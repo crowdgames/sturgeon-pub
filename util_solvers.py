@@ -177,6 +177,66 @@ def are_all_set(solver, vvs):
             return False
     return True
 
+def are_all_set_to(solver, vvs_and_settings):
+    util_common.check(len(vvs_and_settings) != 0, 'no vars to check')
+    for vv, setting in vvs_and_settings:
+        if solver.get_var(vv) != setting:
+            return False
+    return True
+
+
+
+def unpack_settings(vvs, settings):
+    if settings in [True, False]:
+        settings = [settings for vv in vvs]
+
+    util_common.check(len(vvs) == len(settings), 'different vvs and settings lengths')
+    return settings
+
+def cache_key(vvs, settings):
+    return tuple(sorted([(str(vv), setting) for vv, setting in zip(vvs, settings)]))
+
+def make_conj_cache(solver, cache, vvs, settings):
+    util_common.check(len(vvs) > 0, 'cache empty conj')
+
+    settings = unpack_settings(vvs, settings)
+    key = cache_key(vvs, settings)
+    duplicate = True
+
+    if key not in cache:
+        duplicate = False
+        if len(vvs) == 1 and settings[0]:
+            cache[key] = vvs[0]
+        else:
+            cache[key] = solver.make_conj(vvs, settings)
+
+    return cache[key], duplicate
+
+def cnstr_disj(solver, vv_disj, vvs, settings):
+    settings = unpack_settings(vvs, settings)
+
+    for vv, setting in zip(vvs, settings):
+        solver.cnstr_implies_disj(vv, setting, [vv_disj], True, None)
+    solver.cnstr_implies_disj(vv_disj, True, vvs, settings, None)
+
+def make_disj_cache(solver, cache, vvs, settings):
+    util_common.check(len(vvs) > 0, 'cache empty disj')
+
+    settings = unpack_settings(vvs, settings)
+    key = cache_key(vvs, settings)
+    duplicate = True
+
+    if key not in cache:
+        duplicate = False
+        if len(vvs) == 1 and settings[0]:
+            cache[key] = vvs[0]
+        else:
+            cache[key] = solver.make_var()
+            cnstr_disj(solver, cache[key], vvs, settings)
+
+
+    return cache[key], duplicate
+
 
 
 class _Solver:
@@ -249,11 +309,7 @@ def _unwrap_lit_lconj(vv, setting, negate_func):
     return vv
 
 def _unwrap_lit_lconjs(vvs, settings, negate_func):
-    if settings in [True, False]:
-        settings = [settings for vv in vvs]
-    else:
-        util_common.check(len(vvs) == len(settings), 'different vvs and settings lengths')
-
+    settings = unpack_settings(vvs, settings)
     return [_unwrap_lit_lconj(vv, setting, negate_func) for vv, setting in zip(vvs, settings)]
 
 def _is_xform_t(vv):

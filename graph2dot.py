@@ -13,6 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--grid', action='store_true', help='Layout as grid.')
     parser.add_argument('--no-dot-etc', action='store_true', help='Don\t append extra attributes to dot output.')
     parser.add_argument('--scale', type=float, help='Amount to scale node size.', default=1.0)
+    parser.add_argument('--central-color', action='store_true', help='Use central attribute colors.')
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('--soko', action='store_true', help='Style as soko.')
     group.add_argument('--lightsout', action='store_true', help='Style as lightsout.')
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     elif args.codemaster:
         write_fn = lambda _out: util_mkiv.write_graph_dot_codemaster(grs, _out)
     else:
-        write_fn = lambda _out: util_graph.write_graph_dot(grs, args.no_dot_etc, False, args.scale, _out)
+        write_fn = lambda _out: util_graph.write_graph_dot(grs, args.no_dot_etc, False, args.central_color, args.scale, _out)
 
     if args.outfile is None:
         write_fn(sys.stdout)

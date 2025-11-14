@@ -17,9 +17,17 @@ EDGEOPT_DBAND       = 'dband'
 EDGEOPT_CODEMASTER  = 'codemaster'
 EDGEOPT_LIST        = [EDGEOPT_TRI, EDGEOPT_BAND, EDGEOPT_STRIPE, EDGEOPT_GRID, EDGEOPT_RECT, EDGEOPT_DBAND, EDGEOPT_CODEMASTER]
 
-def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_min, label_max, label_count, forbid_cycle, require_cycle, connect, mkiv_setup, randomize):
+
+
+def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_min, label_max, label_count, forbid_cycle, require_cycle, connect, mkiv_setup, mkiv_start_nil, mkiv_rule_index_count, mkiv_label_count_layer, mkiv_match_graph_layer, edge_print_internal, randomize):
     # set up solver vars
     util_common.timer_section('set up')
+
+    util_common.check(min_size > 0, 'size')
+    util_common.check(max_size > 0, 'size')
+    util_common.check(min_size <= max_size, 'size')
+    if mkiv_start_nil:
+        util_common.check(min_size == max_size, 'mkiv_start_nil size')
 
     if edgeopt_name in [EDGEOPT_GRID, EDGEOPT_RECT]:
         edge_labels = {}
@@ -89,7 +97,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
         util_common.check(s.supports_xforms(), 'has edge deltas but solver does not support transformations')
 
     # node labels
-    node_labels_plus_none = list(grd.node_labels) + [None]
+    node_labels_plus_none = list(grd.node_labels) + ([None] if not mkiv_start_nil else [])
 
     vars_nodes_by_label = {}
     for ll in node_labels_plus_none:
@@ -134,19 +142,14 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
         util_common.check(len(_ret) == 1, 'edge labels')
         return _ret[0]
 
-    edge_labels_etc_plus_none = list(grd.edge_labels_etc) + [None]
+    edge_labels_etc_plus_none = list(grd.edge_labels_etc) + ([None] if not mkiv_start_nil else [])
 
     vars_edges_by_label_etc = {}
     for ll in edge_labels_etc_plus_none:
         vars_edges_by_label_etc[ll] = []
 
-    PRINT_EDGES = False
-
     vars_edge_by_id_by_label_etc = {}
     for ii in node_id_order:
-        if PRINT_EDGES:
-            sys.stdout.write(f'{ii} ->')
-
         if edgeopt_name == EDGEOPT_TRI:
             jjs = range(ii + 1, max_size)
         elif edgeopt_name == EDGEOPT_BAND:
@@ -175,12 +178,6 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
         for jj in jjs:
             util_common.check(0 <= jj and jj < max_size, 'out of bounds edge')
 
-            if PRINT_EDGES:
-                sys.stdout.write(f' {jj}')
-                if type(jjs) == dict:
-                    jj_str = ' '.join(jjs[jj])
-                    sys.stdout.write(f'[{jj_str}]')
-
             ii_jj = (ii, jj)
 
             vars_edge_by_id_by_label_etc[ii_jj] = {}
@@ -207,10 +204,17 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
                     edge = edge_with_label(vars_edge_by_id_by_label_etc[ii_jj], east_label)
                     s.cnstr_count([vars_edge_by_id_by_label_etc[ii_jj][None], edge], True, 1, 1, None)
 
-        if PRINT_EDGES:
+    if edge_print_internal:
+        total = 0
+        for ii in range(max_size):
+            for jj in range(max_size):
+                if (ii, jj) in vars_edge_by_id_by_label_etc:
+                    sys.stdout.write('x')
+                    total += 1
+                else:
+                    sys.stdout.write('.')
             sys.stdout.write('\n')
-    if PRINT_EDGES:
-        sys.exit(-1)
+        sys.stdout.write(f'{total}\n')
 
     # cycles
     if forbid_cycle or require_cycle:
@@ -258,10 +262,14 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
                     s.cnstr_implies_xform(edge_var, node_vars_ii, node_vars_jj, dxform, delta_primary)
 
     # how many nodes can be missing
-    s.cnstr_count(vars_nodes_by_label[None], True, 0, max_size - min_size, None)
+    if not mkiv_start_nil:
+        s.cnstr_count(vars_nodes_by_label[None], True, 0, max_size - min_size, None)
 
     # connected
-    if connect == CONNECT_REACH:
+    if mkiv_start_nil:
+        pass
+
+    elif connect == CONNECT_REACH:
         vars_node_connect = []
         for ii in range(max_size):
             vars_node_connect.append(s.make_var())
@@ -376,6 +384,12 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
     # add neighbor constraints
     util_common.timer_section('add neighbor constraints')
 
+    if mkiv_start_nil:
+        start_vars = []
+        for ii in node_id_order:
+            start_vars.append(vars_node_by_id[ii][util_mkiv.LABEL_GEN_START])
+        s.cnstr_count(start_vars, True, 1, 1, None)
+
     for ii in node_id_order:
         nbr_edges = {}
         possible_nbr_nodes = {}
@@ -389,80 +403,88 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
                 nbr_edges[(jj, ii)] = None
                 possible_nbr_nodes[jj] = None
 
-        # missing node has no edges; using conj seems to work better than multiple individual implies
-        s.cnstr_implies_disj(vars_node_by_id[ii][None], True, [s.make_conj([vars_edge_by_id_by_label_etc[edge][None] for edge in nbr_edges], [True] * len(nbr_edges))], True, None)
+        if mkiv_start_nil:
+            s.cnstr_count([vars_node_by_id[ii][util_mkiv.LABEL_GEN_START], vars_node_by_id[ii][util_mkiv.LABEL_GEN_NIL]], True, 1, 1, None)
 
-        # apply from description
-        for label in grd.node_labels:
-            patts = []
-            for central_subnode, subnodes, subedges in grd.node_label_subgraphs[label]:
-                node_inds_set = itertools.permutations(possible_nbr_nodes, len(subnodes) - 1)
-                other_subnodes = [subnode for subnode in subnodes if subnode != central_subnode]
-                util_common.check(len(other_subnodes) == len(subnodes) - 1, 'sizes')
+            for jj in possible_nbr_nodes:
+                if (ii, jj) in vars_edge_by_id_by_label_etc:
+                    s.cnstr_count([edge_with_label(vars_edge_by_id_by_label_etc[(ii, jj)], util_mkiv.LABEL_GEN_NIL)], True, 1, 1, None)
 
-                for node_inds in node_inds_set:
-                    subnode_id_mapping = {}
-                    subnode_id_mapping[central_subnode] = ii
-                    for node_ind, subnode in zip(node_inds, other_subnodes):
-                        subnode_id_mapping[subnode] = node_ind
+        else:
+            # missing node has no edges; using conj seems to work better than multiple individual implies
+            s.cnstr_implies_disj(vars_node_by_id[ii][None], True, [s.make_conj([vars_edge_by_id_by_label_etc[edge][None] for edge in nbr_edges], [True] * len(nbr_edges))], True, None)
 
-                    any_missing_edges = False
+            # apply from description
+            for label in grd.node_labels:
+                patts = []
+                for central_subnode, subnodes, subedges in grd.node_label_subgraphs[label]:
+                    node_inds_set = itertools.permutations(possible_nbr_nodes, len(subnodes) - 1)
+                    other_subnodes = [subnode for subnode in subnodes if subnode != central_subnode]
+                    util_common.check(len(other_subnodes) == len(subnodes) - 1, 'sizes')
 
-                    node_labels = {}
-                    for node, node_label in subnodes.items():
-                        if node_label is not None:
-                            node_labels[subnode_id_mapping[node]] = node_label
+                    for node_inds in node_inds_set:
+                        subnode_id_mapping = {}
+                        subnode_id_mapping[central_subnode] = ii
+                        for node_ind, subnode in zip(node_inds, other_subnodes):
+                            subnode_id_mapping[subnode] = node_ind
 
-                    edge_labels = {}
-                    for (fra, til), edge_label_etc in subedges.items():
-                        fra = subnode_id_mapping[fra]
-                        til = subnode_id_mapping[til]
+                        any_missing_edges = False
 
-                        if util_graph.gtype_directed(grd.gtype):
-                            if util_graph.gtype_directed_cyclic(grd.gtype):
-                                util_common.check(use_edge_deltas is None, 'directed cyclic edge delta')
-                                util_common.check(use_edge_polars is None, 'directed cyclic edge polar')
+                        node_labels = {}
+                        for node, node_label in subnodes.items():
+                            if node_label is not None:
+                                node_labels[subnode_id_mapping[node]] = node_label
+
+                        edge_labels = {}
+                        for (fra, til), edge_label_etc in subedges.items():
+                            fra = subnode_id_mapping[fra]
+                            til = subnode_id_mapping[til]
+
+                            if util_graph.gtype_directed(grd.gtype):
+                                if util_graph.gtype_directed_cyclic(grd.gtype):
+                                    util_common.check(use_edge_deltas is None, 'directed cyclic edge delta')
+                                    util_common.check(use_edge_polars is None, 'directed cyclic edge polar')
+                                else:
+                                    if fra >= til:
+                                        any_missing_edges = True
+                                        break
+                                ei, ej = fra, til
                             else:
-                                if fra >= til:
-                                    any_missing_edges = True
-                                    break
-                            ei, ej = fra, til
-                        else:
-                            util_common.check(use_edge_deltas is None, 'undirected edge delta') # TODO edge flip vars ?
-                            util_common.check(use_edge_polars is None, 'undirected edge polar')
-                            ei, ej = min(fra, til), max(fra, til)
+                                util_common.check(use_edge_deltas is None, 'undirected edge delta') # TODO edge flip vars ?
+                                util_common.check(use_edge_polars is None, 'undirected edge polar')
+                                ei, ej = min(fra, til), max(fra, til)
 
-                        if (ei, ej) not in vars_edge_by_id_by_label_etc:
-                            any_missing_edges = True
-                            break
+                            if (ei, ej) not in vars_edge_by_id_by_label_etc:
+                                any_missing_edges = True
+                                break
 
-                        edge_labels[(ei, ej)] = edge_label_etc
+                            edge_labels[(ei, ej)] = edge_label_etc
 
-                    if any_missing_edges:
-                        continue
+                        if any_missing_edges:
+                            continue
 
-                    nodev = []
-                    for node_ind, node_label in node_labels.items():
-                        nodev.append(vars_node_by_id[node_ind][node_label])
+                        nodev = []
+                        for node_ind, node_label in node_labels.items():
+                            nodev.append(vars_node_by_id[node_ind][node_label])
 
-                    edgev = []
-                    for (ei, ej), edge_label_etc in edge_labels.items():
-                        edgev.append(vars_edge_by_id_by_label_etc[(ei, ej)][edge_label_etc])
-                    for ei, ej in nbr_edges:
-                        if (ei, ej) not in edge_labels:
-                            edgev.append(vars_edge_by_id_by_label_etc[(ei, ej)][None])
+                        edgev = []
+                        for (ei, ej), edge_label_etc in edge_labels.items():
+                            edgev.append(vars_edge_by_id_by_label_etc[(ei, ej)][edge_label_etc])
+                        for ei, ej in nbr_edges:
+                            if (ei, ej) not in edge_labels:
+                                edgev.append(vars_edge_by_id_by_label_etc[(ei, ej)][None])
 
-                    patts.append(s.make_conj(nodev + edgev, [True] * (len(nodev) + len(edgev))))
+                        patts.append(s.make_conj(nodev + edgev, [True] * (len(nodev) + len(edgev))))
 
-            if len(patts) == 0:
-                s.cnstr_count([vars_node_by_id[ii][label]], True, 0, 0, None)
-            else:
-                s.cnstr_implies_disj(vars_node_by_id[ii][label], True, patts, True, None)
+                if len(patts) == 0:
+                    s.cnstr_count([vars_node_by_id[ii][label]], True, 0, 0, None)
+                else:
+                    s.cnstr_implies_disj(vars_node_by_id[ii][label], True, patts, True, None)
 
     if mkiv_setup is not None:
         util_common.timer_section('add mkiv')
         mkiv_info = util_mkiv.get_example_info(mkiv_setup)
-        mkiv_tuple = util_mkiv.add_mkiv(mkiv_info, s, grd.gtype, list(grd.node_labels), vars_node_by_id, list(grd.edge_labels_etc), vars_edge_by_id_by_label_etc)
+        mkiv_tuple = util_mkiv.add_mkiv(mkiv_info, s, grd.gtype, mkiv_start_nil, mkiv_rule_index_count, mkiv_label_count_layer, mkiv_match_graph_layer, list(grd.node_labels), vars_node_by_id, list(grd.edge_labels_etc), vars_edge_by_id_by_label_etc)
 
     util_common.timer_section('solve')
 
@@ -557,8 +579,15 @@ if __name__ == '__main__':
 
     parser.add_argument('--mkiv-example', type=str, choices=util_mkiv.EXAMPLES, help='MKIV example name, from: ' + ','.join(util_mkiv.EXAMPLES) + '.')
     parser.add_argument('--mkiv-layers', type=int, help='MKIV number of layers.')
+    parser.add_argument('--mkiv-start-nil', action='store_true', help='Instead of using patterns, make a complete start-nil graph.')
+    parser.add_argument('--mkiv-rule-count', type=str, nargs='+', default=None, help='Counts of rule indices.')
+    parser.add_argument('--mkiv-label-count', type=str, nargs='+', default=None, help='Node label counts.')
+    parser.add_argument('--mkiv-label-layer', type=int, help='Layer to count at.')
+    parser.add_argument('--mkiv-match-graph', type=str, help='Graph to match.')
+    parser.add_argument('--mkiv-match-layer', type=int, help='Layer to match at.')
 
     parser.add_argument('--edgeopt', type=str, default=EDGEOPT_TRI, help='Edge options, from: ' + ','.join(EDGEOPT_LIST) + '.')
+    parser.add_argument('--edge-print-internal', action='store_true', help='Display some extra internal information about edges.')
     parser.add_argument('--connect', type=str, choices=CONNECT_LIST, default=CONNECT_REACH, help='Connect approach name, from: ' + ','.join(CONNECT_LIST) + '.')
     parser.add_argument('--randomize', type=int, help='Randomize based on given number.')
 
@@ -585,7 +614,6 @@ if __name__ == '__main__':
 
 
     mkiv_setup = None
-
     if args.mkiv_example or args.mkiv_layers:
         if not args.mkiv_example or not args.mkiv_layers:
             parser.error('must use --mkiv-example and --mkiv-layers together')
@@ -594,12 +622,35 @@ if __name__ == '__main__':
         mkiv_setup.example = args.mkiv_example
         mkiv_setup.layers = args.mkiv_layers
 
+    mkiv_rule_index_count = None
+    if args.mkiv_rule_count is not None:
+        util_common.check(mkiv_setup is not None, 'needs --mkiv-example')
+        mkiv_rule_index_count = util_common.arg_list_to_dict_int_int(parser, '--mkiv-rule-count', args.mkiv_rule_count)
+        util_common.check(None not in mkiv_rule_index_count, 'must provide all keys')
 
+    mkiv_label_count_layer = None
+    if args.mkiv_label_count is not None:
+        util_common.check(mkiv_setup is not None, 'needs --mkiv-example')
+        mkiv_label_count_layer = (util_common.arg_list_to_dict_str_int(parser, '--mkiv-label-count', args.mkiv_label_count), None)
+        util_common.check(None not in mkiv_label_count_layer[0], 'must provide all keys')
+    if args.mkiv_label_layer is not None:
+        util_common.check(mkiv_setup is not None, 'needs --mkiv-example')
+        util_common.check(mkiv_label_count_layer is not None, 'need --mkiv-label-count with --mkiv-label-layer')
+        mkiv_label_count_layer = (mkiv_label_count_layer[0], args.mkiv_label_layer)
+
+    mkiv_match_graph_layer = None
+    if args.mkiv_match_graph is not None:
+        util_common.check(mkiv_setup is not None, 'needs --mkiv-example')
+        mkiv_match_graph_layer = (util_graph.read_graphs([args.mkiv_match_graph]), None)
+    if args.mkiv_match_layer is not None:
+        util_common.check(mkiv_setup is not None, 'needs --mkiv-example')
+        util_common.check(mkiv_match_graph_layer is not None, 'need --mkiv-match-graph with --mkiv-match-layer')
+        mkiv_match_graph_layer = (mkiv_match_graph_layer[0], args.mkiv_match_layer)
 
     with util_common.openz(args.gdescfile, 'rb') as f:
         grd = pickle.load(f)
 
-    result_info = gdesc2graph(solver, grd, args.minsize, args.maxsize, edgeopt_name, edgeopt_params, label_min, label_max, args.label_count, args.cycle_no, args.cycle_yes, args.connect, mkiv_setup, args.randomize)
+    result_info = gdesc2graph(solver, grd, args.minsize, args.maxsize, edgeopt_name, edgeopt_params, label_min, label_max, args.label_count, args.cycle_no, args.cycle_yes, args.connect, mkiv_setup, args.mkiv_start_nil, mkiv_rule_index_count, mkiv_label_count_layer, mkiv_match_graph_layer, args.edge_print_internal, args.randomize)
 
     if result_info is not None:
         util_graph.write_graph_gr(result_info.graphs, sys.stdout)

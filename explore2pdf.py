@@ -153,7 +153,10 @@ def explore2pdf(explorer_info, cell_size, layout, text_colors, use_text, use_ima
                     cvs.setFillColorRGB(*bg_color, 1.0)
                     cvs.rect(0, 0, cell_size, cell_size, fill=1, stroke=0)
                     cvs.setFillColorRGB(*fg_color, 1.0)
-                    cvs.drawCentredString(0.5 * cell_size, 0.25 * cell_size, data)
+                    cvs.translate(0.5 * cell_size, 0.25 * cell_size)
+                    if len(data) > 1:
+                        cvs.scale(1.0 / len(data), 1.0)
+                    cvs.drawCentredString(0, 0, data)
                 else:
                     cvs.drawImage(tind_to_pdfimage[tind], 0, 0, cell_size, cell_size)
 

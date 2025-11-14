@@ -1,6 +1,5 @@
 import atexit, base64, bz2, copy, gzip, io, json, os, pickle, pprint, subprocess, sys, time
-import PIL.Image
-import webcolors
+import PIL.Image, PIL.ImageColor
 
 
 
@@ -268,10 +267,13 @@ def arg_list_to_dict(parser, name, arg_list, default_key, check_key, check_val):
     else:
         for kv in arg_list:
             if kv.count('=') != 1:
-                parser.error(name + ' as dict must have exactly 1 =')
+                parser.error(name + ' as dict must have exactly one =')
             key, val = kv.split('=')
             res[check_key(key)] = check_val(val)
     return res
+
+def arg_list_to_dict_int_int(parser, name, arg_list):
+    return arg_list_to_dict(parser, name, arg_list, None, int, int)
 
 def arg_list_to_dict_str_int(parser, name, arg_list):
     return arg_list_to_dict(parser, name, arg_list, None, str, int)
@@ -293,10 +295,7 @@ def load_color_cfg(filename):
 
     if 'tile' in cfg:
         for text, colorname in cfg['tile'].items():
-            try:
-                color_cfg[text] = tuple(webcolors.name_to_rgb(colorname, 'css3'))
-            except ValueError:
-                pass
+            color_cfg[text] = PIL.ImageColor.getcolor(colorname, 'RGB')
 
     return color_cfg
 
@@ -697,26 +696,31 @@ def process_old_meta(line):
     return None
 
 def read_text_level(infilename, include_meta=False):
-    with openz(infilename, 'rt') as infile:
-        lvl = []
-        meta = []
+    lvl = []
+    meta = []
 
-        for line in infile.readlines():
-            line = line.rstrip('\n')
+    if '.json' in infilename:
+        with openz(infilename, 'rt') as infile:
+            lvl = json.load(infile)
 
-            old_meta = process_old_meta(line)
-            if old_meta is not None:
-                meta.append(old_meta)
-            elif line.startswith(META_STR):
-                if include_meta:
-                    meta.append(json.loads(line[len(META_STR):]))
-            else:
-                lvl.append([c for c in line])
+    else:
+        with openz(infilename, 'rt') as infile:
+            for line in infile.readlines():
+                line = line.rstrip('\n')
 
-        if include_meta:
-            return lvl, meta
-        else:
-            return lvl
+                old_meta = process_old_meta(line)
+                if old_meta is not None:
+                    meta.append(old_meta)
+                elif line.startswith(META_STR):
+                    if include_meta:
+                        meta.append(json.loads(line[len(META_STR):]))
+                else:
+                    lvl.append([c for c in line])
+
+    if include_meta:
+        return lvl, meta
+    else:
+        return lvl
 
 
 

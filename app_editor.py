@@ -441,6 +441,9 @@ class PathCanvas(tkinter.Canvas):
                     tag = self._cfg.tag_level[rr][cc]
                     if tag == util_common.VOID_TEXT:
                         self._image_draw.append(self.create_rectangle(tocvs(cc), tocvs(rr), tocvs(cc + 1), tocvs(rr + 1), outline=None, fill='black'))
+                    elif self._gen_text is not None:
+                        text = self._gen_text[rr][cc]
+                        self._image_draw.append(self.create_text(tocvs(cc + 0.5), tocvs(rr + 0.5), text=text, fill='black', font=('Courier', str(int(CELL_SIZE * 0.9))), anchor=tkinter.CENTER))
         else:
             self._image_draw.append(self.create_rectangle(tocvs(0), tocvs(0), tocvs(self._cols), tocvs(self._rows), outline=None, fill='black'))
             self._image_draw.append(self.create_image(INSET, INSET, anchor=tkinter.NW, image=self._gen_image))
@@ -840,6 +843,7 @@ if __name__ == '__main__':
     util_common.print_command()
 
     mode = None
+    app_out_no_hash = False
     app_state = None
     app_weight = WEIGHT_APP
 
@@ -867,6 +871,8 @@ if __name__ == '__main__':
         elif args.test:
             mode = MODE_TEST
 
+        app_out_no_hash = args.out_no_hash
+
         if args.statefile is not None:
             with open(args.statefile, 'rt') as f:
                 app_state = json.load(f)
@@ -876,4 +882,4 @@ if __name__ == '__main__':
 
     cfg = scheme2output.scheme2output_argv2cfg(argv)
 
-    app_editor(cfg, mode, args.out_no_hash, app_state, app_weight)
+    app_editor(cfg, mode, app_out_no_hash, app_state, app_weight)

@@ -1,0 +1,6 @@
+t ugraph l l
+
+n 0 __STATIC__:__START__
+n 1 __STATIC__:__NIL__
+
+e 0 1 __STATIC__:__NIL__

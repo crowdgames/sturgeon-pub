@@ -1,6 +1,7 @@
-import sys
+import random, sys
 import util_common
 import networkx as nx
+import PIL
 
 
 
@@ -28,11 +29,31 @@ GTYPE_UGRAPH     = 'ugraph'
 GTYPE_DGRAPH     = 'dgraph'
 GTYPE_LIST       = [GTYPE_UTREE, GTYPE_DTREE, GTYPE_DAG, GTYPE_UGRAPH, GTYPE_DGRAPH]
 
-LABEL_GRID_EAST  = 'e'
-LABEL_GRID_SOUTH = 's'
-
 DIR_FRA          = 'fra'
 DIR_TIL          = 'til'
+
+LABEL_GRID_EAST     = 'e'
+LABEL_GRID_SOUTH    = 's'
+
+LABEL_GEN_STATIC    = '__STATIC__'
+
+LABEL_GEN_DYN_START = '__START__'
+LABEL_GEN_DYN_NIL   = '__NIL__'
+
+LABEL_RULE_NOT      = '__NOT__'
+LABEL_RULE_WILD     = '__WILD__'
+LABEL_RULE_ARROW    = '__ARROW__'
+
+
+
+DOT_SUBST = {
+    LABEL_GEN_STATIC + ':': '',
+    LABEL_GEN_DYN_START:    '\U0001D54A',
+    LABEL_GEN_DYN_NIL:      '\u2022',
+    LABEL_RULE_NOT:         '\u00AC',
+    LABEL_RULE_WILD:        '\u2610',
+    LABEL_RULE_ARROW:       '\u2192'
+}
 
 
 
@@ -124,6 +145,8 @@ def graph_node_cattrs(gr):
         util_common.check(node_cattrs is None or node_cattrs == this_node_cattrs, 'node_cattrs mismatch')
         node_cattrs = this_node_cattrs
 
+    if node_cattrs is None:
+        return ''
     return ''.join(node_cattrs.keys())
 
 def graph_edge_cattrs(gr):
@@ -149,6 +172,8 @@ def graph_edge_cattrs(gr):
         util_common.check(edge_cattrs is None or edge_cattrs == this_edge_cattrs, 'edge_cattrs mismatch')
         edge_cattrs = this_edge_cattrs
 
+    if edge_cattrs is None:
+        return ''
     return ''.join(edge_cattrs.keys())
 
 def nodes_and_label_central_pos(gr):
@@ -166,6 +191,30 @@ def edges_and_label_central_delta_polar_cycle(gr):
              gr.edges[edge][GATTR_POLAR] if GATTR_POLAR in gr.edges[edge] else None,
              gr.edges[edge][GATTR_CYCLE] if GATTR_CYCLE in gr.edges[edge] else None)
             for edge in gr.edges]
+
+def read_central(s):
+    if s == 'T':
+        return True
+    elif s == 'F':
+        return False
+    else:
+        c = int(s)
+        util_common.check(c >= 0, 'central')
+        return c
+
+def write_central(c):
+    if c is True:
+        return 'T'
+    elif c is False:
+        return 'F'
+    else:
+        util_common.check(type(c) == int, 'central')
+        util_common.check(c >= 0, 'central')
+        return str(c)
+
+def is_central(c):
+    util_common.check((c is None) or (type(c) == bool) or (type(c) == int and c >= 0), 'central')
+    return c is not None and c is not False
 
 def read_graphs(filenames):
     grs = Graphs()
@@ -234,7 +283,7 @@ def read_graphs(filenames):
                             splt = splt[1:]
                         elif cattr == CATTR_CENTRAL:
                             util_common.check(len(splt) >= 1, 'splt len')
-                            gr.nodes[node][GATTR_CENTRAL] = (splt[0] == 'T')
+                            gr.nodes[node][GATTR_CENTRAL] = read_central(splt[0])
                             splt = splt[1:]
                         elif cattr == CATTR_POSITION2:
                             util_common.check(len(splt) >= 2, 'splt len')
@@ -267,7 +316,7 @@ def read_graphs(filenames):
                             splt = splt[1:]
                         elif cattr == CATTR_CENTRAL:
                             util_common.check(len(splt) >= 1, 'splt len')
-                            gr.edges[(fra, til)][GATTR_CENTRAL] = (splt[0] == 'T')
+                            gr.edges[(fra, til)][GATTR_CENTRAL] = read_central(splt[0])
                             splt = splt[1:]
                         elif cattr == CATTR_DELTA2:
                             util_common.check(len(splt) >= 2, 'splt len')
@@ -345,7 +394,7 @@ def write_graph_gr(grs, out):
             if cattr == CATTR_LABEL:
                 line += f' {cattrs[GATTR_LABEL]}'
             elif cattr == CATTR_CENTRAL:
-                line += f' {"T" if cattrs[GATTR_CENTRAL] else "F"}'
+                line += f' {write_central(cattrs[GATTR_CENTRAL])}'
             elif cattr == CATTR_POSITION2:
                 line += f' {fmtpos(cattrs[GATTR_POSITION][0])} {fmtpos(cattrs[GATTR_POSITION][1])}'
             elif cattr == CATTR_POSITION3:
@@ -358,7 +407,7 @@ def write_graph_gr(grs, out):
             if cattr == CATTR_LABEL:
                 line += f' {cattrs[GATTR_LABEL]}'
             elif cattr == CATTR_CENTRAL:
-                line += f' {"T" if cattrs[GATTR_CENTRAL] else "F"}'
+                line += f' {write_central(cattrs[GATTR_CENTRAL])}'
             elif cattr == CATTR_DELTA2:
                 line += f' {fmtpos(cattrs[GATTR_DELTA][0])} {fmtpos(cattrs[GATTR_DELTA][1])}'
             elif cattr == CATTR_DELTA3:
@@ -369,7 +418,9 @@ def write_graph_gr(grs, out):
                 line += f' {cattrs[GATTR_CYCLE]}'
         out.write(f'{line}\n')
 
-def write_graph_dot(grs, no_etc, use_clusters, scale, out):
+_dot_central_colors = None
+
+def write_graph_dot(grs, no_etc, use_clusters, use_central_colors, scale, out):
     if gtype_directed(grs.gtype):
         dtype = 'digraph'
         dedge = '->'
@@ -381,9 +432,32 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
 
     fontsize = 16
     fontsize_per = 2.0
-    fontsize_min = 5
+    fontsize_min_node = 5
+    fontsize_min_edge = 10
 
     fontsize_etc = 7
+
+    def _dot_label(_label):
+        _any_subst = True
+        while _any_subst:
+            _any_subst = False
+            for _old, _new in DOT_SUBST.items():
+                if _old in _label:
+                    _label = _label.replace(_old, _new)
+                    _any_subst = True
+        return _label
+
+    def _central_color(_c):
+        global _dot_central_colors
+        if _dot_central_colors is None:
+            _dot_central_colors = list(sorted(PIL.ImageColor.colormap))
+            _dot_central_colors.remove('black')
+            _dot_central_colors.remove('rebeccapurple')
+            _dot_central_colors = [PIL.ImageColor.getrgb(name) for name in _dot_central_colors]
+            _dot_central_colors = [rgb for rgb in _dot_central_colors if rgb[0] < 192 or rgb[1] < 192 or rgb[2] < 192]
+            _dot_central_colors = [util_common.color_to_hex(rgb) for rgb in _dot_central_colors]
+            random.Random(77).shuffle(_dot_central_colors)
+        return _dot_central_colors[_c % len(_dot_central_colors)]
 
     out.write(f'{dtype} G {{\n')
     out.write(f'  graph [fontname="Courier New" margin="0"]\n')
@@ -393,6 +467,13 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
         if use_clusters:
             out.write(f'  subgraph cluster_{gg} {{\n')
             out.write(f'    margin="10";\n')
+            out.write(f'    peripheries="0";\n')
+
+            if GATTR_LABEL in gr.graph:
+                label = _dot_label(gr.graph[GATTR_LABEL])
+                out.write(f'    fontsize="10.0";\n')
+                out.write(f'    label=<{label}>;\n')
+                out.write(f'    labelloc="b";\n')
 
         if len(grs.graphs) > 1:
             nodeprefix = f'{gg}-'
@@ -407,13 +488,15 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
                 attrs += f' style="invis"'
 
             else:
+                label = _dot_label(label)
+
                 if label == '':
                     attrs += f' label=""'
                 else:
                     attrs += f' label="{label}"'
 
                 if len(label) > 1:
-                    fontsize_disp = max(fontsize_min, fontsize - fontsize_per * (len(label) - 1))
+                    fontsize_disp = max(fontsize_min_node, fontsize - fontsize_per * (len(label) - 1))
                     attrs += f' fontsize="{fontsize_disp}"'
 
                 if label in grs.colors:
@@ -421,9 +504,10 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
                 else:
                     attrs += f' style="filled" fillcolor="#eeeeee"'
 
-            if central is not None:
-                if central:
-                    attrs += f' penwidth="4"'
+            if is_central(central):
+                attrs += f' penwidth="4"'
+                if type(central) == int and use_central_colors:
+                    attrs += f' color="{_central_color(central)}"'
 
             if pos is not None:
                 pos_str = ','.join([fmtpos(ee) for ee in pos])
@@ -436,14 +520,16 @@ def write_graph_dot(grs, no_etc, use_clusters, scale, out):
         for fra, til, label, central, delta, polar, cycle in edges_and_label_central_delta_polar_cycle(gr):
             attrs = ''
             dot_label = ''
+            label = _dot_label(label)
 
             if label != '':
-                fontsize_disp = max(fontsize_min, fontsize - fontsize_per * (len(label) - 1))
+                fontsize_disp = max(fontsize_min_edge, fontsize - fontsize_per * (len(label) - 1))
                 dot_label += f'<FONT POINT-SIZE="{fontsize_disp}">{label}</FONT>'
 
-            if central is not None:
-                if central:
-                    attrs += f' penwidth="4"'
+            if is_central(central):
+                attrs += f' penwidth="4"'
+                if type(central) == int and use_central_colors:
+                    attrs += f' color="{_central_color(central)}"'
 
             if not no_etc:
                 if delta is not None:
@@ -476,7 +562,7 @@ def write_graph_to_file(grs, filename):
     else:
         with util_common.openz(filename, 'wt') as outfile:
             if util_common.fileistype(filename, '.dot'):
-                write_graph_dot(grs, False, False, 1.0, outfile)
+                write_graph_dot(grs, False, False, False, 1.0, outfile)
             else:
                 write_graph_gr(grs, outfile)
 

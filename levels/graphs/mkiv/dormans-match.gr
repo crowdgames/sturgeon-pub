@@ -1,0 +1,57 @@
+t dag lc lc
+n 3 e F
+n 4 ts F
+n 9 t F
+n 10 t F
+n 11 ib F
+n 14 k T
+n 18 l T
+n 19 bm F
+n 20 iq F
+n 21 ti F
+n 22 t F
+n 24 t F
+n 25 k T
+n 26 ib F
+n 27 l T
+n 29 k T
+n 30 l T
+n 32 t F
+n 34 t F
+n 35 ib F
+n 36 t F
+n 37 n F
+n 39 t F
+n 40 kf F
+n 41 lf F
+n 42 bl F
+n 43 g F
+n 44 n F
+e 3 4 - F
+e 4 9 = F
+e 9 10 = F
+e 9 14 = F
+e 10 11 = F
+e 14 18 = T
+e 18 19 = F
+e 19 20 = F
+e 20 21 = F
+e 21 22 = F
+e 22 24 = F
+e 22 25 = F
+e 22 37 - F
+e 22 39 - F
+e 24 26 = F
+e 25 27 = T
+e 27 29 = T
+e 29 30 = T
+e 30 32 = F
+e 32 34 = F
+e 32 36 = F
+e 34 35 = F
+e 36 41 = F
+e 39 40 = F
+e 39 44 - F
+e 40 41 - F
+e 41 42 = F
+e 42 43 = F

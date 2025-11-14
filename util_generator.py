@@ -148,8 +148,8 @@ class Generator:
 
                 self._solver.cnstr_count(vvs, True, 1, 1, None)
 
-    def add_rules_patterns(self, single_patterns, ignore_no_in_patterns, weight_patterns):
-        print('add pattern constraints' + (' single' if single_patterns else '') + (' ignore-no-in' if ignore_no_in_patterns else '') + ' ' + str(weight_patterns))
+    def add_rules_patterns(self, single_patterns, ignore_no_in_void_patterns, weight_patterns):
+        print('add pattern constraints' + (' single' if single_patterns else '') + (' ignore-no-in-void' if ignore_no_in_void_patterns else '') + ' ' + str(weight_patterns))
 
         util_common.check(weight_patterns is None or weight_patterns > 0, 'weight')
 
@@ -165,7 +165,7 @@ class Generator:
                 if single_patterns:
                     self._solver.cnstr_count(_pattern_out_vars, True, 0, 1, weight_patterns)
 
-        def add_pattern_options(_patterns, _ignore_empty):
+        def add_pattern_options(_patterns):
             _pattern_vars = [self._pattern_var(_pattern) for _pattern in _patterns]
             self._solver.cnstr_count(_pattern_vars, True, 1, len(_pattern_vars), weight_patterns)
 
@@ -187,7 +187,7 @@ class Generator:
 
                 if _nbr_tag == util_common.VOID_TEXT:
                     if _ptile != util_common.VOID_TILE:
-                        return None
+                        return util_common.VOID_TEXT
                 else:
                     if _ptile not in self._vars_rc_t[(_nr, _nc)]:
                         return None
@@ -206,14 +206,14 @@ class Generator:
 
                 for pattern_template_in in game_patterns_info:
                     all_pattern_in_inst = []
-                    found_void_in = False
+                    skipped_void_in = 0
 
                     for pattern_in in game_patterns_info[pattern_template_in]:
                         pattern_inst_in = pattern_inst(pattern_template_in, pattern_in)
                         if pattern_inst_in is None:
                             continue
-                        if pattern_inst_in is False:
-                            found_void_in = True
+                        if pattern_inst_in == util_common.VOID_TEXT:
+                            skipped_void_in += 1
                             continue
 
                         all_pattern_in_inst.append(pattern_inst_in)
@@ -233,16 +233,18 @@ class Generator:
                                     pattern_inst_out = pattern_inst(pattern_template_out, pattern_out)
                                     if pattern_inst_out is None:
                                         continue
+                                    if pattern_inst_out == util_common.VOID_TEXT:
+                                        continue
                                     pattern_list_out.append(pattern_inst_out)
 
                             add_tile_patterns(pattern_inst_in, pattern_list_out)
 
-                    if ignore_no_in_patterns:
-                        if len(all_pattern_in_inst) == 0:
-                            continue
-                    else:
-                        util_common.check(len(all_pattern_in_inst) > 0, 'no inst in patterns')
-                    add_pattern_options(all_pattern_in_inst, ignore_no_in_patterns)
+                    if len(all_pattern_in_inst) == 0 and ignore_no_in_void_patterns:
+                        util_common.check(skipped_void_in == len(game_patterns_info[pattern_template_in]), 'void inst in patterns')
+                        continue
+
+                    util_common.check(len(all_pattern_in_inst) > 0, 'no inst in patterns')
+                    add_pattern_options(all_pattern_in_inst)
 
     def add_rules_counts(self, use_out_text_groups, counts_scale, weight_counts):
         print('add count constraints', weight_counts)
@@ -492,6 +494,7 @@ class Generator:
 
     def _make_open_vars(self, reach_connect_info, nodes):
         open_vars = {}
+        disj_cache = {}
 
         for rr, cc in nodes:
             game = self._game_level[rr][cc]
@@ -502,16 +505,8 @@ class Generator:
 
             # TODO: treat src and dst tiles separately from open tiles?
             all_open_tiles = open_tiles + [src_tile, dst_tile]
-
-            if len(all_open_tiles) == 1:
-                open_var = self._tile_var(rr, cc, all_open_tiles[0])
-            else:
-                open_var = self._solver.make_var()
-                open_tile_vvs = [self._tile_var(rr, cc, all_open_tile) for all_open_tile in all_open_tiles]
-                for open_tile_vv in open_tile_vvs:
-                    self._solver.cnstr_implies_disj(open_tile_vv, True, [open_var], True, None)
-                self._solver.cnstr_implies_disj(open_var, True, open_tile_vvs, True, None)
-            open_vars[(rr, cc)] = open_var
+            open_tile_vvs = [self._tile_var(rr, cc, all_open_tile) for all_open_tile in all_open_tiles]
+            open_vars[(rr, cc)], _ = util_solvers.make_disj_cache(self._solver, disj_cache, open_tile_vvs, True)
 
         return open_vars
 

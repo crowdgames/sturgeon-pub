@@ -6,21 +6,31 @@ Sturgeon is a system for constraint-based level generation.
 
 ## Setup
 
-* You will need Python 3.12 and pipenv on your system.  To install pipenv, if needed:
+* You will need Python 3.14 and pipenv on your system.  To install pipenv, if needed:
   ```
   pip3 install pipenv
   ```
 
-* Pipenv is used to set up an environment.  This only needs to be done once (in any root folder for this project):
+* Pipenv is used to set up an environment.  One of these commands needs to be run once (in any root folder for this project):
 
-  * Either set up the environment with only the default PySAT-based solvers:
+  * Set up the environment with pipenv. By default, pipenv will try to install all the solvers.
+    ```
+    pipenv install
+    ```
+
+  * Or, it is also possible to set up with only the default PySAT-based solvers:
     ```
     pipenv install --categories solvers-minimal
     ```
 
-  * Or, set up the environment with all solvers:
+  * Or, set up the environment with no solvers (only utilities will be usable):
     ```
-    pipenv install --categories solvers-all
+    pipenv install --categories solvers-none
+    ```
+
+  * Or, on Windows, using an older version of Python (3.12) may be needed:
+    ```
+    pipenv install --python 3.12 --categories solvers-minimal
     ```
 
 * Any commands will need to be run in this environment.  Each time a shell is needed, start a shell in the environment with:
@@ -35,6 +45,7 @@ Sturgeon is a system for constraint-based level generation.
 For example usage (within pipenv), see:
 
 * `examples_basic.sh` - basic use with tile-based levels
+* `examples_solver.sh` - use of different solvers
 * `examples_custom.sh` - custom contraints, such as tile counts, level repair, and level extension
 * `examples_junction.sh` - junctions for adding multiple reachable and unreachable paths
 * `examples_blend.sh` - blending different games, using tiles and reachabiity from multiple games in one level
@@ -103,7 +114,7 @@ Graph Utilities:
 
 * Seth Cooper. 2022. "Sturgeon: tile-based procedural level generation via learned and designed constraints." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 18(1), 26-36. https://doi.org/10.1609/aiide.v18i1.21944
 
-* Seth Cooper. 2022. "Constraint-based 2D tile game blending in the Sturgeon system." Proceedings of the Experimental AI in Games Workshop. https://www.exag.org/papers/Constraint-Based%202D%20Tile%20Game%20Blending%20in%20the%20Sturgeon%20System.pdf
+* Seth Cooper. 2022. "Constraint-based 2D tile game blending in the Sturgeon system." Proceedings of the Experimental AI in Games Workshop. https://doi.org/10.17605/OSF.IO/VBUW5
 
 * Seth Cooper. 2023. "Sturgeon-GRAPH: constrained graph generation from examples." Proceedings of the 18th International Conference on the Foundations of Digital Games. https://doi.org/10.1145/3582437.3582465
 
@@ -122,3 +133,7 @@ Graph Utilities:
 * Seth Cooper and Mahsa Bazzaz. 2024. "Sturgeon-MKIV: constraint-based level and playthrough generation with graph label rewrite rules." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 20(1), 13-24. https://doi.org/10.1609/aiide.v20i1.31862
 
 * Seth Cooper and Mahsa Bazzaz. 2025. "Stuck in the middle: generating levels without (or with) softlocks." Proceedings of the 16th Workshop on Procedural Content Generation. https://doi.org/10.1145/3723498.3723844
+
+* Seth Cooper and Mahsa Bazzaz. 2025. "A constraint-based graph grammar approach unifying level and playthrough generation." Proceedings of the Experimental AI in Games Workshop. https://ceur-ws.org/Vol-4090/short5.pdf
+
+* Akshar Vandara, Kaylah Facey and Seth Cooper. 2025. "Spacetime level generation and editing with constraints from examples." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 21(1), 142-152. https://doi.org/10.1609/aiide.v21i1.36818

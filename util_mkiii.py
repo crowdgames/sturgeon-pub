@@ -22,14 +22,14 @@ EXAMPLES = [EX_MKJR_WALK, EX_MKJR_WALK_THRU, EX_MKJR_MAZE, EX_MKJR_MAZE_COIN, EX
 
 
 
-DIR_NORTH     = [(-1,  0)]
-DIR_SOUTH     = [( 1,  0)]
-DIR_EAST      = [( 0,  1)]
-DIR_WEST      = [( 0, -1)]
-DIR_EASTWEST  = [( 0,  1), ( 0, -1)]
-DIR_SOUTHEAST = [( 1,  0), ( 0, 1)]
-DIR_ALL       = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-DIR_NONE      = [(0, 0)]
+DIR_NORTH      = [(-1,  0)]
+DIR_SOUTH      = [( 1,  0)]
+DIR_EAST       = [( 0,  1)]
+DIR_WEST       = [( 0, -1)]
+DIR_EAST_WEST  = [( 0,  1), ( 0, -1)]
+DIR_SOUTH_EAST = [( 1,  0), ( 0, 1)]
+DIR_ALL        = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+DIR_NONE       = [(0, 0)]
 
 
 
@@ -164,6 +164,24 @@ def get_example_info(mkiii_setup):
     ei = MKIIIInfo()
 
     ei.layers = mkiii_setup.layers
+
+    def _check_rep_rules_subgrid_match(_rep_rules):
+        for _rep_rules_type, _rep_rules in _rep_rules:
+            if _rep_rules_type != RR_GRP_CHOICE:
+                continue
+
+            for _ii, (_ii_rule_dirs, _ii_rule_in, _ii_rule_out) in enumerate(_rep_rules):
+                for _jj, (_jj_rule_dirs, _jj_rule_in, _jj_rule_out) in enumerate(_rep_rules):
+                    if _ii == _jj:
+                        continue
+                    for _ii_dr, _ii_dc in _ii_rule_dirs:
+                        for _jj_dr, _jj_dc in _jj_rule_dirs:
+                            if (_ii_dr == _ii_dc == 0) or (_jj_dr == _jj_dc == 0) or (_ii_dr == _jj_dr and _ii_dc == _jj_dc):
+                                for _idx in range(len(_ii_rule_in) - len(_jj_rule_in) + 1):
+                                    if _ii_rule_in[_idx:_idx + len(_jj_rule_in)] == _jj_rule_in and _ii_rule_out[_idx:_idx + len(_jj_rule_out)] == _jj_rule_out:
+                                        print(_ii_dr, _ii_dc, _ii_rule_in, _ii_rule_out)
+                                        print(_jj_dr, _jj_dc, _jj_rule_in, _jj_rule_out)
+                                        util_common.check(False, 'rep rule subgrid match')
 
     if mkiii_setup.example == EX_MKJR_WALK:
         ei.states = 'X-*'
@@ -582,9 +600,9 @@ def get_example_info(mkiii_setup):
     elif mkiii_setup.example == EX_PLAT:
         ei.states = 'X-@12oO+?'
         ei.rep_rules = [(RR_GRP_CHOICE,
-                         [(DIR_EASTWEST, '@-', '-@'), (DIR_NONE, '@', '@'), (DIR_EASTWEST, '@o', '-O'), (DIR_NORTH, 'X@', 'X2'),
-                          (DIR_EASTWEST, '1-', '-1'), (DIR_NONE, '1', '1'),
-                          (DIR_EASTWEST, '2-', '-2'), (DIR_NONE, '2', '2')]),
+                         [(DIR_EAST_WEST, '@-', '-@'), (DIR_NONE, '@', '@'), (DIR_EAST_WEST, '@o', '-O'), (DIR_NORTH, 'X@', 'X2'),
+                          (DIR_EAST_WEST, '1-', '-1'), (DIR_NONE, '1', '1'),
+                          (DIR_EAST_WEST, '2-', '-2'), (DIR_NONE, '2', '2')]),
                         (RR_GRP_ALL,
                          [(DIR_WEST, '+-', '-+'), (DIR_WEST, '+@', '-+'), (DIR_WEST, '+2', '-+'), (DIR_WEST, '+1', '-+')]),
                         (RR_GRP_ALL, # TODO: what about enemy above player? '-@+'
@@ -616,8 +634,8 @@ def get_example_info(mkiii_setup):
     elif mkiii_setup.example == EX_VVV:
         ei.states = 'X-^v+()oO'
         ei.rep_rules = [(RR_GRP_CHOICE,
-                         [(DIR_SOUTH, 'vX', '^X'), (DIR_NONE, 'v', 'v'), (DIR_EASTWEST, 'v-', '-v'), (DIR_EASTWEST, 'vo', '-O'),
-                          (DIR_NORTH, '^X', 'vX'), (DIR_NONE, '^', '^'), (DIR_EASTWEST, '^-', '-^'), (DIR_EASTWEST, '^o', '-O')]),
+                         [(DIR_SOUTH, 'vX', '^X'), (DIR_NONE, 'v', 'v'), (DIR_EAST_WEST, 'v-', '-v'), (DIR_EAST_WEST, 'vo', '-O'),
+                          (DIR_NORTH, '^X', 'vX'), (DIR_NONE, '^', '^'), (DIR_EAST_WEST, '^-', '-^'), (DIR_EAST_WEST, '^o', '-O')]),
                         (RR_GRP_ALL,
                          [(DIR_EAST, ')-', '-)'), (DIR_EAST, ')X', '(X'), (DIR_EAST, ')v', '-)'), (DIR_EAST, ')^', '-)'),
                           (DIR_WEST, '(-', '-('), (DIR_WEST, '(X', ')X'), (DIR_WEST, '(v', '-('), (DIR_WEST, '(^', '-('),
@@ -711,8 +729,8 @@ def get_example_info(mkiii_setup):
     elif mkiii_setup.example == EX_MATCH:
         ei.states = 'X-789'
         rep_rules_fall  = (RR_GRP_ALL, [(DIR_SOUTH, '7-', '-7'), (DIR_SOUTH, '8-', '-8'), (DIR_SOUTH, '9-', '-9')])
-        rep_rules_match = (RR_GRP_ALL, [(DIR_SOUTHEAST, '777', '---'), (DIR_SOUTHEAST, '888', '---'), (DIR_SOUTHEAST, '999', '---')])
-        rep_rules_swap  = (RR_GRP_CHOICE, [(DIR_ALL, '78', '87'), (DIR_ALL, '89', '98'), (DIR_ALL, '97', '79'), (DIR_EASTWEST, '7-', '-7'), (DIR_EASTWEST, '8-', '-8'), (DIR_EASTWEST, '9-', '-9')])
+        rep_rules_match = (RR_GRP_ALL, [(DIR_SOUTH_EAST, '777', '---'), (DIR_SOUTH_EAST, '888', '---'), (DIR_SOUTH_EAST, '999', '---')])
+        rep_rules_swap  = (RR_GRP_CHOICE, [(DIR_ALL, '78', '87'), (DIR_ALL, '89', '98'), (DIR_ALL, '97', '79'), (DIR_EAST_WEST, '7-', '-7'), (DIR_EAST_WEST, '8-', '-8'), (DIR_EAST_WEST, '9-', '-9')])
         ei.rep_rules = [rep_rules_fall, rep_rules_match, rep_rules_swap]
         ei.rep_rule_names = ['fall', 'match', 'swap']
         ei.rep_rule_order = RR_ORD_PRI
@@ -753,6 +771,8 @@ def get_example_info(mkiii_setup):
 
     else:
         util_common.check(False, 'mkiii_setup example' + mkiii_setup.example)
+
+    _check_rep_rules_subgrid_match(ei.rep_rules)
 
     return ei
 
@@ -844,15 +864,11 @@ class GeneratorMKIII(util_generator.Generator):
                     self._solver.cnstr_count(vvs, True, 1, 1, None)
 
         # make_conj duplicate helper
-        conjs = {}
+        conj_cache = {}
         def _make_conj(_vvs):
-            nonlocal conjs
-
-            _key = tuple(sorted([str(_vv) for _vv in _vvs]))
-
-            if _key not in conjs:
-                conjs[_key] = self._solver.make_conj(_vvs, True)
-            return conjs[_key]
+            nonlocal conj_cache
+            conj, dupl = util_solvers.make_conj_cache(self._solver, conj_cache, _vvs, True)
+            return conj
 
         if mkiii_info.rep_rule_order in [RR_ORD_ONE, RR_ORD_SEQ]:
             self._vars_pri = None
@@ -938,9 +954,7 @@ class GeneratorMKIII(util_generator.Generator):
 
                 if self._vars_pri is not None:
                     # pri equals any change
-                    for change in ind_changes:
-                        self._solver.cnstr_implies_disj(change, True, [ind_pri], True, None)
-                    self._solver.cnstr_implies_disj(ind_pri, True, ind_changes, True, None)
+                    util_solvers.cnstr_disj(self._solver, ind_pri, ind_changes, True)
 
                 if rep_rules_type == RR_GRP_CHOICE:
                     # exactly one change or terminal or prev pri changed
@@ -1064,11 +1078,7 @@ class GeneratorMKIII(util_generator.Generator):
                     util_common.check(curr_term, 'term unset')
 
                 step_info.term = curr_term
-
-                if curr_term and not prev_term:
-                    step_info.first_term = True
-                else:
-                    step_info.first_term = False
+                step_info.first_term = curr_term and not prev_term
 
         return steps
 
