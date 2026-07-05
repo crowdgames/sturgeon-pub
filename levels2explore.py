@@ -77,7 +77,7 @@ def levels2explore(tilefiles, resultfiles, pad_top, text_only, image_only):
             _tile_to_image_key = {}
             if use_image:
                 for _tile in tileset.tile_ids:
-                    _tile_to_image_key[_tile] = tuple(tileset.tile_to_image[_tile].getdata())
+                    _tile_to_image_key[_tile] = tileset.tile_to_image[_tile].get_flattened_data()
 
             _text_uniq = {}
             _image_key_uniq = {}

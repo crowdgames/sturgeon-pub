@@ -13,7 +13,7 @@ def get_tile_key(tile_text, tile_image):
     if tile_text is not None:
         tile_key = tile_key + (tile_text,)
     if tile_image is not None:
-        tile_key = tile_key + (tuple(tile_image.getdata()),)
+        tile_key = tile_key + (tile_image.get_flattened_data(),)
     return tile_key
 
 
@@ -130,7 +130,7 @@ def input2tiles(tileset_input, text_levels, image_levels, tag_levels, game_strs_
                 tile_image_is_void = None
                 if image_level is not None:
                     tile_image = util_common.fresh_image(image_level.crop((cc * ts.tile_image_size, rr * ts.tile_image_size, cc * ts.tile_image_size + ts.tile_image_size, rr * ts.tile_image_size + ts.tile_image_size)).convert('RGBA'))
-                    tile_image_is_void = (sum([ch for px in tile_image.getdata() for ch in px]) == 0)
+                    tile_image_is_void = (sum([ch for px in tile_image.get_flattened_data() for ch in px]) == 0)
 
                 if tile_text_is_void or tile_image_is_void:
                     util_common.check(tile_text_is_void in [True, None], 'void')

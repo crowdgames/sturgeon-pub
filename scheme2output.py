@@ -87,7 +87,7 @@ def scheme2output(cfg):
     if cfg.counts_weight != 0:
         util_common.check(si.count_info is not None, 'count rules requested but not counts')
         util_common.timer_section('add count rules')
-        gen.add_rules_counts(False, cfg.counts_scale, cfg.counts_weight) # TODO? (si.tile_to_text is not None)
+        gen.add_rules_counts(False, cfg.counts_scale, cfg.counts_weight) # TODO?: (si.tile_to_text is not None)
     elif si.count_info is not None:
         print('scheme has counts but not using count rules')
 
@@ -175,6 +175,10 @@ def scheme2output_argv2cfg(argv):
     parser.add_argument('--reach-wrap-cols', action='store_true', help='Wrap columns in reachability.')
     parser.add_argument('--reach-open-zelda', action='store_true', help='Use Zelda open tiles.')
     parser.add_argument('--reach-unreachable', action='store_true', help='Generate levels with unreachable goals.')
+
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument('--reach-null', action='store_true', help='Use null reachability.')
+    group.add_argument('--reach-layered', type=int, default=None, help='Use layered reachability.')
 
     parser.add_argument('--reach-path-search', action='store_true', help='Search to find path rather that using solution path (if present)')
     parser.add_argument('--reach-print-internal', action='store_true', help='Display some extra internal information about reachability.')
@@ -285,17 +289,21 @@ def scheme2output_argv2cfg(argv):
     cfg.reach_connect_setups = []
 
     if args.reach_move is not None:
-        cfg.reach_connect_setups.append(util_reach.default_reach_connect(util_common.arg_list_to_dict_text_options(parser, '--reach-move', args.reach_move, util_reach.RMOVE_LIST, False), args.reach_wrap_rows, args.reach_wrap_cols, util_common.OPEN_TEXT_ZELDA if args.reach_open_zelda else util_common.OPEN_TEXT, args.reach_unreachable))
+        cfg.reach_connect_setups.append(util_reach.default_reach_connect(util_common.arg_list_to_dict_text_options(parser, '--reach-move', args.reach_move, util_reach.RMOVE_LIST, False), args.reach_wrap_rows, args.reach_wrap_cols, util_common.OPEN_TEXT_ZELDA if args.reach_open_zelda else util_common.OPEN_TEXT, args.reach_unreachable, args.reach_null, args.reach_layered))
 
     else:
-        if args.reach_open_zelda:
-            parser.error('cannot specify --reach-open-zelda without --reach-move')
         if args.reach_wrap_rows:
             parser.error('cannot specify --reach-wrap-rows without --reach-move')
         if args.reach_wrap_cols:
             parser.error('cannot specify --reach-wrap-cols without --reach-move')
+        if args.reach_open_zelda:
+            parser.error('cannot specify --reach-open-zelda without --reach-move')
         if args.reach_unreachable:
             parser.error('cannot specify --reach-unreachable without --reach-move')
+        if args.reach_null:
+            parser.error('cannot specify --reach-null without --reach-move')
+        if args.reach_layered is not None:
+            parser.error('cannot specify --reach-layered without --reach-move')
 
     if args.reach_connect is not None:
         if cfg.reach_junction_setups is None:

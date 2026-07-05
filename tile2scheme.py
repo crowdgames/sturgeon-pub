@@ -7,6 +7,7 @@ PATTERN_SINGLE           = 'single'
 PATTERN_NBR_2            = 'nbr-2'
 PATTERN_NBR_L            = 'nbr-l'
 PATTERN_NBR_PLUS         = 'nbr-plus'
+PATTERN_NBR_RING         = 'nbr-ring'
 PATTERN_RING             = 'ring'
 PATTERN_DIAMOND          = 'diamond'
 PATTERN_BLOCK            = 'block'
@@ -17,7 +18,7 @@ PATTERN_CGRAM            = 'cgram'
 PATTERN_ZCGRAM           = 'zcgram'
 PATTERN_CGRAM_NOOUT      = 'cgram-noout'
 PATTERN_LIST = [PATTERN_SINGLE,
-                PATTERN_NBR_2, PATTERN_NBR_L, PATTERN_NBR_PLUS,
+                PATTERN_NBR_2, PATTERN_NBR_L, PATTERN_NBR_PLUS, PATTERN_NBR_RING,
                 PATTERN_RING, PATTERN_DIAMOND,
                 PATTERN_BLOCK, PATTERN_BLOCK_NOOUT, PATTERN_BLOCK_RST_NOOUT,
                 PATTERN_RGRAM, PATTERN_CGRAM, PATTERN_ZCGRAM, PATTERN_CGRAM_NOOUT]
@@ -38,6 +39,15 @@ BASIC_PATTERNS = {
                          ([(0, 0)], [( 1,  0)]),
                          ([(0, 0)], [( 0, -1)]),
                          ([(0, 0)], [(-1,  0)])],
+
+    PATTERN_NBR_RING  : [([(0, 0)], [(-1, -1)]),
+                         ([(0, 0)], [(-1,  0)]),
+                         ([(0, 0)], [(-1,  1)]),
+                         ([(0, 0)], [( 0, -1)]),
+                         ([(0, 0)], [( 0,  1)]),
+                         ([(0, 0)], [( 1, -1)]),
+                         ([(0, 0)], [( 1,  0)]),
+                         ([(0, 0)], [( 1,  1)])],
 
     PATTERN_RING      : [([(0, 0)],
                           [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])],

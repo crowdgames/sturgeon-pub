@@ -3,27 +3,42 @@ import util_common, util_reach
 
 
 
-WEIGHT_CUSTOM      =   100
+WEIGHT_CUSTOM            = 100
 
-CUST_RESULT              = 'result'
+CUST_TEXT_COUNT          = 'text-count'
+CUST_TEXT_EXCLUDE        = 'text-exclude'
+CUST_TEXT_MIN            = 'text-min'
+CUST_TEXT_MAX            = 'text-max'
+
 CUST_TEXT_LEVEL          = 'text-level'
 CUST_TEXT_LEVEL_WEIGHTED = 'text-level-weighted'
 CUST_TEXT_LEVEL_SUBST    = 'text-level-subst'
 CUST_TEXT_LEVEL_RANGE    = 'text-level-range'
-CUST_TEXT_COUNT          = 'text-count'
-CUST_TEXT_EXCLUDE        = 'text-exclude'
-CUST_TEXT_MAX            = 'text-max'
-CUST_PATH                = 'path'
-CUST_PATH_ENDS           = 'path-ends'
-CUST_PATH_FWD            = 'path-fwd'
-CUST_PATH_SHORT          = 'path-short'
+
+CUST_FLAT_PATH           = 'flat-path'
+CUST_FLAT_ENDS           = 'flat-ends'
+CUST_FLAT_FWD            = 'flat-fwd'
+CUST_FLAT_MIN            = 'flat-min'
+
+CUST_LAYERED_FWD         = 'layered-fwd'
+CUST_LAYERED_MIN_EDGE    = 'layered-min-edge'
+CUST_LAYERED_MIN_TILE    = 'layered-min-tile'
+
 CUST_FWDBWD_NOSTUCK      = 'fwdbwd-nostuck'
 CUST_FWDBWD_STUCK        = 'fwdbwd-stuck'
 CUST_FWDBWD_REACH_OPEN   = 'fwdbwd-reach-open'
 CUST_FWDBWD_REACH_SINK   = 'fwdbwd-reach-sink'
 CUST_FWDBWD_COUNT_SINK   = 'fwdbwd-count-sink'
 CUST_FWDBWD_COUNT_FWDBWD = 'fwdbwd-count-fwdbwd'
-CUST_LIST = [CUST_RESULT, CUST_TEXT_LEVEL, CUST_TEXT_LEVEL_WEIGHTED, CUST_TEXT_LEVEL_SUBST, CUST_TEXT_LEVEL_RANGE, CUST_TEXT_COUNT, CUST_TEXT_EXCLUDE, CUST_TEXT_MAX, CUST_PATH, CUST_PATH_ENDS, CUST_PATH_FWD, CUST_PATH_SHORT, CUST_FWDBWD_NOSTUCK, CUST_FWDBWD_STUCK, CUST_FWDBWD_REACH_OPEN, CUST_FWDBWD_REACH_SINK, CUST_FWDBWD_COUNT_SINK, CUST_FWDBWD_COUNT_FWDBWD]
+
+CUST_RESULT              = 'result'
+
+CUST_LIST = [CUST_TEXT_COUNT, CUST_TEXT_EXCLUDE, CUST_TEXT_MIN, CUST_TEXT_MAX,
+             CUST_TEXT_LEVEL, CUST_TEXT_LEVEL_WEIGHTED, CUST_TEXT_LEVEL_SUBST, CUST_TEXT_LEVEL_RANGE,
+             CUST_FLAT_PATH, CUST_FLAT_ENDS, CUST_FLAT_FWD, CUST_FLAT_MIN,
+             CUST_LAYERED_FWD, CUST_LAYERED_MIN_EDGE, CUST_LAYERED_MIN_TILE,
+             CUST_FWDBWD_NOSTUCK, CUST_FWDBWD_STUCK, CUST_FWDBWD_REACH_OPEN, CUST_FWDBWD_REACH_SINK, CUST_FWDBWD_COUNT_SINK, CUST_FWDBWD_COUNT_FWDBWD,
+             CUST_RESULT]
 
 
 
@@ -59,27 +74,7 @@ def arg_cvt(args, cvts):
     return [cvt(arg) for arg, cvt in zip(args, cvts)]
 
 def args_to_custom(cust, args):
-    if cust == CUST_RESULT:
-        result_info, which, rlo, clo, rhi, chi, roff, coff, weight = arg_cvt(args, (str_to_result, str, int, int, int, int, int, int, str_to_weight))
-        return OutResultConstraint(result_info, which, rlo, clo, rhi, chi, roff, coff, weight)
-
-    elif cust == CUST_TEXT_LEVEL:
-        out_text_level, weight = arg_cvt(args, (util_common.read_text_level, str_to_weight))
-        return OutTextLevelConstraint(out_text_level, weight)
-
-    elif cust == CUST_TEXT_LEVEL_WEIGHTED:
-        out_text_level, weights = arg_cvt(args, (util_common.read_text_level, str_to_json))
-        return OutTextLevelWeightedConstraint(out_text_level, weights)
-
-    elif cust == CUST_TEXT_LEVEL_SUBST:
-        out_text_level, weights = arg_cvt(args, (util_common.read_text_level, str_to_json))
-        return OutTextLevelSubstConstraint(out_text_level, weights)
-
-    elif cust == CUST_TEXT_LEVEL_RANGE:
-        out_text_level, lo, hi, weight = arg_cvt(args, (util_common.read_text_level, int, int, str_to_weight))
-        return OutTextLevelRangeConstraint(out_text_level, lo, hi, weight)
-
-    elif cust == CUST_TEXT_COUNT:
+    if cust == CUST_TEXT_COUNT:
         util_common.check(len(args) >= 5 + 3 and (len(args) - 3) % 5 == 0, 'argument length')
         regions = []
         while len(args) >= 5:
@@ -87,47 +82,83 @@ def args_to_custom(cust, args):
             regions.append((rlo, clo, rhi, chi, out_texts))
             args = args[5:]
         tlo, thi, weight = arg_cvt(args, (int, int, str_to_weight))
-        return OutTextCountConstraint(regions, tlo, thi, weight)
+        return TextCountConstraint(regions, tlo, thi, weight)
 
     elif cust == CUST_TEXT_EXCLUDE:
         out_texts, weight = arg_cvt(args, (str, str_to_weight))
-        return OutTextExcludeConstraint(out_texts, weight)
+        return TextExcludeConstraint(out_texts, weight)
+
+    elif cust == CUST_TEXT_MIN:
+        rlo, clo, rhi, chi, out_texts, weight = arg_cvt(args, (int, int, int, int, str, str_to_weight))
+        return TextMinimizeConstraint(rlo, clo, rhi, chi, out_texts, weight)
 
     elif cust == CUST_TEXT_MAX:
         rlo, clo, rhi, chi, out_texts, weight = arg_cvt(args, (int, int, int, int, str, str_to_weight))
-        return OutTextMaximizeConstraint(rlo, clo, rhi, chi, out_texts, weight)
+        return TextMaximizeConstraint(rlo, clo, rhi, chi, out_texts, weight)
 
-    elif cust == CUST_PATH:
+
+    elif cust == CUST_TEXT_LEVEL:
+        out_text_level, weight = arg_cvt(args, (util_common.read_text_level, str_to_weight))
+        return TextLevelConstraint(out_text_level, weight)
+
+    elif cust == CUST_TEXT_LEVEL_WEIGHTED:
+        out_text_level, weights = arg_cvt(args, (util_common.read_text_level, str_to_json))
+        return TextLevelWeightedConstraint(out_text_level, weights)
+
+    elif cust == CUST_TEXT_LEVEL_SUBST:
+        out_text_level, weights = arg_cvt(args, (util_common.read_text_level, str_to_json))
+        return TextLevelSubstConstraint(out_text_level, weights)
+
+    elif cust == CUST_TEXT_LEVEL_RANGE:
+        out_text_level, lo, hi, weight = arg_cvt(args, (util_common.read_text_level, int, int, str_to_weight))
+        return TextLevelRangeConstraint(out_text_level, lo, hi, weight)
+
+
+    elif cust == CUST_FLAT_PATH:
         path_points, weight = arg_cvt(args, (str_to_path, str_to_weight))
-        return OutPathConstraint(path_points, weight)
+        return FlatPathConstraint(path_points, weight)
 
-    elif cust == CUST_PATH_ENDS:
+    elif cust == CUST_FLAT_ENDS:
         sr, sc, gr, gc, weight = arg_cvt(args, (int, int, int, int, str_to_weight))
-        return OutPathEndsConstraint(sr, sc, gr, gc, weight)
+        return FlatEndsConstraint(sr, sc, gr, gc, weight)
 
-    elif cust == CUST_PATH_FWD:
+    elif cust == CUST_FLAT_FWD:
         direction, weight, = arg_cvt(args, (str, str_to_weight))
-        return OutPathFwdConstraint(direction, weight)
+        return FlatFwdConstraint(direction, weight)
 
-    elif cust == CUST_PATH_SHORT:
-        direction, most, weight = arg_cvt(args, (str, int, str_to_weight))
-        return OutPathShortConstraint(direction, most, weight)
+    elif cust == CUST_FLAT_MIN:
+        weight, = arg_cvt(args, (str_to_weight,))
+        return FlatMinConstraint(weight)
+
+
+    elif cust == CUST_LAYERED_FWD:
+        direction, weight, = arg_cvt(args, (str, str_to_weight))
+        return LayeredFwdConstraint(direction, weight)
+
+    elif cust == CUST_LAYERED_MIN_EDGE:
+        weight, = arg_cvt(args, (str_to_weight,))
+        return LayeredMinEdgeConstraint(weight)
+
+    elif cust == CUST_LAYERED_MIN_TILE:
+        weight, = arg_cvt(args, (str_to_weight,))
+        return LayeredMinTileConstraint(weight)
+
 
     elif cust == CUST_FWDBWD_NOSTUCK:
         weight, = arg_cvt(args, (str_to_weight,))
-        return OutFwdBwdNoStuckConstraint(weight)
+        return FwdBwdNoStuckConstraint(weight)
 
     elif cust == CUST_FWDBWD_STUCK:
         sink_ok, weight = arg_cvt(args, (str, str_to_weight))
-        return OutFwdBwdStuckConstraint(sink_ok, weight)
+        return FwdBwdStuckConstraint(sink_ok, weight)
 
     elif cust == CUST_FWDBWD_REACH_OPEN:
         weight, = arg_cvt(args, (str_to_weight,))
-        return OutFwdBwdReachOpenConstraint(weight)
+        return FwdBwdReachOpenConstraint(weight)
 
     elif cust == CUST_FWDBWD_REACH_SINK:
         weight, = arg_cvt(args, (str_to_weight,))
-        return OutFwdBwdReachSinkConstraint(weight)
+        return FwdBwdReachSinkConstraint(weight)
 
     elif cust == CUST_FWDBWD_COUNT_SINK:
         if len(args) == 3:
@@ -136,12 +167,18 @@ def args_to_custom(cust, args):
         else:
             rlo, clo, rhi, chi, snklo, snkhi, weight = arg_cvt(args, (int, int, int, int, int, int, str_to_weight))
 
-        return OutFwdBwdCountSinkConstraint(rlo, clo, rhi, chi, snklo, snkhi, weight)
+        return FwdBwdCountSinkConstraint(rlo, clo, rhi, chi, snklo, snkhi, weight)
 
     elif cust == CUST_FWDBWD_COUNT_FWDBWD:
         fwdlo, fwdhi, bwdlo, bwdhi, weight = arg_cvt(args, (int, int, int, int, str_to_weight))
 
-        return OutFwdBwdCountFwdBwdConstraint(fwdlo, fwdhi, bwdlo, bwdhi, weight)
+        return FwdBwdCountFwdBwdConstraint(fwdlo, fwdhi, bwdlo, bwdhi, weight)
+
+
+    elif cust == CUST_RESULT:
+        result_info, which, rlo, clo, rhi, chi, roff, coff, weight = arg_cvt(args, (str_to_result, str, int, int, int, int, int, int, str_to_weight))
+        return ResultConstraint(result_info, which, rlo, clo, rhi, chi, roff, coff, weight)
+
 
     else:
         util_common.check(False, 'cust')
@@ -164,17 +201,197 @@ class CustomConstraint:
     def add(self, gen):
         pass
 
-class OutPathConstraint(CustomConstraint):
+
+
+class TextCountConstraint(CustomConstraint):
+    def __init__(self, regions, tlo, thi, weight):
+        self._regions = regions
+        self._tlo = tlo
+        self._thi = thi
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom text count constraint', self._weight)
+
+        rcts = []
+        for rlo, clo, rhi, chi, out_texts in self._regions:
+            for rr in range(rlo, rhi):
+                for cc in range(clo, chi):
+                    possible_tiles = possible_tiles_at_texts(rr, cc, out_texts, gen)
+                    rcts.append((rr, cc, possible_tiles))
+
+        gen.add_constraint_tile_counts(rcts, self._tlo, self._thi, self._weight)
+
+class TextExcludeConstraint(CustomConstraint):
+    def __init__(self, out_texts, weight):
+        self._out_texts = out_texts
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom text exclude constraint', self._weight)
+
+        rcts = []
+        for rr in range(gen.get_rows()):
+            for cc in range(gen.get_cols()):
+                possible_tiles = possible_tiles_at_texts(rr, cc, self._out_texts, gen)
+                rcts.append((rr, cc, possible_tiles))
+        gen.add_constraint_tile_counts(rcts, 0, 0, self._weight)
+
+class TextMinimizeConstraint(CustomConstraint):
+    def __init__(self, rlo, clo, rhi, chi, out_texts, weight):
+        self._rlo = rlo
+        self._clo = clo
+        self._rhi = rhi
+        self._chi = chi
+        self._out_texts = out_texts
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom text minimize constraint', self._weight)
+
+        for rr in range(self._rlo, self._rhi):
+            for cc in range(self._clo, self._chi):
+                possible_tiles = possible_tiles_at_texts(rr, cc, self._out_texts, gen)
+                gen.add_constraint_tile_counts([(rr, cc, possible_tiles)], 0, 0, self._weight)
+
+class TextMaximizeConstraint(CustomConstraint):
+    def __init__(self, rlo, clo, rhi, chi, out_texts, weight):
+        self._rlo = rlo
+        self._clo = clo
+        self._rhi = rhi
+        self._chi = chi
+        self._out_texts = out_texts
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom text maximize constraint', self._weight)
+
+        for rr in range(self._rlo, self._rhi):
+            for cc in range(self._clo, self._chi):
+                possible_tiles = possible_tiles_at_texts(rr, cc, self._out_texts, gen)
+                gen.add_constraint_tile_counts([(rr, cc, possible_tiles)], 1, 1, self._weight)
+
+
+
+class TextLevelConstraint(CustomConstraint):
+    def __init__(self, out_text_level, weight):
+        self._out_text_level = out_text_level
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom text level constraint', self._weight)
+
+        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
+        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
+
+        for rr in range(gen.get_rows()):
+            for cc in range(gen.get_cols()):
+                out_text = self._out_text_level[rr][cc]
+                if out_text != util_common.DEFAULT_TEXT:
+                    possible_tiles = possible_tiles_at_texts(rr, cc, out_text, gen)
+                    gen.add_constraint_tile_counts([(rr, cc, possible_tiles)], 1, 1, self._weight)
+
+class TextLevelWeightedConstraint(CustomConstraint):
+    def __init__(self, out_text_level, weights):
+        self._out_text_level = out_text_level
+        self._weights = weights
+
+    def add(self, gen):
+        print('add custom text level weighted constraint')
+
+        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
+        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
+
+        util_common.check(len(self._weights) == gen.get_rows(), 'weights size')
+        util_common.check(len(self._weights[0]) == gen.get_cols(), 'weights size')
+
+        for rr in range(gen.get_rows()):
+            for cc in range(gen.get_cols()):
+                out_text = self._out_text_level[rr][cc]
+                weight = self._weights[rr][cc]
+                if out_text != util_common.DEFAULT_TEXT:
+                    possible_tiles = possible_tiles_at_texts(rr, cc, out_text, gen)
+                    gen.add_constraint_tile_counts([(rr, cc, possible_tiles)], 1, 1, weight)
+
+class TextLevelSubstConstraint(CustomConstraint):
+    def __init__(self, out_text_level, weights):
+        self._out_text_level = out_text_level
+        self._weights = weights
+
+    def add(self, gen):
+        print('add custom text level subst constraint')
+
+        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
+        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
+
+        tile_to_text = gen.get_scheme_info().tileset.tile_to_text
+
+        for rr in range(gen.get_rows()):
+            for cc in range(gen.get_cols()):
+                out_text = self._out_text_level[rr][cc]
+                if out_text != util_common.DEFAULT_TEXT:
+                    possible_texts_to_tiles = {}
+                    for ptile in gen.get_possible_tiles_at(rr, cc):
+                        ptext = tile_to_text[ptile]
+                        if ptext not in possible_texts_to_tiles:
+                            possible_texts_to_tiles[ptext] = []
+                        possible_texts_to_tiles[ptext].append(ptile)
+
+                    if out_text not in self._weights:
+                        gen.add_constraint_tile_counts([(rr, cc, possible_texts_to_tiles[out_text])], 1, 1, None)
+                    else:
+                        substs = self._weights[out_text]
+                        for ptext, ptiles in possible_texts_to_tiles.items():
+                            weight = substs[ptext] if ptext in substs else None
+                            if weight == 0:
+                                pass
+                            elif weight is None:
+                                gen.add_constraint_tile_counts([(rr, cc, ptiles)], 0, 0, None)
+                            else:
+                                other_tiles = []
+                                for otext, otiles in possible_texts_to_tiles.items():
+                                    if ptext != otext and otext in substs:
+                                        other_tiles += otiles
+                                gen.add_constraint_tile_counts([(rr, cc, other_tiles)], 1, 1, weight)
+
+class TextLevelRangeConstraint(CustomConstraint):
+    def __init__(self, out_text_level, lo, hi, weight):
+        self._out_text_level = out_text_level
+        self._lo = lo
+        self._hi = hi
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom text level range constraint', self._weight)
+
+        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
+        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
+
+        rcts = []
+        for rr in range(gen.get_rows()):
+            for cc in range(gen.get_cols()):
+                out_text = self._out_text_level[rr][cc]
+                if out_text != util_common.DEFAULT_TEXT:
+                    possible_tiles = possible_tiles_at_texts(rr, cc, out_text, gen)
+                    rcts.append((rr, cc, possible_tiles))
+
+        gen.add_constraint_tile_counts(rcts, len(rcts) - self._hi, len(rcts) - self._lo, self._weight)
+
+
+
+class FlatPathConstraint(CustomConstraint):
     def __init__(self, path, weight):
         self._path = path
         self._weight = weight
 
     def add(self, gen):
-        print('add custom out path constraint', self._weight)
+        print('add custom flat path constraint', self._weight)
 
         util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FLAT, 'method')
+
             if gen.is_unreachable(connect_index):
                 continue
 
@@ -209,7 +426,7 @@ class OutPathConstraint(CustomConstraint):
 
             gen.append_extra_meta([util_common.meta_path('custom-path', self._path)])
 
-class OutPathEndsConstraint(CustomConstraint):
+class FlatEndsConstraint(CustomConstraint):
     def __init__(self, sr, sc, gr, gc, weight):
         self._sr = sr
         self._sc = sc
@@ -218,7 +435,7 @@ class OutPathEndsConstraint(CustomConstraint):
         self._weight = weight
 
     def add(self, gen):
-        print('add custom out path ends constraint', self._weight)
+        print('add custom flat ends constraint', self._weight)
 
         for rr in range(gen.get_rows()):
             for cc in range(gen.get_cols()):
@@ -228,17 +445,19 @@ class OutPathEndsConstraint(CustomConstraint):
         ends = [(self._sr, self._sc), (self._gr, self._gc)]
         gen.append_extra_meta([util_common.meta_tile('custom-path-ends', ends)])
 
-class OutPathFwdConstraint(CustomConstraint):
+class FlatFwdConstraint(CustomConstraint):
     def __init__(self, direction, weight):
         self._direction = direction
         self._weight = weight
 
     def add(self, gen):
-        print('add custom out path forward constraint', self._weight)
+        print('add custom flat forward constraint', self._weight)
 
         util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FLAT, 'method')
+
             if gen.is_unreachable(connect_index):
                 continue
 
@@ -256,39 +475,114 @@ class OutPathFwdConstraint(CustomConstraint):
                 if exclude:
                     gen.add_constraint_reach_edge(connect_index, cfr, cfc, ctr, ctc, cpwtr, cpwtc, False, self._weight)
 
-class OutPathShortConstraint(CustomConstraint):
-    def __init__(self, direction, most, weight):
-        self._direction = direction
-        self._most = most
+class FlatMinConstraint(CustomConstraint):
+    def __init__(self, weight):
         self._weight = weight
 
     def add(self, gen):
-        print('add custom out path short constraint', self._weight)
+        print('add custom flat min constraint', self._weight)
 
         util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FLAT, 'method')
+
             if gen.is_unreachable(connect_index):
                 continue
 
-            if self._direction == util_reach.RSGLOC_L_R:
-                for cc in range(gen.get_cols()):
-                    vvs = []
-                    for rr in range(gen.get_rows()):
-                        vvs.append(gen._reach_connect_entry[connect_index].vars_node[(rr, cc)])
-                    gen._solver.cnstr_count(vvs, True, 0, self._most, self._weight)
+            vars_node = gen._reach_connect_entry[connect_index].vars_node
 
-            elif self._direction == util_reach.RSGLOC_B_T:
-                for rr in range(gen.get_rows()):
-                    vvs = []
-                    for cc in range(gen.get_cols()):
-                        vvs.append(gen._reach_connect_entry[connect_index].vars_node[(rr, cc)])
-                    gen._solver.cnstr_count(vvs, True, 0, self._most, self._weight)
+            for loc in vars_node:
+                gen._solver.cnstr_count([vars_node[loc]], True, 0, 0, self._weight)
 
-            else:
-                util_common.check(False, 'direction')
 
-class OutFwdBwdNoStuckConstraint(CustomConstraint):
+
+class LayeredFwdConstraint(CustomConstraint):
+    def __init__(self, direction, weight):
+        self._direction = direction
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom layered forward constraint', self._weight)
+
+        util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
+
+        for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_LAYERED, 'method')
+            util_common.check(not gen.is_unreachable(connect_index), 'unreachable')
+
+            vars_layer_edge = gen._reach_connect_entry[connect_index].vars_layer_edge
+
+            for layer in vars_layer_edge:
+                for edge_key, edge_var in vars_layer_edge[layer].items():
+                    fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+
+                    if self._direction == util_reach.RSGLOC_L_R:
+                        exclude = (tc <= fc)
+                    elif self._direction == util_reach.RSGLOC_B_T:
+                        exclude = (tr >= fr)
+                    else:
+                        util_common.check(False, 'direction')
+
+                    if exclude:
+                        gen._solver.cnstr_count([edge_var], True, 0, 0, self._weight)
+
+class LayeredMinEdgeConstraint(CustomConstraint):
+    def __init__(self, weight):
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom layered min edge constraint', self._weight)
+
+        util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
+
+        for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_LAYERED, 'method')
+            util_common.check(not gen.is_unreachable(connect_index), 'unreachable')
+
+            vars_layer_edge = gen._reach_connect_entry[connect_index].vars_layer_edge
+
+            for layer in vars_layer_edge:
+                for edge_key, edge_var in vars_layer_edge[layer].items():
+                    gen._solver.cnstr_count([edge_var], True, 0, 0, self._weight)
+
+class LayeredMinTileConstraint(CustomConstraint):
+    def __init__(self, weight):
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom layered min tile constraint', self._weight)
+
+        util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
+
+        for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_LAYERED, 'method')
+            util_common.check(not gen.is_unreachable(connect_index), 'unreachable')
+
+            vars_layer_edge = gen._reach_connect_entry[connect_index].vars_layer_edge
+
+            tile_max = 0
+            for layer in vars_layer_edge:
+                for edge_key, edge_var in vars_layer_edge[layer].items():
+                    fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+                    tile_len = 1 + len(need_open_path) + len(need_closed_path)
+                    tile_max = max(tile_max, tile_len)
+
+            for layer in vars_layer_edge:
+                tile_len_vars = [gen._solver.make_var() for tt in range(tile_max)]
+                for len_vv in tile_len_vars:
+                    gen._solver.cnstr_count([len_vv], True, 0, 0, self._weight)
+
+                for edge_key, edge_var in vars_layer_edge[layer].items():
+                    fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+                    tile_len = 1 + len(need_open_path) + len(need_closed_path)
+                    for tt, len_vv in enumerate(tile_len_vars):
+                        if tt < tile_len:
+                            gen._solver.cnstr_implies_disj(edge_var, True, [len_vv], True, None)
+
+
+
+class FwdBwdNoStuckConstraint(CustomConstraint):
     def __init__(self, weight):
         self._weight = weight
 
@@ -298,6 +592,8 @@ class OutFwdBwdNoStuckConstraint(CustomConstraint):
         util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FWDBWD, 'method')
+
             fwd_reachable_vars = gen.reachability_fwdbwd_fwd_reachable(connect_index)
             bwd_reachable_vars = gen.reachability_fwdbwd_bwd_reachable(connect_index)
             sink_vars = gen.reachability_fwdbwd_sink(connect_index)
@@ -307,7 +603,7 @@ class OutFwdBwdNoStuckConstraint(CustomConstraint):
                 fwd_reachable_and_not_sink = fwd_reachable_vars[rc] if sink_vars is None else gen._solver.make_conj([fwd_reachable_vars[rc], sink_vars[rc]], [True, False])
                 gen._solver.cnstr_implies_disj(fwd_reachable_and_not_sink, True, [bwd_reachable_vars[rc]], True, self._weight)
 
-class OutFwdBwdStuckConstraint(CustomConstraint):
+class FwdBwdStuckConstraint(CustomConstraint):
     def __init__(self, sink_ok, weight):
         util_common.check(sink_ok in ['sink-ok', 'sink-no'], 'value must be sink-ok or sink-no')
 
@@ -320,6 +616,8 @@ class OutFwdBwdStuckConstraint(CustomConstraint):
         util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FWDBWD, 'method')
+
             fwd_reachable_vars = gen.reachability_fwdbwd_fwd_reachable(connect_index)
             bwd_reachable_vars = gen.reachability_fwdbwd_bwd_reachable(connect_index)
             sink_vars = gen.reachability_fwdbwd_sink(connect_index)
@@ -350,7 +648,7 @@ class OutFwdBwdStuckConstraint(CustomConstraint):
 
             gen._solver.cnstr_count(vars_stuck, True, 1, len(vars_stuck), None)
 
-class OutFwdBwdReachOpenConstraint(CustomConstraint):
+class FwdBwdReachOpenConstraint(CustomConstraint):
     def __init__(self, weight):
         self._weight = weight
 
@@ -360,13 +658,15 @@ class OutFwdBwdReachOpenConstraint(CustomConstraint):
         util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FWDBWD, 'method')
+
             open_vars = gen.reachability_open(connect_index)
             fwd_reachable_vars = gen.reachability_fwdbwd_fwd_reachable(connect_index)
 
             for rc, open_var in open_vars.items():
                 gen._solver.cnstr_implies_disj(open_var, True, [fwd_reachable_vars[rc]], True, self._weight)
 
-class OutFwdBwdReachSinkConstraint(CustomConstraint):
+class FwdBwdReachSinkConstraint(CustomConstraint):
     def __init__(self, weight):
         self._weight = weight
 
@@ -384,7 +684,7 @@ class OutFwdBwdReachSinkConstraint(CustomConstraint):
             for rc, sink_var in sink_vars.items():
                 gen._solver.cnstr_implies_disj(sink_var, True, [fwd_reachable_vars[rc]], True, self._weight)
 
-class OutFwdBwdCountSinkConstraint(CustomConstraint):
+class FwdBwdCountSinkConstraint(CustomConstraint):
     def __init__(self, rlo, clo, rhi, chi, snklo, snkhi, weight):
         self._rlo = rlo
         self._clo = clo
@@ -405,6 +705,8 @@ class OutFwdBwdCountSinkConstraint(CustomConstraint):
         chi = gen.get_cols() if self._chi is None else self._chi
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FWDBWD, 'method')
+
             sink_vars = gen.reachability_fwdbwd_sink(connect_index)
 
             if sink_vars is None:
@@ -418,7 +720,7 @@ class OutFwdBwdCountSinkConstraint(CustomConstraint):
 
                 gen._solver.cnstr_count(use_sink_vars, True, self._snklo, self._snkhi, self._weight)
 
-class OutFwdBwdCountFwdBwdConstraint(CustomConstraint):
+class FwdBwdCountFwdBwdConstraint(CustomConstraint):
     def __init__(self, fwdlo, fwdhi, bwdlo, bwdhi, weight):
         self._fwdlo = fwdlo
         self._fwdhi = fwdhi
@@ -432,13 +734,17 @@ class OutFwdBwdCountFwdBwdConstraint(CustomConstraint):
         util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
 
         for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_FWDBWD, 'method')
+
             fwd_reachable_vars = gen.reachability_fwdbwd_fwd_reachable(connect_index)
             bwd_reachable_vars = gen.reachability_fwdbwd_bwd_reachable(connect_index)
 
-            gen._solver.cnstr_count(fwd_reachable_vars.values(), True, self._fwdlo, self._fwdhi, self._weight)
-            gen._solver.cnstr_count(bwd_reachable_vars.values(), True, self._bwdlo, self._bwdhi, self._weight)
+            gen._solver.cnstr_count(list(fwd_reachable_vars.values()), True, self._fwdlo, self._fwdhi, self._weight)
+            gen._solver.cnstr_count(list(bwd_reachable_vars.values()), True, self._bwdlo, self._bwdhi, self._weight)
 
-class OutResultConstraint(CustomConstraint):
+
+
+class ResultConstraint(CustomConstraint):
     def __init__(self, out_result, which, rlo, clo, rhi, chi, roff, coff, weight):
         self._out_result = out_result
         self._which = which
@@ -451,7 +757,7 @@ class OutResultConstraint(CustomConstraint):
         self._weight = weight
 
     def add(self, gen):
-        print('add custom out result constraint', self._weight)
+        print('add custom result constraint', self._weight)
 
         util_common.check(gen.get_num_reach_connect() == 1, 'only supports one reach move')
 
@@ -551,158 +857,3 @@ class OutResultConstraint(CustomConstraint):
                         gen.add_constraint_start(rr + rinto, cc + cinto, (rr, cc) == path_start, self._weight)
                     if path_goal_found or path_all:
                         gen.add_constraint_goal(rr + rinto, cc + cinto, (rr, cc) == path_goal, self._weight)
-
-class OutTextLevelConstraint(CustomConstraint):
-    def __init__(self, out_text_level, weight):
-        self._out_text_level = out_text_level
-        self._weight = weight
-
-    def add(self, gen):
-        print('add custom out text level constraint', self._weight)
-
-        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
-        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
-
-        for rr in range(gen.get_rows()):
-            for cc in range(gen.get_cols()):
-                out_text = self._out_text_level[rr][cc]
-                if out_text != util_common.DEFAULT_TEXT:
-                    possible_tiles = possible_tiles_at_texts(rr, cc, out_text, gen)
-                    gen.add_constraint_tile_counts([(rr, cc, possible_tiles)], 1, 1, self._weight)
-
-class OutTextLevelWeightedConstraint(CustomConstraint):
-    def __init__(self, out_text_level, weights):
-        self._out_text_level = out_text_level
-        self._weights = weights
-
-    def add(self, gen):
-        print('add custom out text level weighted constraint')
-
-        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
-        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
-
-        util_common.check(len(self._weights) == gen.get_rows(), 'weights size')
-        util_common.check(len(self._weights[0]) == gen.get_cols(), 'weights size')
-
-        for rr in range(gen.get_rows()):
-            for cc in range(gen.get_cols()):
-                out_text = self._out_text_level[rr][cc]
-                weight = self._weights[rr][cc]
-                if out_text != util_common.DEFAULT_TEXT:
-                    possible_tiles = possible_tiles_at_texts(rr, cc, out_text, gen)
-                    gen.add_constraint_tile_counts([(rr, cc, possible_tiles)], 1, 1, weight)
-
-class OutTextLevelSubstConstraint(CustomConstraint):
-    def __init__(self, out_text_level, weights):
-        self._out_text_level = out_text_level
-        self._weights = weights
-
-    def add(self, gen):
-        print('add custom out text level subst constraint')
-
-        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
-        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
-
-        tile_to_text = gen.get_scheme_info().tileset.tile_to_text
-
-        for rr in range(gen.get_rows()):
-            for cc in range(gen.get_cols()):
-                out_text = self._out_text_level[rr][cc]
-                if out_text != util_common.DEFAULT_TEXT:
-                    possible_texts_to_tiles = {}
-                    for ptile in gen.get_possible_tiles_at(rr, cc):
-                        ptext = tile_to_text[ptile]
-                        if ptext not in possible_texts_to_tiles:
-                            possible_texts_to_tiles[ptext] = []
-                        possible_texts_to_tiles[ptext].append(ptile)
-
-                    if out_text not in self._weights:
-                        gen.add_constraint_tile_counts([(rr, cc, possible_texts_to_tiles[out_text])], 1, 1, None)
-                    else:
-                        substs = self._weights[out_text]
-                        for ptext, ptiles in possible_texts_to_tiles.items():
-                            weight = substs[ptext] if ptext in substs else None
-                            if weight == 0:
-                                pass
-                            elif weight is None:
-                                gen.add_constraint_tile_counts([(rr, cc, ptiles)], 0, 0, None)
-                            else:
-                                other_tiles = []
-                                for otext, otiles in possible_texts_to_tiles.items():
-                                    if ptext != otext and otext in substs:
-                                        other_tiles += otiles
-                                gen.add_constraint_tile_counts([(rr, cc, other_tiles)], 1, 1, weight)
-
-class OutTextLevelRangeConstraint(CustomConstraint):
-    def __init__(self, out_text_level, lo, hi, weight):
-        self._out_text_level = out_text_level
-        self._lo = lo
-        self._hi = hi
-        self._weight = weight
-
-    def add(self, gen):
-        print('add custom out text level range constraint', self._weight)
-
-        util_common.check(len(self._out_text_level) == gen.get_rows(), 'size')
-        util_common.check(len(self._out_text_level[0]) == gen.get_cols(), 'size')
-
-        rcts = []
-        for rr in range(gen.get_rows()):
-            for cc in range(gen.get_cols()):
-                out_text = self._out_text_level[rr][cc]
-                if out_text != util_common.DEFAULT_TEXT:
-                    possible_tiles = possible_tiles_at_texts(rr, cc, out_text, gen)
-                    rcts.append((rr, cc, possible_tiles))
-
-        gen.add_constraint_tile_counts(rcts, len(rcts) - self._hi, len(rcts) - self._lo, self._weight)
-
-class OutTextCountConstraint(CustomConstraint):
-    def __init__(self, regions, tlo, thi, weight):
-        self._regions = regions
-        self._tlo = tlo
-        self._thi = thi
-        self._weight = weight
-
-    def add(self, gen):
-        print('add custom out text count constraint', self._weight)
-
-        rcts = []
-        for rlo, clo, rhi, chi, out_texts in self._regions:
-            for rr in range(rlo, rhi):
-                for cc in range(clo, chi):
-                    possible_tiles = possible_tiles_at_texts(rr, cc, out_texts, gen)
-                    rcts.append((rr, cc, possible_tiles))
-
-        gen.add_constraint_tile_counts(rcts, self._tlo, self._thi, self._weight)
-
-class OutTextExcludeConstraint(CustomConstraint):
-    def __init__(self, out_texts, weight):
-        self._out_texts = out_texts
-        self._weight = weight
-
-    def add(self, gen):
-        print('add custom out text exclude constraint', self._weight)
-
-        rcts = []
-        for rr in range(gen.get_rows()):
-            for cc in range(gen.get_cols()):
-                possible_tiles = possible_tiles_at_texts(rr, cc, self._out_texts, gen)
-                rcts.append((rr, cc, possible_tiles))
-        gen.add_constraint_tile_counts(rcts, 0, 0, self._weight)
-
-class OutTextMaximizeConstraint(CustomConstraint):
-    def __init__(self, rlo, clo, rhi, chi, out_texts, weight):
-        self._rlo = rlo
-        self._clo = clo
-        self._rhi = rhi
-        self._chi = chi
-        self._out_texts = out_texts
-        self._weight = weight
-
-    def add(self, gen):
-        print('add custom out text maximize constraint', self._weight)
-
-        for rr in range(self._rlo, self._rhi):
-            for cc in range(self._clo, self._chi):
-                possible_tiles = possible_tiles_at_texts(rr, cc, self._out_texts, gen)
-                gen.add_constraint_tile_counts([(rr, cc, possible_tiles)], 1, 1, self._weight)

@@ -121,6 +121,74 @@ if __name__ == '__main__':
         solver.cnstr_count([a, b], True, 2, 2, wt)
     tests.append((setup, [True, True, False, False]))
 
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_disj(solver, a, [b, c], True)
+        solver.cnstr_count([a], True, 1, 1, wt)
+        solver.cnstr_count([b], False, 1, 1, wt)
+    tests.append((setup, [True, False, True]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_disj(solver, a, [b, c], True)
+        solver.cnstr_count([a], True, 1, 1, wt)
+        solver.cnstr_count([c], False, 1, 1, wt)
+    tests.append((setup, [True, True, False]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_disj(solver, a, [b, c], True)
+        solver.cnstr_count([b], False, 1, 1, wt)
+        solver.cnstr_count([c], True, 1, 1, wt)
+    tests.append((setup, [True, False, True]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_disj(solver, a, [b, c], True)
+        solver.cnstr_count([b], True, 1, 1, wt)
+        solver.cnstr_count([c], False, 1, 1, wt)
+    tests.append((setup, [True, True, False]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_disj(solver, a, [b, c], True)
+        solver.cnstr_count([a], False, 1, 1, wt)
+    tests.append((setup, [False, False, False]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_disj(solver, a, [b, c], True)
+        solver.cnstr_count([b], False, 1, 1, wt)
+        solver.cnstr_count([c], False, 1, 1, wt)
+    tests.append((setup, [False, False, False]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_implies_atmost_one(solver, a, True, [b, c], True, wt)
+        solver.cnstr_count([a], True, 1, 1, wt)
+        solver.cnstr_count([b], True, 1, 1, wt)
+    tests.append((setup, [True, True, False]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_implies_atmost_one(solver, a, True, [b, c], True, wt)
+        solver.cnstr_count([a], True, 1, 1, wt)
+        solver.cnstr_count([c], True, 1, 1, wt)
+    tests.append((setup, [True, False, True]))
+
+    def setup(solver, wt, a, b, c):
+        util_solvers.cnstr_implies_atmost_one(solver, a, True, [b, c], True, wt)
+        solver.cnstr_count([b], True, 1, 1, wt)
+        solver.cnstr_count([c], True, 1, 1, wt)
+    tests.append((setup, [False, True, True]))
+
+    def setup(solver, wt, a, b, c, d):
+        j = solver.make_conj([a, b], False)
+        k = solver.make_conj([c, d], True)
+        l = solver.make_conj([j, k], True)
+        solver.cnstr_count([l], True, 1, 1, wt)
+    tests.append((setup, [False, False, True, True]))
+
+    def setup(solver, wt, a, b, c, d):
+        j = solver.make_conj([a], True)
+        k = solver.make_conj([b, j], True)
+        l = solver.make_conj([c, k], True)
+        m = solver.make_conj([d, l], True)
+        solver.cnstr_count([m], True, 1, 1, wt)
+    tests.append((setup, [True, True, True, True]))
+
     for solver_id in solvers_to_test:
         for use_portfolio in [False, True]:
             for use_weight in [None, 1]:

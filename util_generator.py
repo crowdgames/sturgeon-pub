@@ -3,9 +3,6 @@ import util_common, util_path, util_solvers
 
 
 
-ENTRY_PATH   = 'path'
-ENTRY_FWDBWD = 'fwdbwd'
-
 COUNTS_ZERO     = 'zero'
 COUNTS_ZERO_ONE = 'zero-one'
 
@@ -19,18 +16,34 @@ class Generator:
             self.out_edges = None
             self.edges = None
 
-    class ConnectEntryPath:
+    class ConnectEntryNull:
         def __init__(self):
-            self.type = ENTRY_PATH
+            self.method = util_common.REACH_METHOD_NULL
+            self.connect_info = None
+            self.rgraph = None
+            self.vars_open = None
+
+    class ConnectEntryFlat:
+        def __init__(self):
+            self.method = util_common.REACH_METHOD_FLAT
             self.connect_info = None
             self.rgraph = None
             self.vars_open = None
             self.vars_node = None
             self.vars_edge = None
 
+    class ConnectEntryLayered:
+        def __init__(self):
+            self.method = util_common.REACH_METHOD_LAYERED
+            self.connect_info = None
+            self.rgraph = None
+            self.vars_open = None
+            self.vars_layer_node = None
+            self.vars_layer_edge = None
+
     class ConnectEntryFwdBwd:
         def __init__(self):
-            self.type = ENTRY_FWDBWD
+            self.method = util_common.REACH_METHOD_FWDBWD
             self.connect_info = None
             self.graph = None
             self.vars_open = None
@@ -92,8 +105,8 @@ class Generator:
     def get_num_reach_connect(self):
         return len(self._reach_connect_entry)
 
-    def get_reach_connect_type(self, connect_index):
-        return self._reach_connect_entry[connect_index].type
+    def get_reach_connect_method(self, connect_index):
+        return self._reach_connect_entry[connect_index].method
 
     def is_unreachable(self, connect_index):
         return self._reach_connect_entry[connect_index].connect_info.unreachable
@@ -163,7 +176,7 @@ class Generator:
                 _pattern_out_vars = [self._pattern_var(_pattern_out) for _pattern_out in _pattern_out_list]
                 self._solver.cnstr_implies_disj(_pattern_in_var, True, _pattern_out_vars, True, weight_patterns)
                 if single_patterns:
-                    self._solver.cnstr_count(_pattern_out_vars, True, 0, 1, weight_patterns)
+                    util_solvers.cnstr_implies_atmost_one(self._solver, _pattern_in_var, True, _pattern_out_vars, True, weight_patterns)
 
         def add_pattern_options(_patterns):
             _pattern_vars = [self._pattern_var(_pattern) for _pattern in _patterns]
@@ -328,7 +341,7 @@ class Generator:
 
     def reachability_edges(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_PATH, 'type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FLAT, 'method')
 
         edges = {}
         for edge_key in connect_entry.vars_edge:
@@ -342,27 +355,27 @@ class Generator:
 
         return connect_entry.vars_open
 
-    def reachability_fwdbwd_layers(self, connect_index):
+    def reachability_layers(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_FWDBWD, 'type')
+        util_common.check(connect_entry.method in [util_common.REACH_METHOD_LAYERED, util_common.REACH_METHOD_FWDBWD], 'method')
 
-        return max(connect_entry.vars_fwd_layer_node)
+        return max(connect_entry.connect_info.layers)
 
     def reachability_fwdbwd_fwd_reachable(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_FWDBWD, 'type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FWDBWD, 'method')
 
         return connect_entry.vars_fwd_layer_node[max(connect_entry.vars_fwd_layer_node)]
 
     def reachability_fwdbwd_bwd_reachable(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_FWDBWD, 'type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FWDBWD, 'method')
 
         return connect_entry.vars_bwd_layer_node[max(connect_entry.vars_bwd_layer_node)]
 
     def reachability_fwdbwd_sink(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_FWDBWD, 'type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FWDBWD, 'method')
 
         if connect_entry.vars_sink_layer_node is not None:
             return connect_entry.vars_sink_layer_node[max(connect_entry.vars_sink_layer_node)]
@@ -371,7 +384,7 @@ class Generator:
 
     def reachability_fwdbwd_edges(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_FWDBWD, 'type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FWDBWD, 'method')
 
         return connect_entry.vars_edge
 
@@ -383,7 +396,7 @@ class Generator:
 
     def add_constraint_reach_edge(self, connect_index, cfr, cfc, ctr, ctc, cpwtr, cpwtc, on_path, weight):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_PATH, 'type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FLAT, 'method')
 
         edge_vars = []
         for edge_key in connect_entry.rgraph.out_edges[(cfr, cfc)]:
@@ -455,13 +468,19 @@ class Generator:
             game = self._game_level[rr][cc]
             move_info = reach_connect_info.game_to_move_info[game]
 
-            if reach_connect_info.sink_bottom:
+            if reach_connect_info.sink is None:
+                pass
+
+            elif reach_connect_info.sink == util_common.REACH_SINK_BOTTOM:
                 if rr == self._rows - 1:
                     continue
 
-            if reach_connect_info.sink_sides:
+            elif reach_connect_info.sink == util_common.REACH_SINK_SIDES:
                 if rr == 0 or cc == 0 or rr == self._rows - 1 or cc == self._cols - 1:
                     continue
+
+            else:
+                util_common.check(False)
 
             edge_keys = util_common.get_edge_keys_from((rr, cc), self._rows, self._cols, move_info, locations, {}, {}, {})
 
@@ -503,20 +522,39 @@ class Generator:
             move_info = reach_connect_info.game_to_move_info[game]
             open_tiles = reach_connect_info.game_to_open_tiles[game]
 
-            # TODO: treat src and dst tiles separately from open tiles?
+            # TODO?: treat src and dst tiles separately from open tiles
             all_open_tiles = open_tiles + [src_tile, dst_tile]
             open_tile_vvs = [self._tile_var(rr, cc, all_open_tile) for all_open_tile in all_open_tiles]
             open_vars[(rr, cc)], _ = util_solvers.make_disj_cache(self._solver, disj_cache, open_tile_vvs, True)
 
         return open_vars
 
-    def _add_rules_reachability_connect_path(self, reach_connect_info):
-        if reach_connect_info.unreachable:
-            print('add reachability connect unreachable constraints')
-        else:
-            print('add reachability connect constraints')
+    def _add_rules_reachability_connect_null(self, reach_connect_info):
+        print('add reachability connect null constraints')
 
-        util_common.check(reach_connect_info.fwdbwd_layers is None, 'options fwdbwd')
+        util_common.check(reach_connect_info.method == util_common.REACH_METHOD_NULL, 'options')
+        util_common.check(not reach_connect_info.unreachable, 'options')
+        util_common.check(reach_connect_info.layers is None, 'options')
+        util_common.check(reach_connect_info.sink is None, 'options')
+
+        rgraph = self._make_reach_graph(reach_connect_info, self._vars_rc_t)
+        open_vars = self._make_open_vars(reach_connect_info, rgraph.nodes)
+
+        connect_entry = Generator.ConnectEntryNull()
+        connect_entry.connect_info = reach_connect_info
+        connect_entry.rgraph = rgraph
+        connect_entry.vars_open = open_vars
+        self._reach_connect_entry.append(connect_entry)
+
+    def _add_rules_reachability_connect_flat(self, reach_connect_info):
+        if reach_connect_info.unreachable:
+            print('add reachability connect flat unreachable constraints')
+        else:
+            print('add reachability connect flat constraints')
+
+        util_common.check(reach_connect_info.method == util_common.REACH_METHOD_FLAT, 'options')
+        util_common.check(reach_connect_info.layers is None, 'options')
+        util_common.check(reach_connect_info.sink is None, 'options')
 
         rgraph = self._make_reach_graph(reach_connect_info, self._vars_rc_t)
 
@@ -524,7 +562,7 @@ class Generator:
         reach_vars_edge = self._make_edge_vars(rgraph)
         open_vars = self._make_open_vars(reach_connect_info, rgraph.nodes)
 
-        connect_entry = Generator.ConnectEntryPath()
+        connect_entry = Generator.ConnectEntryFlat()
         connect_entry.connect_info = reach_connect_info
         connect_entry.rgraph = rgraph
         connect_entry.vars_open = open_vars
@@ -662,15 +700,137 @@ class Generator:
                     # dst must be unreachable
                     self._solver.cnstr_implies_disj(dst_tile_var, True, [reach_node_var], False, None) # dst_tile_var -> !reach_node_var
 
+    def _add_rules_reachability_connect_layered(self, reach_connect_info):
+        print('add reachability connect layered constraints')
+
+        util_common.check(reach_connect_info.method == util_common.REACH_METHOD_LAYERED, 'options')
+        util_common.check(not reach_connect_info.unreachable, 'options')
+        util_common.check(reach_connect_info.layers is not None and reach_connect_info.layers >= 2, 'options')
+        util_common.check(reach_connect_info.sink is None, 'options')
+
+        layers = reach_connect_info.layers
+
+        rgraph = self._make_reach_graph(reach_connect_info, self._vars_rc_t)
+
+        reach_vars_layer_node = {}
+        reach_vars_layer_edge = {}
+        for layer in range(layers):
+            reach_vars_layer_node[layer] = self._make_node_vars(rgraph)
+            if layer + 1 < layers:
+                reach_vars_layer_edge[layer] = self._make_edge_vars(rgraph)
+
+        open_vars = self._make_open_vars(reach_connect_info, rgraph.nodes)
+
+        connect_entry = Generator.ConnectEntryLayered()
+        connect_entry.connect_info = reach_connect_info
+        connect_entry.rgraph = rgraph
+        connect_entry.vars_open = open_vars
+        connect_entry.vars_layer_node = reach_vars_layer_node
+        connect_entry.vars_layer_edge = reach_vars_layer_edge
+        self._reach_connect_entry.append(connect_entry)
+
+        for rr, cc in rgraph.nodes:
+            game = self._game_level[rr][cc]
+            src_tile = self._reach_junction_info[reach_connect_info.src].game_to_junction_tile[game]
+            dst_tile = self._reach_junction_info[reach_connect_info.dst].game_to_junction_tile[game]
+
+            src_tile_var = self._tile_var(rr, cc, src_tile) if self._tile_has_var(rr, cc, src_tile) else None
+            dst_tile_var = self._tile_var(rr, cc, dst_tile) if self._tile_has_var(rr, cc, dst_tile) else None
+            open_tile_var = open_vars[(rr, cc)]
+
+            if dst_tile_var is not None:
+                rc_reach_vars = [reach_vars_layer_node[layer][(rr, cc)] for layer in range(layers)]
+                # a location being the goal means it must be reached
+                self._solver.cnstr_implies_disj(dst_tile_var, True, rc_reach_vars, True, None)
+                # at most one time
+                util_solvers.cnstr_implies_atmost_one(self._solver, dst_tile_var, True, rc_reach_vars, True, None)
+
+        for layer in range(layers):
+            if layer + 1 < layers:
+                # at most one edge each layer
+                self._solver.cnstr_count(list(reach_vars_layer_edge[layer].values()), True, 0, 1, None)
+
+                for edge_key, edge_var in reach_vars_layer_edge[layer].items():
+                    fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+
+                    edge_needed_vars = []
+                    edge_needed_settings = []
+
+                    for nor, noc in ((fr, fc),) + need_open_path + ((tr, tc),) + need_open_aux:
+                        open_out_var = open_vars[(nor, noc)]
+                        edge_needed_vars.append(open_out_var)
+                        edge_needed_settings.append(True)
+
+                    for ncr, ncc in need_closed_path + need_closed_aux:
+                        open_out_var = open_vars[(ncr, ncc)]
+                        edge_needed_vars.append(open_out_var)
+                        edge_needed_settings.append(False)
+
+                    conj_needed = self._solver.make_conj(edge_needed_vars, edge_needed_settings)
+                    self._solver.cnstr_implies_disj(conj_needed, False, [edge_var], False, None)
+
+                    src_reachable = reach_vars_layer_node[layer][(fr, fc)]
+                    self._solver.cnstr_implies_disj(src_reachable, False, [edge_var], False, None)
+
+            # at most one node each layer
+            self._solver.cnstr_count(list(reach_vars_layer_node[layer].values()), True, 0, 1, None)
+
+            for (rr, cc), node_var in reach_vars_layer_node[layer].items():
+                game = self._game_level[rr][cc]
+                src_tile = self._reach_junction_info[reach_connect_info.src].game_to_junction_tile[game]
+                dst_tile = self._reach_junction_info[reach_connect_info.dst].game_to_junction_tile[game]
+
+                src_tile_var = self._tile_var(rr, cc, src_tile) if self._tile_has_var(rr, cc, src_tile) else None
+                dst_tile_var = self._tile_var(rr, cc, dst_tile) if self._tile_has_var(rr, cc, dst_tile) else None
+                open_tile_var = open_vars[(rr, cc)]
+
+                if layer + 1 < layers:
+                    all_out_edge_vars = []
+                    for edge_key in rgraph.out_edges[(rr, cc)]:
+                        fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+                        all_out_edge_vars.append(reach_vars_layer_edge[layer][edge_key])
+
+                    # dst has no outgoing, non-dst reachable has outgoing
+                    if dst_tile_var is not None:
+                        for out_edge_var in all_out_edge_vars:
+                            self._solver.cnstr_implies_disj(dst_tile_var, True, [out_edge_var], False, None)
+                        node_var_and_not_dst = self._solver.make_conj([node_var, dst_tile_var], [True, False])
+                        self._solver.cnstr_implies_disj(node_var_and_not_dst, True, all_out_edge_vars, True, None)
+                    else:
+                        self._solver.cnstr_implies_disj(node_var, True, all_out_edge_vars, True, None)
+
+                if layer == 0:
+                    # src is reachable in initial layer, others are not
+                    if src_tile_var is not None:
+                        self._solver.cnstr_implies_disj(src_tile_var, True, [node_var], True, None)
+                        self._solver.cnstr_implies_disj(src_tile_var, False, [node_var], False, None)
+                    else:
+                        self._solver.cnstr_count([node_var], False, 1, 1, None)
+
+                else:
+                    # in other layers, no incoming reachable edge means not reachable
+                    all_in_edge_vars = []
+                    for edge_key in rgraph.in_edges[(rr, cc)]:
+                        fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+                        all_in_edge_vars.append(reach_vars_layer_edge[layer - 1][edge_key])
+
+                    conj_no_in = self._solver.make_conj(all_in_edge_vars, False)
+                    self._solver.cnstr_implies_disj(conj_no_in, True, [node_var], False, None)
+
+                    # incoming edge means reachable
+                    for in_edge_var in all_in_edge_vars:
+                        self._solver.cnstr_implies_disj(in_edge_var, True, [node_var], True, None)
+
     def _add_rules_reachability_connect_fwdbwd(self, reach_connect_info):
         if reach_connect_info.unreachable:
             print('add reachability connect forward-backward unreachable constraints')
         else:
             print('add reachability connect forward-backward constraints')
 
-        util_common.check(reach_connect_info.fwdbwd_layers is not None, 'options fwdbwd')
+        util_common.check(reach_connect_info.method == util_common.REACH_METHOD_FWDBWD, 'options')
+        util_common.check(reach_connect_info.layers is not None and reach_connect_info.layers >= 2, 'options')
 
-        layers = reach_connect_info.fwdbwd_layers
+        layers = reach_connect_info.layers
 
         rgraph = self._make_reach_graph(reach_connect_info, self._vars_rc_t)
 
@@ -714,7 +874,6 @@ class Generator:
             conj_needed = self._solver.make_conj(edge_needed_vars, edge_needed_settings)
             self._solver.cnstr_implies_disj(conj_needed, True, [edge_var], True, None)
             self._solver.cnstr_implies_disj(conj_needed, False, [edge_var], False, None)
-
 
         for layer in range(layers):
             for rr, cc in rgraph.nodes:
@@ -887,10 +1046,16 @@ class Generator:
         util_common.check(reach_connect_info.src in self._reach_junction_info, 'cannot add reach connect without source junction')
         util_common.check(reach_connect_info.dst in self._reach_junction_info, 'cannot add reach connect without destination junction')
 
-        if reach_connect_info.fwdbwd_layers is None:
-            self._add_rules_reachability_connect_path(reach_connect_info)
-        else:
+        if reach_connect_info.method == util_common.REACH_METHOD_NULL:
+            self._add_rules_reachability_connect_null(reach_connect_info)
+        elif reach_connect_info.method == util_common.REACH_METHOD_FLAT:
+            self._add_rules_reachability_connect_flat(reach_connect_info)
+        elif reach_connect_info.method == util_common.REACH_METHOD_LAYERED:
+            self._add_rules_reachability_connect_layered(reach_connect_info)
+        elif reach_connect_info.method == util_common.REACH_METHOD_FWDBWD:
             self._add_rules_reachability_connect_fwdbwd(reach_connect_info)
+        else:
+            util_common.check(False, 'method')
 
     def solve(self):
         if self._solver.solve():
@@ -913,15 +1078,22 @@ class Generator:
         for connect_index, connect_entry in enumerate(self._reach_connect_entry):
             reach_info = util_common.ResultReachInfo()
 
-            if connect_entry.type == ENTRY_PATH:
+            if connect_entry.method == util_common.REACH_METHOD_NULL:
+                reach_info = None
+
+            elif connect_entry.method == util_common.REACH_METHOD_FLAT:
                 if connect_entry.connect_info.unreachable:
                     reach_info = None
                 elif self._reach_path_search:
-                    reach_info.path_edges, reach_info.path_locations = self._get_reach_path_search(connect_index)
+                    reach_info.path_edges, reach_info.path_locations = self._get_reach_flat_search(connect_index)
                 else:
-                    reach_info.path_edges, reach_info.path_locations, path_edge_keys = self._get_reach_path_path(connect_index)
-                    reach_info.extra_meta.append(util_common.meta_line(util_common.MGROUP_OFFPATH, self._get_reach_path_offpath_edges(connect_index, path_edge_keys)))
-            elif connect_entry.type == ENTRY_FWDBWD:
+                    reach_info.path_edges, reach_info.path_locations, path_edge_keys = self._get_reach_flat_path(connect_index)
+                    reach_info.extra_meta.append(util_common.meta_line(util_common.MGROUP_OFFPATH, self._get_reach_flat_offpath_edges(connect_index, path_edge_keys)))
+
+            elif connect_entry.method == util_common.REACH_METHOD_LAYERED:
+                reach_info.path_edges, reach_info.path_locations = self._get_reach_layered_path(connect_index)
+
+            elif connect_entry.method == util_common.REACH_METHOD_FWDBWD:
                 reach_info.path_edges, reach_info.path_locations, locations_fwd, locations_bwd, locations_sink = self._get_reach_fwdbwd_path_reachable(connect_index)
 
                 maxlayer = max(locations_fwd)
@@ -946,7 +1118,7 @@ class Generator:
                             reach_info.extra_meta.append(util_common.meta_tile(util_common.MGROUP_REACHABLE_SINK + suff, sorted(locations_sink[layer])))
 
             else:
-                util_common.check(False, 'connect type')
+                util_common.check(False, 'connect method')
 
             if reach_info is not None:
                 res_info.reach_info.append(reach_info)
@@ -988,14 +1160,17 @@ class Generator:
             return
 
         for connect_index, connect_entry in enumerate(self._reach_connect_entry):
-            if connect_entry.type == ENTRY_PATH:
+            if connect_entry.method == util_common.REACH_METHOD_NULL:
+                pass
+
+            elif connect_entry.method == util_common.REACH_METHOD_FLAT:
                 src = connect_entry.connect_info.src
                 dst = connect_entry.connect_info.dst
                 unreachable = connect_entry.connect_info.unreachable
                 if unreachable:
                     path_locations = None
                 else:
-                    _, path_locations, _ = self._get_reach_path_path(connect_index)
+                    _, path_locations, _ = self._get_reach_flat_path(connect_index)
 
                 print('entry %d:' % connect_index, src, 'to', dst, 'path', 'unreachable' if unreachable else 'reachable')
 
@@ -1016,7 +1191,25 @@ class Generator:
                                 _pchar('.')
                     print()
 
-            elif connect_entry.type == ENTRY_FWDBWD:
+            elif connect_entry.method == util_common.REACH_METHOD_LAYERED:
+                src = connect_entry.connect_info.src
+                dst = connect_entry.connect_info.dst
+                unreachable = connect_entry.connect_info.unreachable
+
+                print('entry %d:' % connect_index, src, 'to', dst, 'layered', 'unreachable' if unreachable else 'reachable')
+                print()
+
+                for layer in connect_entry.vars_layer_node:
+                    for rr in range(self._rows):
+                        for cc in range(self._cols):
+                            if self._solver.get_var(connect_entry.vars_layer_node[layer][(rr, cc)]):
+                                _pchar('*')
+                            else:
+                                _pchar('.')
+                        print()
+                    print()
+
+            elif connect_entry.method == util_common.REACH_METHOD_FWDBWD:
                 src = connect_entry.connect_info.src
                 dst = connect_entry.connect_info.dst
                 unreachable = connect_entry.connect_info.unreachable
@@ -1059,7 +1252,7 @@ class Generator:
                         print()
 
             else:
-                util_common.check(False, 'connect type')
+                util_common.check(False, 'connect method')
 
     def _get_tiles_set(self):
         tiles = {}
@@ -1090,9 +1283,9 @@ class Generator:
 
         return src_rc, dst_rc
 
-    def _get_reach_path_search(self, connect_index):
+    def _get_reach_flat_search(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_PATH, 'entry type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FLAT, 'entry method')
 
         src_rc, dst_rc = self._get_src_dst_rc(connect_entry)
 
@@ -1107,15 +1300,15 @@ class Generator:
                 else:
                     closed_locations[(rr, cc)] = None
 
-        path_edges, seen = util_path.shortest_path_between(src_rc, dst_rc, self._rows, self._cols, connect_entry.connect_info.game_to_move_info, game_locations, open_locations, closed_locations)
+        path_edges = util_path.shortest_path_between(src_rc, dst_rc, self._rows, self._cols, connect_entry.connect_info.game_to_move_info, game_locations, open_locations, closed_locations)
 
         util_common.check(path_edges is not None, 'no path found')
 
         return path_edges, None
 
-    def _get_reach_path_path(self, connect_index):
+    def _get_reach_flat_path(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_PATH, 'entry type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FLAT, 'entry method')
 
         reach_connect_info = connect_entry.connect_info
         reach_vars_node = connect_entry.vars_node
@@ -1183,9 +1376,9 @@ class Generator:
 
         return node_path, loc_path, key_path
 
-    def _get_reach_path_offpath_edges(self, connect_index, path_edge_keys):
+    def _get_reach_flat_offpath_edges(self, connect_index, path_edge_keys):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_PATH, 'entry type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FLAT, 'entry method')
 
         reach_vars_edge = connect_entry.vars_edge
 
@@ -1203,9 +1396,57 @@ class Generator:
 
         return list(edges.keys())
 
+    def _get_reach_layered_path(self, connect_index):
+        connect_entry = self._reach_connect_entry[connect_index]
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_LAYERED, 'entry method')
+
+        start, goal = self._get_src_dst_rc(connect_entry)
+
+        node_path, loc_path = [], []
+
+        loc_path.append(start)
+
+        max_layer = max(connect_entry.vars_layer_node)
+
+        found_goal = False
+        for layer in range(max_layer + 1):
+            if not found_goal:
+                node = util_solvers.get_one_set(self._solver, connect_entry.vars_layer_node[layer])
+                if layer == 0:
+                    util_common.check(node == start, 'start node')
+                if node == goal:
+                    found_goal = True
+            else:
+                util_common.check(util_solvers.are_none_set(self._solver, connect_entry.vars_layer_node[layer].values()), 'reachable after goal')
+        util_common.check(found_goal, 'did not find goal')
+
+        for layer in range(max_layer):
+            layer_edges = util_solvers.get_all_set(self._solver, connect_entry.vars_layer_edge[layer])
+            util_common.check(len(layer_edges) <= 1, 'edges')
+            if len(layer_edges) == 0:
+                break
+
+            layer_edge = layer_edges[0]
+            fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = layer_edge
+
+            layer_node_curr = util_solvers.get_one_set(self._solver, connect_entry.vars_layer_node[layer])
+            layer_node_next = util_solvers.get_one_set(self._solver, connect_entry.vars_layer_node[layer + 1])
+            util_common.check(layer_node_curr == (fr, fc), 'path')
+            util_common.check(layer_node_next == (tr, tc), 'path')
+
+            for nr, nc in need_closed_path:
+                loc_path.append((nr, nc))
+            for nr, nc in need_open_path:
+                loc_path.append((nr, nc))
+            loc_path.append((tr, tc))
+
+            node_path.append(util_common.get_path_edge(fr, fc, tr, tc, pwtr, pwtc))
+
+        return node_path, loc_path
+
     def _get_reach_fwdbwd_path_reachable(self, connect_index):
         connect_entry = self._reach_connect_entry[connect_index]
-        util_common.check(connect_entry.type == ENTRY_FWDBWD, 'entry type')
+        util_common.check(connect_entry.method == util_common.REACH_METHOD_FWDBWD, 'entry method')
 
         start, goal = self._get_src_dst_rc(connect_entry)
 

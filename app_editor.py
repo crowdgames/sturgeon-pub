@@ -197,9 +197,9 @@ class PathCanvas(tkinter.Canvas):
         if cfg.custom_constraints is None:
             cfg.custom_constraints = []
         if PathCanvas.is_edge_path(path):
-            cfg.custom_constraints.append(util_custom.OutPathConstraint(path, weight_app))
+            cfg.custom_constraints.append(util_custom.FlatPathConstraint(path, weight_app))
         if text_level is not None:
-            cfg.custom_constraints.append(util_custom.OutTextLevelConstraint(text_level, weight_app))
+            cfg.custom_constraints.append(util_custom.TextLevelConstraint(text_level, weight_app))
 
         result_info = scheme2output.scheme2output(cfg)
 
@@ -697,7 +697,7 @@ class PathCanvas(tkinter.Canvas):
 
         self._seed_rand_path += 1
         rng = random.Random(self._seed_rand_path)
-        self._path_or_point, reachable = util_path.random_path_by_search(rng, self._rows, self._cols, self._game_to_move_info, self._game_locations)
+        self._path_or_point = util_path.random_path(self._rows, self._cols, self._game_to_move_info, self._game_locations, rng)
         self.new_manual_path(False)
 
     def on_evt_path_shortest_drawn(self, event):
@@ -707,7 +707,7 @@ class PathCanvas(tkinter.Canvas):
         if PathCanvas.is_edge_path(self._path_or_point):
             begin = util_path.path_begin_point(self._path_or_point)
             end = util_path.path_end_point(self._path_or_point)
-            self._path_or_point, reachable = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, None, None)
+            self._path_or_point = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, None, None)
             self.new_manual_path(False)
 
     def on_evt_path_shortest_gen(self, event):
@@ -718,7 +718,7 @@ class PathCanvas(tkinter.Canvas):
             begin = util_path.path_begin_point(self._gen_path)
             end = util_path.path_end_point(self._gen_path)
             open_locations, closed_locations = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT, util_common.START_TEXT, util_common.GOAL_TEXT)
-            self._path_or_point, reachable = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, open_locations, closed_locations)
+            self._path_or_point = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, open_locations, closed_locations)
             self.new_manual_path(False)
 
     def on_mouse_motion(self, event):
@@ -826,14 +826,15 @@ def app_editor(cfg, mode, out_no_hash, app_state, app_weight):
     canvas.yview_moveto(0.0)
 
     if mode == MODE_TEST:
-        canvas.on_evt_path_random(None)
-        canvas.restart_gen_proc(-1.0)
-        canvas.on_timer()
-        while canvas.is_gen_proc_running():
-            time.sleep(REFRESH_MSEC / 1000)
+        for fn in [canvas.on_evt_path_random, canvas.on_evt_path_shortest_drawn, canvas.on_evt_path_shortest_gen]:
+            fn(None)
+            canvas.restart_gen_proc(-1.0)
             canvas.on_timer()
-        canvas.on_evt_all_export(None)
-        util_common.print_text_level(canvas.get_gen_text_level())
+            while canvas.is_gen_proc_running():
+                time.sleep(REFRESH_MSEC / 1000)
+                canvas.on_timer()
+            canvas.on_evt_all_export(None)
+            util_common.print_text_level(canvas.get_gen_text_level())
     else:
         root.mainloop()
 

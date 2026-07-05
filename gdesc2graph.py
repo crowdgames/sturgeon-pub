@@ -450,7 +450,7 @@ def gdesc2graph(s, grd, min_size, max_size, edgeopt_name, edgeopt_params, label_
                                         break
                                 ei, ej = fra, til
                             else:
-                                util_common.check(use_edge_deltas is None, 'undirected edge delta') # TODO edge flip vars ?
+                                util_common.check(use_edge_deltas is None, 'undirected edge delta') # TODO?: edge flip vars
                                 util_common.check(use_edge_polars is None, 'undirected edge polar')
                                 ei, ej = min(fra, til), max(fra, til)
 

@@ -20,7 +20,11 @@ SOLVER_PYSAT_FM_BOOL      = 'pysat-fm-boolonly'
 SOLVER_PYSAT_RC2_BOOL     = 'pysat-rc2-boolonly'
 SOLVER_PYSAT_MC           = 'pysat-minicard'
 SOLVER_PYSAT_GC41         = 'pysat-gluecard41'
-SOLVER_LIST               = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ, SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE, SOLVER_CVC5, SOLVER_SCIPY, SOLVER_CVXPY, SOLVER_CLINGO_FE, SOLVER_CLINGO_BE, SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC, SOLVER_PYSAT_GC41]
+SOLVER_LIST               = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ,
+                             SOLVER_Z3_OPTIMIZE, SOLVER_Z3_SOLVE,
+                             SOLVER_CVC5, SOLVER_SCIPY, SOLVER_CVXPY,
+                             SOLVER_CLINGO_FE, SOLVER_CLINGO_BE,
+                             SOLVER_PYSAT_FM, SOLVER_PYSAT_RC2, SOLVER_PYSAT_FM_BOOL, SOLVER_PYSAT_RC2_BOOL, SOLVER_PYSAT_MC, SOLVER_PYSAT_GC41]
 SOLVER_NOTEST_LIST        = [SOLVER_JSON_WRITE, SOLVER_DIMACS_WRITE_CNF, SOLVER_DIMACS_WRITE_WCNF, SOLVER_DIMACS_READ]
 
 
@@ -177,6 +181,13 @@ def are_all_set(solver, vvs):
             return False
     return True
 
+def are_none_set(solver, vvs):
+    util_common.check(len(vvs) != 0, 'no vars to check')
+    for vv in vvs:
+        if solver.get_var(vv):
+            return False
+    return True
+
 def are_all_set_to(solver, vvs_and_settings):
     util_common.check(len(vvs_and_settings) != 0, 'no vars to check')
     for vv, setting in vvs_and_settings:
@@ -234,8 +245,12 @@ def make_disj_cache(solver, cache, vvs, settings):
             cache[key] = solver.make_var()
             cnstr_disj(solver, cache[key], vvs, settings)
 
-
     return cache[key], duplicate
+
+def cnstr_implies_atmost_one(solver, vv, setting, vvs, settings, weight):
+    settings = unpack_settings(vvs, settings)
+
+    solver.cnstr_count([vv] * (len(vvs) - 1) + vvs, [setting] * (len(vvs) - 1) + settings, 0, len(vvs), weight)
 
 
 
@@ -291,15 +306,21 @@ def _is_conj(vv):
     return vv[0] == 'c'
 
 def _unwrap_var(vv):
-    util_common.check(type(vv) == tuple and len(vv) == 2 and vv[0] == 'v', 'unwrap')
+    util_common.check(type(vv) == tuple, 'unwrap var type: ' + type(vv).__name__)
+    util_common.check(len(vv) == 2, 'unwrap var len: ' + str(len(vv)))
+    util_common.check(vv[0] == 'v', 'unwrap var id: ' + str(vv[0]))
     return vv[1]
 
 def _unwrap_conj(vv):
-    util_common.check(type(vv) == tuple and len(vv) == 2 and vv[0] == 'c', 'unwrap')
+    util_common.check(type(vv) == tuple, 'unwrap conj type: ' + type(vv).__name__)
+    util_common.check(len(vv) == 2, 'unwrap conj len: ' + str(len(vv)))
+    util_common.check(vv[0] == 'c', 'unwrap conj id: ' + str(vv[0]))
     return vv[1]
 
 def _unwrap_any(vv):
-    util_common.check(type(vv) == tuple and len(vv) == 2 and vv[0] in ['v', 'c'], 'unwrap')
+    util_common.check(type(vv) == tuple, 'unwrap any type: ' + type(vv).__name__)
+    util_common.check(len(vv) == 2, 'unwrap any len: ' + str(len(vv)))
+    util_common.check(vv[0] in ['v', 'c'], 'unwrap any id: ' + str(vv[0]))
     return vv[1]
 
 def _unwrap_lit_lconj(vv, setting, negate_func):
@@ -316,14 +337,18 @@ def _is_xform_t(vv):
     return vv[0] in ['t2', 't3']
 
 def _unwrap_xform_t(vv):
-    util_common.check(type(vv) == tuple and vv[0] in ['t2', 't3'], 'unwrap')
+    util_common.check(type(vv) == tuple, 'unwrap xform_t type: ' + type(vv).__name__)
+    util_common.check(len(vv) in [3, 4], 'unwrap xform_t len: ' + str(len(vv)))
+    util_common.check(vv[0] in ['t2', 't3'], 'unwrap xform_t id: ' + str(vv[0]))
     return vv[1:]
 
 def _is_xform_x2(vv):
     return vv[0] in ['x2']
 
 def _unwrap_xform_x2(vv):
-    util_common.check(type(vv) == tuple and vv[0] in ['x2'], 'unwrap')
+    util_common.check(type(vv) == tuple, 'unwrap xform_x2 type: ' + type(vv).__name__)
+    util_common.check(len(vv) in [7], 'unwrap xform_x2 len: ' + str(len(vv)))
+    util_common.check(vv[0] in ['x2'], 'unwrap xform_x2 id: ' + str(vv[0]))
     return vv[1:]
 
 
@@ -347,6 +372,9 @@ class _SolverImpl(_Solver):
         return _wrap_conj(self._IMPL_make_conj(_unwrap_lit_lconjs(vvs, settings, self._IMPL_negate_var_conj)))
 
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
+        util_common.check(type(out_vvs) in [list, tuple], 'type')
+        util_common.check(type(out_vv_settings) in [list, tuple, bool], 'type')
+
         if not self._supports_weights:
             util_common.check(weight is None, 'solver does not support weights')
         else:
@@ -355,6 +383,8 @@ class _SolverImpl(_Solver):
         return self._IMPL_cnstr_implies_disj(_unwrap_lit_lconj(in_vv, in_vv_setting, self._IMPL_negate_var_conj), _unwrap_lit_lconjs(out_vvs, out_vv_settings, self._IMPL_negate_var_conj_for_implies_out), weight)
 
     def cnstr_count(self, vvs, settings, lo, hi, weight):
+        util_common.check(type(vvs) in [list, tuple], 'type')
+        util_common.check(type(settings) in [list, tuple, bool], 'type')
         util_common.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
 
         if not self._supports_weights:
@@ -459,12 +489,18 @@ class PortfolioSolver(_Solver):
         return len(self._solver_var_conjs) - 1
 
     def cnstr_implies_disj(self, in_vv, in_vv_setting, out_vvs, out_vv_settings, weight):
+        util_common.check(type(out_vvs) in [list, tuple], 'type')
+        util_common.check(type(out_vv_settings) in [list, tuple, bool], 'type')
+
         util_common.check(weight is None or type(weight) == int, 'weights must be integers')
 
         self._solver_commands.append(('cnstr_implies_disj', (in_vv, in_vv_setting, out_vvs, out_vv_settings, weight)))
 
     def cnstr_count(self, vvs, settings, lo, hi, weight):
+        util_common.check(type(vvs) in [list, tuple], 'type')
+        util_common.check(type(settings) in [list, tuple, bool], 'type')
         util_common.check(0 <= lo and lo <= hi and hi <= len(vvs), 'count')
+
         util_common.check(weight is None or type(weight) == int, 'weights must be integers')
 
         self._solver_commands.append(('cnstr_count', (vvs, settings, lo, hi, weight)))
@@ -1266,7 +1302,7 @@ class BackendClingoSolver(_SolverImpl):
         return ret
 
     def _IMPL_negate_var_conj_for_implies_out(self, ll):
-        # TODO: is there a better way to get negative literals in the head of a rule?
+        # TODO?: is there a better way to get negative literals in the head of a rule?
         with self._ctl.backend() as be:
             opp_ll = self._help_new_var(be)
             # one is true, one is false

@@ -15,7 +15,7 @@ python scheme2output.py --outfile work/cave-gems_ti --schemefile work/cave-gems_
 python input2tile.py --outfile work/mario-cave_ti.tile --textfile levels/vglc/mario-1-1-generic.lvl levels/kenney/cave.lvl --imagefile levels/vglc/mario-1-1-clean.png levels/kenney/cave.png --game M C
 python tile2scheme.py --outfile work/mario-cave_ti.scheme --tilefile work/mario-cave_ti.tile --count-divs 1 1 --pattern M=ring C=nbr-plus
 python scheme2output.py --outfile work/mario-cave_ti --schemefile work/mario-cave_ti.scheme --gamefile levels/vglc/mario-cave.game --pattern-soft --count-soft --reach-move M=platform C=maze --reach-start-goal l-r 6
-python level2repath.py --outfile work/mario-cave_ti-rp.lvl --textfile work/mario-cave_ti.lvl --gamefile levels/vglc/mario-cave.game --reach-connect "--move M=platform C=maze --src { --dst }" --print-level
+python level2repath.py --outfile work/mario-cave_ti-rp.lvl --textfile work/mario-cave_ti.lvl --gamefile levels/vglc/mario-cave.game --reach-connect "--move M=platform C=maze --src { --dst }" --print-level --cost tile
 
 # mario by icarus
 python input2tile.py --outfile work/mario-icarus-ti.tile --textfile levels/vglc/mario-1-1-generic.lvl levels/vglc/kidicarus-1-doors.lvl --imagefile levels/vglc/mario-1-1-clean.png levels/vglc/kidicarus-1-clean.png --tagfile levels/vglc/mario-1-1-generic.lvl levels/vglc/kidicarus-1-doors.lvl --game M I

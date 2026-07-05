@@ -50,6 +50,7 @@ For example usage (within pipenv), see:
 * `examples_junction.sh` - junctions for adding multiple reachable and unreachable paths
 * `examples_blend.sh` - blending different games, using tiles and reachabiity from multiple games in one level
 * `examples_mkiii.sh` - MKIII tile rewrite rules for generating playthroughs
+* `examples_spacetime.sh` - learning and applying spacetime patterns from examples
 * `examples_graph.sh` - graph generation
 * `examples_mkiv.sh` - MKIV graph label rewrite rules for generating playthroughs
 * `examples_editor.sh` - setup and use of level editor application

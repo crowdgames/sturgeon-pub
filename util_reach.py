@@ -4,7 +4,9 @@ import util_common
 
 
 RMOVE_MAZE               = 'maze'
-RMOVE_MAZE_BLINK         = 'maze-blink'
+RMOVE_MAZE_BLINK_1       = 'maze-blink-1'
+RMOVE_MAZE_BLINK_2_NOOK  = 'maze-blink-2-nook'
+RMOVE_MAZE_SKIP          = 'maze-skip'
 RMOVE_DRILLER            = 'driller'
 RMOVE_TOMB               = 'tomb'
 RMOVE_TOMB_FULL_50       = 'tomb-full-50'
@@ -13,8 +15,8 @@ RMOVE_SUPERCAT           = 'supercat'
 RMOVE_SUPERCAT_NEW       = 'supercat-new'
 RMOVE_PLATFORM           = 'platform'
 RMOVE_PLATFORM_HIGHJUMP  = 'platform-highjump'
-RMOVE_PLATFORM_BLINK     = 'platform-blink'
-RMOVE_LIST               = [RMOVE_MAZE, RMOVE_MAZE_BLINK, RMOVE_DRILLER, RMOVE_TOMB, RMOVE_TOMB_FULL_50, RMOVE_SUPERCAT, RMOVE_SUPERCAT_NEW, RMOVE_CLIMB, RMOVE_PLATFORM, RMOVE_PLATFORM_HIGHJUMP, RMOVE_PLATFORM_BLINK]
+RMOVE_PLATFORM_BLINK_2   = 'platform-blink-2'
+RMOVE_LIST               = [RMOVE_MAZE, RMOVE_MAZE_BLINK_1, RMOVE_MAZE_BLINK_2_NOOK, RMOVE_MAZE_SKIP, RMOVE_DRILLER, RMOVE_TOMB, RMOVE_TOMB_FULL_50, RMOVE_SUPERCAT, RMOVE_SUPERCAT_NEW, RMOVE_CLIMB, RMOVE_PLATFORM, RMOVE_PLATFORM_HIGHJUMP, RMOVE_PLATFORM_BLINK_2]
 
 RSGLOC_ALL                = 'all'
 RSGLOC_L_R                = 'l-r'
@@ -27,7 +29,8 @@ RSGLOC_BR_TL              = 'br-tl'
 RSGLOC_LIST = [RSGLOC_ALL, RSGLOC_L_R, RSGLOC_B_T, RSGLOC_T_B, RSGLOC_TL_BR, RSGLOC_TR_BL, RSGLOC_BL_TR, RSGLOC_BR_TL]
 
 RPLOC_ALL                = 'all'
-RPLOC_SET                = 'set'
+RPLOC_RECT               = 'rect'
+RPLOC_AT                 = 'at'
 RPLOC_L                  = 'l'
 RPLOC_R                  = 'r'
 RPLOC_B                  = 'b'
@@ -38,7 +41,8 @@ RPLOC_BL                 = 'bl'
 RPLOC_BR                 = 'br'
 RPLOC_DICT = {
     RPLOC_ALL: 0,
-    RPLOC_SET: 2,
+    RPLOC_RECT: 4,
+    RPLOC_AT: 2,
     RPLOC_L: 1,
     RPLOC_R: 1,
     RPLOC_B: 1,
@@ -113,8 +117,13 @@ def get_reach_junction_info(reach_junction_setup, rows, cols, scheme_info):
             for _cc in range(cols):
                 _locs.append((_rr, _cc))
 
-    def r_set(_locs, _lr, _lc):
-        _locs.append((_lr, _lc))
+    def r_rect(_locs, _lr, _lc, _hr, _hc):
+        for _rr in range(_lr, _hr):
+            for _cc in range(_lc, _hc):
+                _locs.append((_rr, _cc))
+
+    def r_at(_locs, _rr, _cc):
+        _locs.append((_rr, _cc))
 
     def r_left(_locs, _sz):
         for _rr in range(rows):
@@ -158,8 +167,10 @@ def get_reach_junction_info(reach_junction_setup, rows, cols, scheme_info):
 
     if reach_junction_setup.loc == RPLOC_ALL:
         r_all(reach_junction_info.rcs)
-    elif reach_junction_setup.loc == RPLOC_SET:
-        r_set(reach_junction_info.rcs, reach_junction_setup.loc_params[0], reach_junction_setup.loc_params[1], reach_junction_setup.loc_params[2], reach_junction_setup.loc_params[3])
+    elif reach_junction_setup.loc == RPLOC_RECT:
+        r_rect(reach_junction_info.rcs, reach_junction_setup.loc_params[0], reach_junction_setup.loc_params[1], reach_junction_setup.loc_params[2], reach_junction_setup.loc_params[3])
+    elif reach_junction_setup.loc == RPLOC_AT:
+        r_at(reach_junction_info.rcs, reach_junction_setup.loc_params[0], reach_junction_setup.loc_params[1])
     elif reach_junction_setup.loc == RPLOC_L:
         r_left(reach_junction_info.rcs, reach_junction_setup.loc_params[0])
     elif reach_junction_setup.loc == RPLOC_R:
@@ -198,17 +209,17 @@ def get_reach_junction_info(reach_junction_setup, rows, cols, scheme_info):
 
 
 
-def default_reach_connect(game_to_reach_move, wrap_rows, wrap_cols, open_text, unreachable):
+def default_reach_connect(game_to_reach_move, wrap_rows, wrap_cols, open_text, unreachable, null, layered):
     reach_connect_setup = util_common.ReachConnectSetup()
 
     reach_connect_setup.src = util_common.START_TEXT
     reach_connect_setup.dst = util_common.GOAL_TEXT
 
+    util_common.check(not null or layered is None, 'reach method')
+    reach_connect_setup.method = util_common.REACH_METHOD_NULL if null else (util_common.REACH_METHOD_FLAT if layered is None else util_common.REACH_METHOD_LAYERED)
     reach_connect_setup.unreachable = unreachable
-    reach_connect_setup.fwdbwd_layers = None
-
-    reach_connect_setup.sink_bottom = False
-    reach_connect_setup.sink_sides = False
+    reach_connect_setup.layers = None if layered is None else layered
+    reach_connect_setup.sink = None
 
     reach_connect_setup.game_to_reach_move = game_to_reach_move
     reach_connect_setup.missing_aux_closed = False
@@ -228,24 +239,26 @@ def parse_reach_connect_subargs(name, subargs):
     reach_parser.add_argument('--wrap-rows', action='store_true', help='Wrap rows in reachability.')
     reach_parser.add_argument('--wrap-cols', action='store_true', help='Wrap columns in reachability.')
     reach_parser.add_argument('--open', type=str, help='Use specified open tiles.')
+
+    reach_parser.add_argument('--method', type=str, default=util_common.REACH_METHOD_FLAT, help='Reach method to use.')
     reach_parser.add_argument('--unreachable', action='store_true', help='Generate levels with unreachable goals.')
-    reach_parser.add_argument('--fwdbwd-layers', type=int, help='Use forward/backward reachability, with given number of layers.')
-    reach_parser.add_argument('--sink-bottom', action='store_true', help='Bottom side is sink.')
-    reach_parser.add_argument('--sink-sides', action='store_true', help='All sides are sinks.')
+    reach_parser.add_argument('--layers', type=int, help='Use given number of layers when available.')
+    reach_parser.add_argument('--sink', type=str, help='Sink locations.')
     reach_args = reach_parser.parse_args(subargs)
 
-    util_common.check(reach_args.fwdbwd_layers is None or reach_args.fwdbwd_layers >= 2, '--fwdbwd-layers must be >= 2')
+    util_common.check(reach_args.method != util_common.REACH_METHOD_LAYERED or not reach_args.unreachable, '--method')
+    util_common.check(reach_args.layers is None or reach_args.layers >= 2, '--layers must be >= 2')
+    util_common.check(reach_args.method == util_common.REACH_METHOD_FWDBWD or reach_args.sink is None, '--method')
 
     reach_connect_setup = util_common.ReachConnectSetup()
 
     reach_connect_setup.src = reach_args.src
     reach_connect_setup.dst = reach_args.dst
 
+    reach_connect_setup.method = reach_args.method
     reach_connect_setup.unreachable = reach_args.unreachable
-    reach_connect_setup.fwdbwd_layers = reach_args.fwdbwd_layers
-
-    reach_connect_setup.sink_bottom = reach_args.sink_bottom
-    reach_connect_setup.sink_sides = reach_args.sink_sides
+    reach_connect_setup.layers = reach_args.layers
+    reach_connect_setup.sink = reach_args.sink
 
     reach_connect_setup.game_to_reach_move = util_common.arg_list_to_dict_text_options(reach_parser, name+' sub-argument --move', reach_args.move, RMOVE_LIST, False)
     reach_connect_setup.missing_aux_closed = reach_args.missing_aux_closed
@@ -259,20 +272,30 @@ def parse_reach_connect_subargs(name, subargs):
 def get_move_template(reach_move):
     move_template = []
 
-    if reach_move in [RMOVE_MAZE, RMOVE_MAZE_BLINK]:
+    if reach_move in [RMOVE_MAZE, RMOVE_MAZE_BLINK_1, RMOVE_MAZE_BLINK_2_NOOK, RMOVE_MAZE_SKIP]:
         move_template.append(((-1,  0), [], [], [], []))
         move_template.append((( 1,  0), [], [], [], []))
         move_template.append((( 0, -1), [], [], [], []))
         move_template.append((( 0,  1), [], [], [], []))
 
-        if reach_move == RMOVE_MAZE_BLINK:
-            BLINK_WIDTH = 3
-            brng1 = list(range(1, BLINK_WIDTH))
-            brng2 = list(range(0, BLINK_WIDTH))
-            move_template.append(((-BLINK_WIDTH,            0), [], [], [(-ii,   0) for ii in brng1], [(-ii,  -1) for ii in brng2] + [(-ii,   1) for ii in brng2]))
-            move_template.append((( BLINK_WIDTH,            0), [], [], [( ii,   0) for ii in brng1], [( ii,  -1) for ii in brng2] + [( ii,   1) for ii in brng2]))
-            move_template.append((( 0,           -BLINK_WIDTH), [], [], [( 0,  -ii) for ii in brng1], [( -1, -ii) for ii in brng2] + [(  1, -ii) for ii in brng2]))
-            move_template.append((( 0,            BLINK_WIDTH), [], [], [( 0,   ii) for ii in brng1], [( -1,  ii) for ii in brng2] + [(  1,  ii) for ii in brng2]))
+        if reach_move in [RMOVE_MAZE_BLINK_1, RMOVE_MAZE_BLINK_2_NOOK]:
+            if reach_move == RMOVE_MAZE_BLINK_1:
+                blink_width = 2
+                brng_aux = []
+            else:
+                blink_width = 3
+                brng_aux = list(range(0, blink_width))
+            brng_pth = list(range(1, blink_width))
+            move_template.append(((-blink_width,            0), [], [], [(-ii,   0) for ii in brng_pth], [(-ii,  -1) for ii in brng_aux] + [(-ii,   1) for ii in brng_aux]))
+            move_template.append((( blink_width,            0), [], [], [( ii,   0) for ii in brng_pth], [( ii,  -1) for ii in brng_aux] + [( ii,   1) for ii in brng_aux]))
+            move_template.append((( 0,           -blink_width), [], [], [( 0,  -ii) for ii in brng_pth], [( -1, -ii) for ii in brng_aux] + [(  1, -ii) for ii in brng_aux]))
+            move_template.append((( 0,            blink_width), [], [], [( 0,   ii) for ii in brng_pth], [( -1,  ii) for ii in brng_aux] + [(  1,  ii) for ii in brng_aux]))
+
+        elif reach_move == RMOVE_MAZE_SKIP:
+            move_template.append(((-2,  0), [(-1,  0)], [], [], []))
+            move_template.append((( 2,  0), [( 1,  0)], [], [], []))
+            move_template.append((( 0, -2), [( 0, -1)], [], [], []))
+            move_template.append((( 0,  2), [( 0,  1)], [], [], []))
 
     elif reach_move in [RMOVE_DRILLER]:
         move_template.append((( 1,  0), [], [], [], []))
@@ -344,7 +367,7 @@ def get_move_template(reach_move):
                     need_closed_aux = [(1, 0)]
                     move_template.append((dest, need_open_path, need_open_aux, need_closed_path, need_closed_aux))
 
-    elif reach_move in [RMOVE_PLATFORM, RMOVE_PLATFORM_HIGHJUMP, RMOVE_PLATFORM_BLINK]:
+    elif reach_move in [RMOVE_PLATFORM, RMOVE_PLATFORM_HIGHJUMP, RMOVE_PLATFORM_BLINK_2]:
         # fall
         move_template.append(((1,  0), [],       [], [], []))
         move_template.append(((1,  1), [(1, 0)], [], [], []))
@@ -374,10 +397,10 @@ def get_move_template(reach_move):
         if reach_move == RMOVE_PLATFORM_HIGHJUMP:
             HIGHJUMP_HEIGHT = 8
             move_template.append(((-HIGHJUMP_HEIGHT,  0), [(-ii, 0) for ii in range(1, HIGHJUMP_HEIGHT)], [], [], [(1, 0)]))
-        elif reach_move == RMOVE_PLATFORM_BLINK:
-            BLINK_WIDTH = 3
-            move_template.append(((0,  BLINK_WIDTH), [], [], [(0,  ii) for ii in range(1, BLINK_WIDTH)], [(1, 0)]))
-            move_template.append(((0, -BLINK_WIDTH), [], [], [(0, -ii) for ii in range(1, BLINK_WIDTH)], [(1, 0)]))
+        elif reach_move == RMOVE_PLATFORM_BLINK_2:
+            blink_width = 3
+            move_template.append(((0,  blink_width), [], [], [(0,  ii) for ii in range(1, blink_width)], [(1, 0)]))
+            move_template.append(((0, -blink_width), [], [], [(0, -ii) for ii in range(1, blink_width)], [(1, 0)]))
 
     else:
         util_common.check(False, 'reach_move ' + reach_move)
@@ -411,11 +434,10 @@ def get_reach_connect_info(reach_connect_setup, rows, cols, scheme_info):
     reach_connect_info.src = reach_connect_setup.src
     reach_connect_info.dst = reach_connect_setup.dst
 
+    reach_connect_info.method = reach_connect_setup.method
     reach_connect_info.unreachable = reach_connect_setup.unreachable
-    reach_connect_info.fwdbwd_layers = reach_connect_setup.fwdbwd_layers
-
-    reach_connect_info.sink_bottom = reach_connect_setup.sink_bottom
-    reach_connect_info.sink_sides = reach_connect_setup.sink_sides
+    reach_connect_info.layers = reach_connect_setup.layers
+    reach_connect_info.sink = reach_connect_setup.sink
 
     reach_connect_info.game_to_move_info = get_game_to_move_info(reach_connect_setup)
 

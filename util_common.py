@@ -12,6 +12,14 @@ MGROUP_REACHABLE_BACK  = 'reachable-back'
 MGROUP_REACHABLE_STUCK = 'reachable-stuck'
 MGROUP_REACHABLE_SINK  = 'reachable-sink'
 
+REACH_METHOD_NULL      = 'null'
+REACH_METHOD_FLAT      = 'flat'
+REACH_METHOD_LAYERED   = 'layered'
+REACH_METHOD_FWDBWD    = 'fwdbwd'
+
+REACH_SINK_BOTTOM      = 'bottom'
+REACH_SINK_SIDES       = 'sides'
+
 OPEN_TEXT        = '-'
 OPEN_TEXT_ZELDA  = 'DLOMS-'
 START_TEXT       = '{'
@@ -85,11 +93,10 @@ class ReachConnectSetup:
         self.src = None
         self.dst = None
 
+        self.method = None
         self.unreachable = None
-        self.fwdbwd_layers = None
-
-        self.sink_bottom = None
-        self.sink_sides = None
+        self.layers = None
+        self.sink = None
 
         self.game_to_reach_move = None
         self.missing_aux_closed = None
@@ -116,11 +123,10 @@ class ReachConnectInfo:
         self.src = None
         self.dst = None
 
+        self.method = None
         self.unreachable = None
-        self.fwdbwd_layers = None
-
-        self.sink_bottom = None
-        self.sink_sides = None
+        self.layers = None
+        self.sink = None
 
         self.game_to_move_info = None
 
@@ -319,7 +325,7 @@ def check_tileset_match(ts0, ts1):
     if ts0.tile_to_image is not None or ts1.tile_to_image is not None:
         check(ts0.tile_to_image is not None and ts1.tile_to_image is not None, 'tileset mismatch')
         for tile in ts0.tile_ids:
-            check(tuple(ts0.tile_to_image[tile].getdata()) == tuple(ts1.tile_to_image[tile].getdata()), 'tileset mismatch')
+            check(ts0.tile_to_image[tile].get_flattened_data() == ts1.tile_to_image[tile].get_flattened_data(), 'tileset mismatch')
     else:
         check(ts0.tile_to_image is None and ts1.tile_to_image is None, 'tileset mismatch')
 
@@ -382,7 +388,7 @@ def fileistype(fn, ext):
 
 def fresh_image(image):
     image_data = PIL.Image.new(image.mode, image.size)
-    image_data.putdata(image.getdata())
+    image_data.putdata(image.get_flattened_data())
     return image_data
 
 def image_to_bytes_io(image):

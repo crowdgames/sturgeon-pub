@@ -941,7 +941,7 @@ def get_example_info(mkiv_setup):
                     ei.rep_rules.append(([(None, mplyr), (None, '_'),  ('s2', 'sP'), (sclr, '_')], [(0, 1, mclr, '_'), (2, 3, s2TF, None)],
                                          [       '_',           mplyr,         '_',         'sP'], [             '_',               '_']))
 
-                    # TODO: check moving along true/false edge onto color
+                    # TODO?: check moving along true/false edge onto color
 
                     if pcrystal + 1 <= MAX_CRYSTAL_PLAYER:
                         mplyrc = 'mP' + str(pcrystal + 1)

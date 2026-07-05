@@ -605,7 +605,7 @@ def get_example_info(mkiii_setup):
                           (DIR_EAST_WEST, '2-', '-2'), (DIR_NONE, '2', '2')]),
                         (RR_GRP_ALL,
                          [(DIR_WEST, '+-', '-+'), (DIR_WEST, '+@', '-+'), (DIR_WEST, '+2', '-+'), (DIR_WEST, '+1', '-+')]),
-                        (RR_GRP_ALL, # TODO: what about enemy above player? '-@+'
+                        (RR_GRP_ALL, # TODO?: what about enemy above player? '-@+'
                          [(DIR_NORTH, '-+', '+-'), (DIR_NORTH, '@+', '+-'),
                           (DIR_NORTH, 'X@', 'X@'), (DIR_NORTH, '+@', '@-'), (DIR_NORTH, '-@', '@-'),
                           (DIR_NORTH, '2-', '-1'), (DIR_NORTH, '2X', '@X'), (DIR_NORTH, '2?', '@X'),
@@ -997,7 +997,7 @@ class GeneratorMKIII(util_generator.Generator):
                         vv0 = self._vars_lrct[(ll + 0, rr, cc, ss)]
                         vv1 = self._vars_lrct[(ll + 1, rr, cc, ss)]
                         self._solver.cnstr_implies_disj(vv0, True, [vv1] + all_changes_rc[(rr, cc)], True, None)
-                        # TODO needed?
+                        # TODO?: needed?
                         self._solver.cnstr_implies_disj(vv0, False, [vv1] + all_changes_rc[(rr, cc)], [False] + [True] * len(all_changes_rc[(rr, cc)]), None)
 
         if mkiii_info.custom:

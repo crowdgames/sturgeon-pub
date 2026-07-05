@@ -184,7 +184,7 @@ class ExplorerFrame(tkinter.Frame):
             img_sum = None
             img_count = 0
             for tile, image in self._ex.tileset.tile_to_image.items():
-                arr = np.array(image.getdata())
+                arr = np.array(image.get_flattened_data())
                 if img_sum is None:
                     img_sum = np.sum(arr, axis=0)
                 else:
