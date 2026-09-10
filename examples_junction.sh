@@ -31,9 +31,9 @@ python scheme2output.py --outfile work/cave-junction-a --schemefile work/cave-ju
 
 python scheme2output.py --outfile work/cave-junction-b --schemefile work/cave-junction.scheme --size 15 15 --pattern-hard --count-soft --reach-junction 0 tl 4 --reach-junction 1 br 4 --custom text-exclude 23 hard --reach-connect "--src 0 --dst 1 --move maze" --reach-connect "--src 1 --dst 0 --move maze"
 
-python scheme2output.py --outfile work/cave-junction-d --schemefile work/cave-junction.scheme --size 15 15 --pattern-hard --count-soft --reach-junction 0 tl 4 --reach-junction 1 tr 4 --reach-junction 2 bl 4 --reach-junction 3 br 4 --reach-connect "--src 0 --dst 1 --move maze" --reach-connect "--src 1 --dst 3 --move maze" --reach-connect "--src 3 --dst 2 --move maze" --reach-connect "--src 2 --dst 0 --move maze"
-
 python scheme2output.py --outfile work/cave-junction-c --schemefile work/cave-junction.scheme --size 15 15 --pattern-hard --count-soft --reach-junction 0 tl 4 --reach-junction 1 tr 4 --reach-junction 2 bl 4 --reach-junction 3 br 4 --reach-connect "--src 0 --dst 2 --move maze --unreachable" --reach-connect "--src 0 --dst 1 --move maze" --reach-connect "--src 2 --dst 3 --move maze" --reach-print-internal
+
+python scheme2output.py --outfile work/cave-junction-d --schemefile work/cave-junction.scheme --size 15 15 --pattern-hard --count-soft --reach-junction 0 tl 4 --reach-junction 1 tr 4 --reach-junction 2 bl 4 --reach-junction 3 br 4 --reach-connect "--src 0 --dst 1 --move maze" --reach-connect "--src 1 --dst 3 --move maze" --reach-connect "--src 3 --dst 2 --move maze" --reach-connect "--src 2 --dst 0 --move maze"
 
 # cave-doors
 python input2tile.py --outfile work/cave-doors.tile --textfile levels/kenney/cave-doors.lvl --imagefile levels/kenney/cave-doors.png

@@ -338,6 +338,10 @@ def make_grid(rows, cols, elem):
         out.append(out_row)
     return out
 
+def grid_cat_col(left, right):
+    check(len(left) == len(right), 'grid sizes')
+    return [lf + rt for lf, rt in zip(left, right)]
+
 def grid_size(grid):
     rows = len(grid)
     cols = None
@@ -371,6 +375,9 @@ def xform_grid_pad_around(grid, tl, tt, tr, ll, rr, bl, bb, br):
         new_grid.append([ll] + row + [rr])
     new_grid.append([bl] + ([bb] * cols) + [br])
     return new_grid
+
+def xform_grid_subgrid(grid, rr0, cc0, rr1, cc1):
+    return [row[cc0:cc1] for row in grid[rr0:rr1]]
 
 def corner_indices(til, depth):
     def corner_indices_helper(_fra, _til, _depth, _sofar, _track):

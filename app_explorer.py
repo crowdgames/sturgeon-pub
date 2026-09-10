@@ -4,6 +4,8 @@ import numpy as np
 import PIL.Image, PIL.ImageDraw, PIL.ImageTk
 import tkinter, tkinter.messagebox
 
+
+
 INSET           =    10
 FRAME           =     5
 
@@ -53,14 +55,18 @@ class RemainingInfo:
 
 
 class ExplorerFrame(tkinter.Frame):
-    def __init__(self, root, explorer_info, cell_size, text_colors, text_disp, image_disp):
+    def __init__(self, root, explorer_info, cell_size, text_scale, text_colors, property_size, property_rows, text_disp, image_disp):
         super().__init__(root)
 
         if TIME_RECOMPUTE is not None:
             self._times = []
 
         self._cell_size = cell_size
+        self._text_scale = text_scale
         self._text_colors = text_colors
+
+        self._property_size = property_size
+        self._property_rows = property_rows
 
         self._ex = explorer_info
         self._nlevels = len(self._ex.level_data)
@@ -101,8 +107,11 @@ class ExplorerFrame(tkinter.Frame):
         self._cvs = tkinter.Canvas(self, width=width, height=height)
         self._cvs.grid(column=0, row=0)
 
-        self._sidebar = tkinter.Frame(self)
-        self._sidebar.grid(column=1, row=0, sticky=tkinter.N, padx=INSET, pady=INSET)
+        self._sidebar1 = tkinter.Frame(self)
+        self._sidebar1.grid(column=1, row=0, sticky=tkinter.N, padx=INSET, pady=INSET)
+
+        self._sidebar2 = tkinter.Frame(self)
+        self._sidebar2.grid(column=2, row=0, sticky=tkinter.N, padx=INSET, pady=INSET)
 
         self._check = []
         self._check_var = []
@@ -113,10 +122,20 @@ class ExplorerFrame(tkinter.Frame):
                 prop_and_pind.append((self._ex.pind_to_prop[ii], ii))
             prop_and_pind = sorted(prop_and_pind)
 
-            for prop, pind in prop_and_pind:
+            for ii, (prop, pind) in enumerate(prop_and_pind):
                 chk_var = tkinter.IntVar()
-                chk = tkinter.Checkbutton(self._sidebar, text=prop, anchor=tkinter.W, variable=chk_var, onvalue=1, offvalue=0, tristatevalue=-1, command=self._toggle_prop)
-                chk.pack()
+
+                if self._property_size is not None:
+                    font = (None, self._property_size)
+                else:
+                    font = None
+
+                chk = tkinter.Checkbutton(self._sidebar1, text=prop, anchor=tkinter.W, variable=chk_var, onvalue=1, offvalue=0, tristatevalue=-1, command=self._toggle_prop, font=font)
+
+                if self._property_rows is not None:
+                    chk.grid(sticky=tkinter.W, column=ii // self._property_rows, row=ii % self._property_rows)
+                else:
+                    chk.pack(anchor=tkinter.W)
 
                 self._check.append(chk)
                 self._check_var.append(chk_var)
@@ -124,12 +143,12 @@ class ExplorerFrame(tkinter.Frame):
 
         self._widgets = []
 
-        self._label_rem = tkinter.Label(self._sidebar)
+        self._label_rem = tkinter.Label(self._sidebar2)
         self._label_rem.pack()
         self._widgets.append(self._label_rem)
 
         def keybutton(key, text, command):
-            btn = tkinter.Button(self._sidebar, text=text, command=command)
+            btn = tkinter.Button(self._sidebar2, text=text, command=command)
             btn.pack()
             self._widgets.append(btn)
             self.bind_all('<KeyPress-' + key + '>', command)
@@ -474,7 +493,7 @@ class ExplorerFrame(tkinter.Frame):
         indices = indices_rc[rr][cc]
         sqrt = indices_sqrt_rc[rr][cc]
         to = self._cell_size / (2 * sqrt)
-        font = ('Courier', str(int(self._cell_size / sqrt)))
+        font = ('Courier', str(int(self._cell_size / sqrt * 0.9 * self._text_scale)))
         ind = 0
 
         for index in indices:
@@ -928,7 +947,7 @@ class ExplorerFrame(tkinter.Frame):
 
 
 
-def app_explorer(explorer_info, cell_size, text_colors, text_disp, image_disp):
+def app_explorer(explorer_info, cell_size, text_scale, text_colors, property_size, property_rows, text_disp, image_disp):
     root = tkinter.Tk()
     root.title('explorer')
 
@@ -938,7 +957,7 @@ def app_explorer(explorer_info, cell_size, text_colors, text_disp, image_disp):
     if len(explorer_info.tind_to_image) > 0:
         print('has image')
 
-    ExplorerFrame(root, explorer_info, cell_size, text_colors, text_disp, image_disp)
+    ExplorerFrame(root, explorer_info, cell_size, text_scale, text_colors, property_size, property_rows, text_disp, image_disp)
 
     root.mainloop()
 
@@ -948,19 +967,18 @@ if __name__ == '__main__':
     util_common.print_command()
 
     parser = argparse.ArgumentParser(description='Level Explorer.')
-
     parser.add_argument('--explorefile', required=True, type=str, help='Explore file to run, or write to.')
-    parser.add_argument('--cell-size', type=int, help='Size of cells.', default=CELL_SIZE_DEF)
-    parser.add_argument('--cfgfile', type=str, help='Config file.')
     parser.add_argument('--text', action='store_true', help='Try text display.')
     parser.add_argument('--image', action='store_true', help='Try image display.')
     parser.add_argument('--test', action='store_true', help='Only test loading.')
-
+    parser.add_argument('--property-size', type=int, help='Font size for properties.')
+    parser.add_argument('--property-rows', type=int, help='Number of rows for properties.')
+    parser.add_argument('--cell-size', type=int, help='Size of cells.', default=CELL_SIZE_DEF)
+    parser.add_argument('--text-scale', type=float, help='Amount to scale display text.', default=1.0)
+    parser.add_argument('--text-colorfile', type=str, help='Config file for text colors.')
     args = parser.parse_args()
 
-    text_colors = None
-    if args.cfgfile is not None:
-        text_colors = util_common.load_color_cfg(args.cfgfile)
+    text_colors = None if args.text_colorfile is None else util_common.load_color_cfg(args.text_colorfile)
 
     print('loading...')
     start_time = time.time()
@@ -974,4 +992,4 @@ if __name__ == '__main__':
     print(msg)
 
     if not args.test:
-        app_explorer(explore_info, args.cell_size, text_colors, args.text, args.image)
+        app_explorer(explore_info, args.cell_size, args.text_scale, text_colors, args.property_size, args.property_rows, args.text, args.image)

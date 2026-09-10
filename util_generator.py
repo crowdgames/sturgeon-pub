@@ -1292,13 +1292,12 @@ class Generator:
         game_locations = {}
         open_locations = {}
         closed_locations = {}
-        for rr in range(self._rows):
-            for cc in range(self._cols):
-                game_locations[(rr, cc)] = self._game_level[rr][cc]
-                if self._solver.get_var(connect_entry.vars_open[(rr, cc)]):
-                    open_locations[(rr, cc)] = None
-                else:
-                    closed_locations[(rr, cc)] = None
+        for (rr, cc) in self._vars_rc_t:
+            game_locations[(rr, cc)] = self._game_level[rr][cc]
+            if self._solver.get_var(connect_entry.vars_open[(rr, cc)]):
+                open_locations[(rr, cc)] = None
+            else:
+                closed_locations[(rr, cc)] = None
 
         path_edges = util_path.shortest_path_between(src_rc, dst_rc, self._rows, self._cols, connect_entry.connect_info.game_to_move_info, game_locations, open_locations, closed_locations)
 

@@ -465,10 +465,10 @@ class FlatFwdConstraint(CustomConstraint):
             util_common.check(reach_edges is not None, 'reach_edges')
 
             for cfr, cfc, ctr, ctc, cpwtr, cpwtc in reach_edges:
-                if self._direction == util_reach.RSGLOC_L_R:
-                    exclude = (ctc <= cfc)
-                elif self._direction == util_reach.RSGLOC_B_T:
+                if self._direction == util_reach.RSGLOC_B_T:
                     exclude = (ctr >= cfr)
+                elif self._direction == util_reach.RSGLOC_L_R:
+                    exclude = (ctc <= cfc)
                 else:
                     util_common.check(False, 'direction')
 
@@ -517,10 +517,10 @@ class LayeredFwdConstraint(CustomConstraint):
                 for edge_key, edge_var in vars_layer_edge[layer].items():
                     fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
 
-                    if self._direction == util_reach.RSGLOC_L_R:
-                        exclude = (tc <= fc)
-                    elif self._direction == util_reach.RSGLOC_B_T:
+                    if self._direction == util_reach.RSGLOC_B_T:
                         exclude = (tr >= fr)
+                    elif self._direction == util_reach.RSGLOC_L_R:
+                        exclude = (tc <= fc)
                     else:
                         util_common.check(False, 'direction')
 

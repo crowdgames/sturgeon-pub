@@ -3,10 +3,12 @@ import scheme2output, util_common, util_custom, util_path, util_reach, util_solv
 import PIL.Image, PIL.ImageTk
 import tkinter
 
+
+
 WEIGHT_APP     =  100
 
 INSET          =   10
-CELL_SIZE      =   25
+CELL_SIZE_DEF  =   25
 
 LEVEL_COUNT    =  128
 
@@ -22,12 +24,6 @@ MODES = [MODE_PATHED, MODE_TEXTED, MODE_TEST]
 
 
 
-def tocvs(x):
-    return (x * CELL_SIZE) + INSET
-
-def fromcvs(x):
-    return (x - INSET) / CELL_SIZE
-
 def encode_result_info(result_info):
     if result_info is not None:
         if result_info.image_level is not None:
@@ -41,7 +37,7 @@ def decode_result_info(result_info):
 
 
 class PathCanvas(tkinter.Canvas):
-    def __init__(self, parent, cfg, mode, out_no_hash, app_state, app_weight):
+    def __init__(self, parent, cfg, mode, cell_size, text_below, text_scale, text_colors, path_arrow, path_color, out_no_hash, app_state, app_weight):
         super().__init__(parent)
 
         util_common.check(cfg.scheme_info.tileset.tile_to_text is not None, 'no text in tileset')
@@ -50,6 +46,19 @@ class PathCanvas(tkinter.Canvas):
 
         self._rows = cfg.rows
         self._cols = cfg.cols
+
+        self._cell_size = cell_size
+        self._text_below = text_below
+        self._text_scale = text_scale
+        self._text_colors = text_colors
+        self._path_arrow = path_arrow
+        self._path_color_gen = 'red'
+        self._path_color_edit = 'pink'
+        if path_color is not None:
+            if ',' in path_color:
+                self._path_color_gen, self._path_color_edit = path_color.split(',')
+            else:
+                self._path_color_gen = path_color
 
         self._out_no_hash = out_no_hash
         self._app_weight = app_weight
@@ -78,12 +87,16 @@ class PathCanvas(tkinter.Canvas):
         self._draw_open_closed = False
         self._mouse_draw = []
 
+        self._text_level = None if (app_state is None or 'text' not in app_state) else app_state['text']
+        self._text_level_draw = []
+
+        self._text_above_draw = []
+
         self._path_or_point = None if (app_state is None or 'path' not in app_state) else [tuple(pt) for pt in app_state['path']]
         self._gen_path = None
         self._path_draw = []
 
-        self._text_level = None if (app_state is None or 'text' not in app_state) else app_state['text']
-        self._text_level_draw = []
+        self._text_below_draw = []
 
         self._grid_draw = []
 
@@ -100,6 +113,8 @@ class PathCanvas(tkinter.Canvas):
 
         self.bind_all('<Escape>', self.on_evt_all_tog_mode)
         self.bind_all('<Return>', self.on_evt_all_export)      # export
+        self.bind_all('<Up>',     self.on_evt_all_zoom_in)     # zoom in
+        self.bind_all('<Down>',   self.on_evt_all_zoom_out)    # zoom out
         self.bind_all('<Right>',  self.on_evt_all_next_level)  # next generated level
         self.bind_all('<Left>',   self.on_evt_all_prev_level)  # previous generated level
         self.bind('<Motion>',          self.on_mouse_motion)
@@ -118,6 +133,12 @@ class PathCanvas(tkinter.Canvas):
         self.recompute_texts()
         self.redraw_from_image()
         self.restart_gen_proc(INIT_DELAY_SEC)
+
+    def tocvs(self, x):
+        return (x * self._cell_size) + INSET
+
+    def fromcvs(self, x):
+        return (x - INSET) / self._cell_size
 
     def set_mode(self, mode):
         def unbind_keys():
@@ -151,9 +172,9 @@ class PathCanvas(tkinter.Canvas):
             self._mode = mode
             unbind_keys()
             bind_key('<KeyPress>',        self.on_evt_text_change)         # change text
-            bind_key('<Up>',              self.on_evt_text_copy)           # copy text
+            bind_key('<Shift-Up>',        self.on_evt_text_copy)           # copy text
             bind_key('<BackSpace>',       self.on_evt_text_del)            # delete text
-            bind_key('<Down>',            self.on_evt_text_del_same_after) # delete text
+            bind_key('<Shift-Down>',      self.on_evt_text_del_same_after) # delete text
             bind_key('<Shift-BackSpace>', self.on_evt_text_clear)          # clear text
 
         elif mode == MODE_TEST:
@@ -250,7 +271,7 @@ class PathCanvas(tkinter.Canvas):
                     decode_result_info(result_info)
 
                     self._gen_result = result_info
-                    self._gen_image = PIL.ImageTk.PhotoImage(result_info.image_level.resize((self._cols * CELL_SIZE, self._rows * CELL_SIZE), PIL.Image.Resampling.BILINEAR)) if result_info.image_level is not None else None
+                    self._update_gen_image()
                     self._gen_text = result_info.text_level
                     self._gen_path = result_info.reach_info[0].path_edges if result_info.reach_info else None
                     self._gen_objective = result_info.solver_objective
@@ -278,9 +299,37 @@ class PathCanvas(tkinter.Canvas):
         self.redraw_from_working()
         self.after(REFRESH_MSEC, self.on_timer)
 
-    def set_scroll_region(self, scw, sch):
-        self._scrollregion = (scw, sch)
-        self.config(scrollregion=(0, 0, scw, sch))
+    def _update_gen_image(self):
+        if self._gen_result is not None and self._gen_result.image_level is not None:
+            self._gen_image = PIL.ImageTk.PhotoImage(self._gen_result.image_level.resize((self._cols * self._cell_size, self._rows * self._cell_size), PIL.Image.Resampling.BILINEAR))
+        else:
+            self._gen_image = None
+
+    def update_scroll_region(self):
+        canvas_width  = self._cols * self._cell_size + 2 * INSET
+        canvas_height = self._rows * self._cell_size + 2 * INSET
+
+        width = min(canvas_width, MAX_SIZE)
+        height = min(canvas_height, MAX_SIZE)
+
+        self._frame.rowconfigure(0, weight=1)
+        self._frame.columnconfigure(0, weight=1)
+
+        self.config(width=width, height=height)
+        self.grid(row=0, column=0, sticky=tkinter.NSEW)
+        if width < canvas_width:
+            self._hbar.grid(row=1, column=0, sticky=tkinter.EW)
+        else:
+            self._hbar.grid_forget()
+        if height < canvas_height:
+            self._vbar.grid(row=0, column=1, sticky=tkinter.NS)
+        else:
+            self._vbar.grid_forget()
+
+        self._scrollregion = (canvas_width, canvas_height)
+        self.config(scrollregion=(0, 0, canvas_width, canvas_height))
+
+        self._update_gen_image()
 
     def set_scroll_x(self, *args):
         self.xview(*args)
@@ -289,6 +338,77 @@ class PathCanvas(tkinter.Canvas):
     def set_scroll_y(self, *args):
         self.yview(*args)
         self.redraw_from_working()
+
+    def _do_draw_text(self, draw_list, texts, include):
+        if self._gen_image is None and self._gen_text is not None:
+            for rr in range(self._rows):
+                for cc in range(self._cols):
+                    tag = self._cfg.tag_level[rr][cc]
+                    if tag != util_common.VOID_TEXT:
+                        text = self._gen_text[rr][cc]
+                        if texts is None or (text in texts) == include:
+                            text_color = 'black' if (self._text_colors is None or text not in self._text_colors) else util_common.color_to_hex(self._text_colors[text])
+                            draw_list.append(self.create_text(self.tocvs(cc + 0.5), self.tocvs(rr + 0.5), text=text, fill=text_color, font=('Courier', str(int(self._cell_size * 0.9 * self._text_scale))), anchor=tkinter.CENTER))
+
+    def _do_draw_path(self, path, larger, color, dash):
+        if larger:
+            outline_color = color
+            width = 3 * self._cell_size / CELL_SIZE_DEF
+        else:
+            outline_color = ''
+            width = 2 * self._cell_size / CELL_SIZE_DEF
+
+        if PathCanvas.is_edge_path(path):
+            path_unwrapped, path_orig_from, path_was_unwrapped = util_path.unwrap_edge_path(path)
+
+            draw_lines = []
+            prev_pt = None
+            for (pr0, pc0, pr1, pc1) in path_unwrapped:
+                if prev_pt != (pr0, pc0):
+                    if prev_pt is not None:
+                        draw_lines[-1].append(self.tocvs(prev_pt[1] + 0.5))
+                        draw_lines[-1].append(self.tocvs(prev_pt[0] + 0.5))
+                    draw_lines.append([])
+                    draw_lines[-1].append(self.tocvs(pc0 + 0.5))
+                    draw_lines[-1].append(self.tocvs(pr0 + 0.5))
+                draw_lines[-1].append(self.tocvs(pc1 + 0.5))
+                draw_lines[-1].append(self.tocvs(pr1 + 0.5))
+                prev_pt = (pr1, pc1)
+            for draw_line in draw_lines:
+                self._path_draw.append(self.create_line(*draw_line, fill=color, width=width, dash=dash))
+
+            if self._path_arrow:
+                for (pr0, pc0, pr1, pc1), was_unwrapped in zip(path_unwrapped, path_was_unwrapped):
+                    if was_unwrapped == util_path.UNWRAP_PRE:
+                        continue
+                    pr0 += 0.5
+                    pc0 += 0.5
+                    pr1 += 0.5
+                    pc1 += 0.5
+                    dr = pr1 - pr0
+                    dc = pc1 - pc0
+                    ll = (dr ** 2 + dc ** 2) ** 0.5
+                    dr /= ll
+                    dc /= ll
+                    SCL = 0.3
+                    OFF = 0.075
+                    tra = pr1 - OFF * dr
+                    tca = pc1 - OFF * dc
+                    trb = (pr1 - dr * SCL - 0.5 * dc * SCL) - OFF * dr
+                    tcb = (pc1 - dc * SCL + 0.5 * dr * SCL) - OFF * dc
+                    trc = (pr1 - dr * SCL + 0.5 * dc * SCL) - OFF * dr
+                    tcc = (pc1 - dc * SCL - 0.5 * dr * SCL) - OFF * dc
+                    self._path_draw.append(self.create_polygon([self.tocvs(tca), self.tocvs(tra), self.tocvs(tcb), self.tocvs(trb), self.tocvs(tcc), self.tocvs(trc)], fill=color, outline=outline_color, width=width))
+
+        draw_ends = []
+        if PathCanvas.is_single_point_path(path):
+            draw_ends.append(path)
+        elif PathCanvas.is_edge_path(path):
+            draw_ends.append(util_path.path_begin_point(path))
+            draw_ends.append(util_path.path_end_point(path))
+        for pr, pc in draw_ends:
+            sz = 0.20
+            self._path_draw.append(self.create_oval(self.tocvs(pc + (0.5 - sz)), self.tocvs(pr + (0.5 - sz)), self.tocvs(pc + (0.5 + sz)), self.tocvs(pr + (0.5 + sz)), fill=color, outline=outline_color, width=width))
 
     def redraw_from_working(self):
         for draw in self._working_draw:
@@ -301,12 +421,18 @@ class PathCanvas(tkinter.Canvas):
         else:
             xoff, yoff = 0, 0
 
+        xoff += INSET
+        yoff += INSET
+
         if self._gen_objective is not None and self._gen_objective > 0:
-            self._working_draw.append(self.create_line(xoff + tocvs(0.65), yoff + tocvs(0.65), xoff + tocvs(1.35), yoff + tocvs(1.35), fill='dark orange', width=3))
-            self._working_draw.append(self.create_line(xoff + tocvs(1.35), yoff + tocvs(0.65), xoff + tocvs(0.65), yoff + tocvs(1.35), fill='dark orange', width=3))
+            sza = CELL_SIZE_DEF * 0.65
+            szb = CELL_SIZE_DEF * 1.35
+            self._working_draw.append(self.create_line(xoff + sza, yoff + sza, xoff + szb, yoff + szb, fill='dark orange', width=3))
+            self._working_draw.append(self.create_line(xoff + szb, yoff + sza, xoff + sza, yoff + szb, fill='dark orange', width=3))
 
         if self._gen_proc is not None:
-            self._working_draw.append(self.create_arc(xoff + tocvs(0.5), yoff + tocvs(0.5), xoff + tocvs(1.5), yoff + tocvs(1.5), outline='dark orange', width=3, style=tkinter.ARC, start=time.time() * 45.0, extent=300.0))
+            sz = CELL_SIZE_DEF * 0.5
+            self._working_draw.append(self.create_arc(xoff + sz, yoff + sz, xoff + 3 * sz, yoff + 3 * sz, outline='dark orange', width=3, style=tkinter.ARC, start=time.time() * 45.0, extent=300.0))
 
     def redraw_from_mouse(self):
         for draw in self._mouse_draw:
@@ -317,9 +443,9 @@ class PathCanvas(tkinter.Canvas):
             mr, mc = self._mouse
 
             if self._path_nexts is None or self._mouse in self._path_nexts:
-                self._mouse_draw.append(self.create_rectangle(tocvs(mc), tocvs(mr), tocvs(mc + 1), tocvs(mr + 1), outline='green', width=3))
+                self._mouse_draw.append(self.create_rectangle(self.tocvs(mc), self.tocvs(mr), self.tocvs(mc + 1), self.tocvs(mr + 1), outline='green', width=3))
             else:
-                self._mouse_draw.append(self.create_rectangle(tocvs(mc), tocvs(mr), tocvs(mc + 1), tocvs(mr + 1), outline='gray', width=3))
+                self._mouse_draw.append(self.create_rectangle(self.tocvs(mc), self.tocvs(mr), self.tocvs(mc + 1), self.tocvs(mr + 1), outline='gray', width=3))
 
         self.redraw_from_working()
 
@@ -333,69 +459,20 @@ class PathCanvas(tkinter.Canvas):
                 for cc in range(self._cols):
                     text = self._text_level[rr][cc]
                     if text != util_common.DEFAULT_TEXT:
-                        self._text_level_draw.append(self.create_rectangle(tocvs(cc), tocvs(rr), tocvs(cc + 0.5), tocvs(rr + 0.5), fill='pink', outline='purple'))
-                        self._text_level_draw.append(self.create_text(tocvs(cc + 0.25), tocvs(rr + 0.25), text=text, fill='purple', font=('Courier', CELL_SIZE // 2), anchor=tkinter.CENTER))
+                        self._text_level_draw.append(self.create_rectangle(self.tocvs(cc), self.tocvs(rr), self.tocvs(cc + 0.5), self.tocvs(rr + 0.5), fill='pink', outline='purple'))
+                        self._text_level_draw.append(self.create_text(self.tocvs(cc + 0.25), self.tocvs(rr + 0.25), text=text, fill='purple', font=('Courier', self._cell_size // 2), anchor=tkinter.CENTER))
 
         self.redraw_from_mouse()
 
-    def _do_draw_path(self, path, larger, color, dash):
-        if larger:
-            outline_color = color
-            width = 3
-        else:
-            outline_color = ''
-            width = 2
+    def redraw_from_text_above(self):
+        for draw in self._text_above_draw:
+            self.delete(draw)
+        self._text_above_draw = []
 
-        if PathCanvas.is_edge_path(path):
-            path_unwrapped, path_orig_from, path_was_unwrapped = util_path.unwrap_edge_path(path)
+        if self._text_below is not None:
+            self._do_draw_text(self._text_above_draw, self._text_below, False)
 
-            draw_lines = []
-            prev_pt = None
-            for (pr0, pc0, pr1, pc1) in path_unwrapped:
-                if prev_pt != (pr0, pc0):
-                    if prev_pt is not None:
-                        draw_lines[-1].append(tocvs(prev_pt[1] + 0.5))
-                        draw_lines[-1].append(tocvs(prev_pt[0] + 0.5))
-                    draw_lines.append([])
-                    draw_lines[-1].append(tocvs(pc0 + 0.5))
-                    draw_lines[-1].append(tocvs(pr0 + 0.5))
-                draw_lines[-1].append(tocvs(pc1 + 0.5))
-                draw_lines[-1].append(tocvs(pr1 + 0.5))
-                prev_pt = (pr1, pc1)
-            for draw_line in draw_lines:
-                self._path_draw.append(self.create_line(*draw_line, fill=color, width=width, dash=dash))
-
-            for (pr0, pc0, pr1, pc1), was_unwrapped in zip(path_unwrapped, path_was_unwrapped):
-                if was_unwrapped == util_path.UNWRAP_PRE:
-                    continue
-                pr0 += 0.5
-                pc0 += 0.5
-                pr1 += 0.5
-                pc1 += 0.5
-                dr = pr1 - pr0
-                dc = pc1 - pc0
-                ll = (dr ** 2 + dc ** 2) ** 0.5
-                dr /= ll
-                dc /= ll
-                SCL = 0.3
-                OFF = 0.075
-                tra = pr1 - OFF * dr
-                tca = pc1 - OFF * dc
-                trb = (pr1 - dr * SCL - 0.5 * dc * SCL) - OFF * dr
-                tcb = (pc1 - dc * SCL + 0.5 * dr * SCL) - OFF * dc
-                trc = (pr1 - dr * SCL + 0.5 * dc * SCL) - OFF * dr
-                tcc = (pc1 - dc * SCL - 0.5 * dr * SCL) - OFF * dc
-                self._path_draw.append(self.create_polygon([tocvs(tca), tocvs(tra), tocvs(tcb), tocvs(trb), tocvs(tcc), tocvs(trc)], fill=color, outline=outline_color, width=width))
-
-        draw_ends = []
-        if PathCanvas.is_single_point_path(path):
-            draw_ends.append(path)
-        elif PathCanvas.is_edge_path(path):
-            draw_ends.append(util_path.path_begin_point(path))
-            draw_ends.append(util_path.path_end_point(path))
-        for pr, pc in draw_ends:
-            sz = 0.15
-            self._path_draw.append(self.create_oval(tocvs(pc + (0.5 - sz)), tocvs(pr + (0.5 - sz)), tocvs(pc + (0.5 + sz)), tocvs(pr + (0.5 + sz)), fill=color, outline=outline_color, width=width))
+        self.redraw_from_text_level()
 
     def redraw_from_path(self):
         for draw in self._path_draw:
@@ -404,18 +481,27 @@ class PathCanvas(tkinter.Canvas):
 
         if self._draw_open_closed:
             for nr, nc in self._path_open:
-                self._path_draw.append(self.create_oval(tocvs(nc + 0.25), tocvs(nr + 0.25), tocvs(nc + 0.75), tocvs(nr + 0.75), outline='blue', width=2))
+                self._path_draw.append(self.create_oval(self.tocvs(nc + 0.25), self.tocvs(nr + 0.25), self.tocvs(nc + 0.75), self.tocvs(nr + 0.75), outline='blue', width=2))
             for nr, nc in self._path_closed:
-                self._path_draw.append(self.create_rectangle(tocvs(nc + 0.25), tocvs(nr + 0.25), tocvs(nc + 0.75), tocvs(nr + 0.75), outline='blue', width=2))
+                self._path_draw.append(self.create_rectangle(self.tocvs(nc + 0.25), self.tocvs(nr + 0.25), self.tocvs(nc + 0.75), self.tocvs(nr + 0.75), outline='blue', width=2))
 
-        self._do_draw_path(self._gen_path, True, 'red', None)
-        self._do_draw_path(self._path_or_point, False, 'pink', (3, 3))
+        self._do_draw_path(self._gen_path, True, self._path_color_gen, None)
+        self._do_draw_path(self._path_or_point, False, self._path_color_edit, (3, 3))
 
         if self._path_nexts is not None:
             for nr, nc in self._path_nexts:
-                self._path_draw.append(self.create_rectangle(tocvs(nc), tocvs(nr), tocvs(nc + 1), tocvs(nr + 1), outline='black', width=3))
+                self._path_draw.append(self.create_rectangle(self.tocvs(nc), self.tocvs(nr), self.tocvs(nc + 1), self.tocvs(nr + 1), outline='black', width=3))
 
-        self.redraw_from_text_level()
+        self.redraw_from_text_above()
+
+    def redraw_from_text_below(self):
+        for draw in self._text_below_draw:
+            self.delete(draw)
+        self._text_below_draw = []
+
+        self._do_draw_text(self._text_below_draw, self._text_below, True)
+
+        self.redraw_from_path()
 
     def redraw_from_grid(self):
         for draw in self._grid_draw:
@@ -423,11 +509,11 @@ class PathCanvas(tkinter.Canvas):
         self._grid_draw = []
 
         for rr in range(self._rows + 1):
-            self._grid_draw.append(self.create_line(tocvs(0), tocvs(rr), tocvs(self._cols), tocvs(rr), fill='gray'))
+            self._grid_draw.append(self.create_line(self.tocvs(0), self.tocvs(rr), self.tocvs(self._cols), self.tocvs(rr), fill='gray'))
         for cc in range(self._cols + 1):
-            self._grid_draw.append(self.create_line(tocvs(cc), tocvs(0), tocvs(cc), tocvs(self._rows), fill='gray'))
+            self._grid_draw.append(self.create_line(self.tocvs(cc), self.tocvs(0), self.tocvs(cc), self.tocvs(self._rows), fill='gray'))
 
-        self.redraw_from_path()
+        self.redraw_from_text_below()
 
     def redraw_from_image(self):
         for draw in self._image_draw:
@@ -435,17 +521,14 @@ class PathCanvas(tkinter.Canvas):
         self._image_draw = []
 
         if self._gen_image is None:
-            self._image_draw.append(self.create_rectangle(tocvs(0), tocvs(0), tocvs(self._cols), tocvs(self._rows), outline=None, fill='white'))
+            self._image_draw.append(self.create_rectangle(self.tocvs(0), self.tocvs(0), self.tocvs(self._cols), self.tocvs(self._rows), outline=None, fill='white'))
             for rr in range(self._rows):
                 for cc in range(self._cols):
                     tag = self._cfg.tag_level[rr][cc]
                     if tag == util_common.VOID_TEXT:
-                        self._image_draw.append(self.create_rectangle(tocvs(cc), tocvs(rr), tocvs(cc + 1), tocvs(rr + 1), outline=None, fill='black'))
-                    elif self._gen_text is not None:
-                        text = self._gen_text[rr][cc]
-                        self._image_draw.append(self.create_text(tocvs(cc + 0.5), tocvs(rr + 0.5), text=text, fill='black', font=('Courier', str(int(CELL_SIZE * 0.9))), anchor=tkinter.CENTER))
+                        self._image_draw.append(self.create_rectangle(self.tocvs(cc), self.tocvs(rr), self.tocvs(cc + 1), self.tocvs(rr + 1), outline=None, fill='black'))
         else:
-            self._image_draw.append(self.create_rectangle(tocvs(0), tocvs(0), tocvs(self._cols), tocvs(self._rows), outline=None, fill='black'))
+            self._image_draw.append(self.create_rectangle(self.tocvs(0), self.tocvs(0), self.tocvs(self._cols), self.tocvs(self._rows), outline=None, fill='black'))
             self._image_draw.append(self.create_image(INSET, INSET, anchor=tkinter.NW, image=self._gen_image))
 
         self.redraw_from_grid()
@@ -532,6 +615,22 @@ class PathCanvas(tkinter.Canvas):
             with open(outfile_base + '.state', 'wt') as outfile:
                 json.dump(app_state, outfile)
                 outfile.write('\n')
+
+    def on_evt_all_zoom_in(self, event):
+        self._cell_size = min(100, math.ceil(self._cell_size * 1.1))
+
+        self.update_scroll_region()
+        self._mouse = None
+
+        self.redraw_from_image()
+
+    def on_evt_all_zoom_out(self, event):
+        self._cell_size = max(4, math.floor(self._cell_size / 1.1))
+
+        self.update_scroll_region()
+        self._mouse = None
+
+        self.redraw_from_image()
 
     def on_evt_all_next_level(self, event):
         self._seed_gen = (self._seed_gen + 1) % LEVEL_COUNT
@@ -724,7 +823,7 @@ class PathCanvas(tkinter.Canvas):
     def on_mouse_motion(self, event):
         mouse_prev = self._mouse
 
-        mr, mc = math.floor(fromcvs(self.canvasy(event.y))), math.floor(fromcvs(self.canvasx(event.x)))
+        mr, mc = math.floor(self.fromcvs(self.canvasy(event.y))), math.floor(self.fromcvs(self.canvasx(event.x)))
         if 0 <= mr and mr < self._rows and 0 <= mc and mc < self._cols:
             self._mouse = (mr, mc)
         else:
@@ -782,46 +881,32 @@ class PathCanvas(tkinter.Canvas):
 
 
 
-def app_editor(cfg, mode, out_no_hash, app_state, app_weight):
+def app_editor(cfg, mode, cell_size, text_below, text_scale, text_colors, path_arrow, path_color, out_no_hash, app_state, app_weight):
     if mode is None:
         if cfg.reach_connect_setups is None:
             mode = MODE_TEXTED
         else:
             mode = MODE_PATHED
 
-    canvas_width  = cfg.cols * CELL_SIZE + 2 * INSET
-    canvas_height = cfg.rows * CELL_SIZE + 2 * INSET
-
-    width = min(canvas_width, MAX_SIZE)
-    height = min(canvas_height, MAX_SIZE)
-
     root = tkinter.Tk()
 
-    frame = tkinter.Frame(root, width=width, height=width)
+    frame = tkinter.Frame(root, width=INSET, height=INSET)
     frame.pack(expand=True, fill=tkinter.BOTH)
 
-    canvas = PathCanvas(frame, cfg, mode, out_no_hash, app_state, app_weight)
-    scroll = False
+    canvas = PathCanvas(frame, cfg, mode, cell_size, text_below, text_scale, text_colors, path_arrow, path_color, out_no_hash, app_state, app_weight)
+    canvas._frame = frame
 
-    if width < canvas_width:
-        hbar = tkinter.Scrollbar(frame, orient=tkinter.HORIZONTAL)
-        hbar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
-        hbar.config(command=canvas.set_scroll_x)
-        canvas.config(xscrollcommand=hbar.set)
-        scroll = True
+    hbar = tkinter.Scrollbar(frame, orient=tkinter.HORIZONTAL)
+    hbar.config(command=canvas.set_scroll_x)
+    canvas.config(xscrollcommand=hbar.set)
+    canvas._hbar = hbar
 
-    if height < canvas_height:
-        vbar = tkinter.Scrollbar(frame, orient=tkinter.VERTICAL)
-        vbar.pack(side=tkinter.RIGHT, fill=tkinter.Y)
-        vbar.config(command=canvas.set_scroll_y)
-        canvas.config(yscrollcommand=vbar.set)
-        scroll = True
+    vbar = tkinter.Scrollbar(frame, orient=tkinter.VERTICAL)
+    vbar.config(command=canvas.set_scroll_y)
+    canvas.config(yscrollcommand=vbar.set)
+    canvas._vbar = vbar
 
-    if scroll:
-        canvas.set_scroll_region(canvas_width, canvas_height)
-
-    canvas.config(width=width, height=height)
-    canvas.pack(side=tkinter.LEFT, expand=True, fill=tkinter.BOTH)
+    canvas.update_scroll_region()
     canvas.xview_moveto(0.0)
     canvas.yview_moveto(0.0)
 
@@ -844,6 +929,12 @@ if __name__ == '__main__':
     util_common.print_command()
 
     mode = None
+    app_cell_size = CELL_SIZE_DEF
+    app_text_below = None
+    app_text_scale = 1.0
+    app_text_colors = None
+    app_path_arrow = True
+    app_path_color = None
     app_out_no_hash = False
     app_state = None
     app_weight = WEIGHT_APP
@@ -857,12 +948,18 @@ if __name__ == '__main__':
 
         parser = argparse.ArgumentParser(description='App-specific arguments.')
         group = parser.add_mutually_exclusive_group()
-        group.add_argument('--pathed', action='store_true', help='Set mode.')
         group.add_argument('--texted', action='store_true', help='Set mode.')
+        group.add_argument('--pathed', action='store_true', help='Set mode.')
         group.add_argument('--test', action='store_true', help='Set mode.')
         parser.add_argument('--out-no-hash', action='store_true', help='Do not append state has to outfile name.')
         parser.add_argument('--statefile', type=str, help='Input state file.')
         parser.add_argument('--app-hard', action='store_true', help='Use hard app constraints.')
+        parser.add_argument('--cell-size', type=int, help='Size of cells.', default=CELL_SIZE_DEF)
+        parser.add_argument('--text-below', type=str, help='When provided, text to place underneath other elements, with other text placed above.')
+        parser.add_argument('--text-scale', type=float, help='Amount to scale display text.', default=1.0)
+        parser.add_argument('--text-colorfile', type=str, help='Config file for text colors.')
+        parser.add_argument('--path-color', type=str, help='Path color.')
+        parser.add_argument('--path-arrow-none', action='store_true', help='Don\'t display path arrows.')
         args = parser.parse_args(app_argv)
 
         if args.pathed:
@@ -881,6 +978,13 @@ if __name__ == '__main__':
         if args.app_hard:
             app_weight = None
 
+        app_cell_size = args.cell_size
+        app_text_below = args.text_below
+        app_text_scale = args.text_scale
+        app_text_colors = None if args.text_colorfile is None else util_common.load_color_cfg(args.text_colorfile)
+        app_path_color = args.path_color
+        app_path_arrow = not args.path_arrow_none
+
     cfg = scheme2output.scheme2output_argv2cfg(argv)
 
-    app_editor(cfg, mode, app_out_no_hash, app_state, app_weight)
+    app_editor(cfg, mode, app_cell_size, app_text_below, app_text_scale, app_text_colors, app_path_arrow, app_path_color, app_out_no_hash, app_state, app_weight)

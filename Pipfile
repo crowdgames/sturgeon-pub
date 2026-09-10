@@ -15,11 +15,11 @@ reportlab = "*"
 squarify = "*"
 
 clingo = "==5.8.0"
-cvc5 = "==1.3.1"
-cvxpy = "==1.7.3"
-python-sat = {version="==1.8.dev24", extras=["aiger", "approxmc", "cryptosat", "pblib"]}
-scipy = "==1.16.2"
-z3-solver = "==4.15.3.0"
+cvc5 = "==1.3.4"
+cvxpy = "==1.9.2"
+python-sat = {version="==1.9.dev5", extras=["aiger", "approxmc", "cryptosat", "pblib"]}
+scipy = "==1.18.0"
+z3-solver = "==4.16.0.0"
 
 [solvers-minimal]
 networkx = "*"
@@ -29,7 +29,7 @@ pydot = "*"
 reportlab = "*"
 squarify = "*"
 
-python-sat = "==1.8.dev24"
+python-sat = "==1.9.dev5"
 
 [solvers-none]
 networkx = "*"

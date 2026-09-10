@@ -19,22 +19,23 @@ RMOVE_PLATFORM_BLINK_2   = 'platform-blink-2'
 RMOVE_LIST               = [RMOVE_MAZE, RMOVE_MAZE_BLINK_1, RMOVE_MAZE_BLINK_2_NOOK, RMOVE_MAZE_SKIP, RMOVE_DRILLER, RMOVE_TOMB, RMOVE_TOMB_FULL_50, RMOVE_SUPERCAT, RMOVE_SUPERCAT_NEW, RMOVE_CLIMB, RMOVE_PLATFORM, RMOVE_PLATFORM_HIGHJUMP, RMOVE_PLATFORM_BLINK_2]
 
 RSGLOC_ALL                = 'all'
-RSGLOC_L_R                = 'l-r'
-RSGLOC_B_T                = 'b-t'
 RSGLOC_T_B                = 't-b'
+RSGLOC_B_T                = 'b-t'
+RSGLOC_L_R                = 'l-r'
+RSGLOC_R_L                = 'r-l'
 RSGLOC_TL_BR              = 'tl-br'
 RSGLOC_TR_BL              = 'tr-bl'
 RSGLOC_BL_TR              = 'bl-tr'
 RSGLOC_BR_TL              = 'br-tl'
-RSGLOC_LIST = [RSGLOC_ALL, RSGLOC_L_R, RSGLOC_B_T, RSGLOC_T_B, RSGLOC_TL_BR, RSGLOC_TR_BL, RSGLOC_BL_TR, RSGLOC_BR_TL]
+RSGLOC_LIST = [RSGLOC_ALL, RSGLOC_T_B, RSGLOC_B_T, RSGLOC_L_R, RSGLOC_R_L, RSGLOC_TL_BR, RSGLOC_TR_BL, RSGLOC_BL_TR, RSGLOC_BR_TL]
 
 RPLOC_ALL                = 'all'
 RPLOC_RECT               = 'rect'
 RPLOC_AT                 = 'at'
+RPLOC_T                  = 't'
+RPLOC_B                  = 'b'
 RPLOC_L                  = 'l'
 RPLOC_R                  = 'r'
-RPLOC_B                  = 'b'
-RPLOC_T                  = 't'
 RPLOC_TL                 = 'tl'
 RPLOC_TR                 = 'tr'
 RPLOC_BL                 = 'bl'
@@ -43,10 +44,10 @@ RPLOC_DICT = {
     RPLOC_ALL: 0,
     RPLOC_RECT: 4,
     RPLOC_AT: 2,
+    RPLOC_T: 1,
+    RPLOC_B: 1,
     RPLOC_L: 1,
     RPLOC_R: 1,
-    RPLOC_B: 1,
-    RPLOC_T: 1,
     RPLOC_TL: 1,
     RPLOC_TR: 1,
     RPLOC_BL: 1,
@@ -171,14 +172,14 @@ def get_reach_junction_info(reach_junction_setup, rows, cols, scheme_info):
         r_rect(reach_junction_info.rcs, reach_junction_setup.loc_params[0], reach_junction_setup.loc_params[1], reach_junction_setup.loc_params[2], reach_junction_setup.loc_params[3])
     elif reach_junction_setup.loc == RPLOC_AT:
         r_at(reach_junction_info.rcs, reach_junction_setup.loc_params[0], reach_junction_setup.loc_params[1])
+    elif reach_junction_setup.loc == RPLOC_T:
+        r_top(reach_junction_info.rcs, reach_junction_setup.loc_params[0])
+    elif reach_junction_setup.loc == RPLOC_B:
+        r_bottom(reach_junction_info.rcs, reach_junction_setup.loc_params[0])
     elif reach_junction_setup.loc == RPLOC_L:
         r_left(reach_junction_info.rcs, reach_junction_setup.loc_params[0])
     elif reach_junction_setup.loc == RPLOC_R:
         r_right(reach_junction_info.rcs, reach_junction_setup.loc_params[0])
-    elif reach_junction_setup.loc == RPLOC_B:
-        r_bottom(reach_junction_info.rcs, reach_junction_setup.loc_params[0])
-    elif reach_junction_setup.loc == RPLOC_T:
-        r_top(reach_junction_info.rcs, reach_junction_setup.loc_params[0])
     elif reach_junction_setup.loc == RPLOC_TL:
         r_topleft(reach_junction_info.rcs, reach_junction_setup.loc_params[0], reach_junction_setup.loc_params[0])
     elif reach_junction_setup.loc == RPLOC_TR:
@@ -201,9 +202,11 @@ def get_reach_junction_info(reach_junction_setup, rows, cols, scheme_info):
                 if text == reach_junction_setup.text:
                     util_common.check(game_junction_tile is None, 'multiple tiles with junction text ' + reach_junction_setup.text)
                     game_junction_tile = tile
-        util_common.check(game_junction_tile is not None, 'no tiles with junction text ' + reach_junction_setup.text)
 
-        reach_junction_info.game_to_junction_tile[game] = game_junction_tile
+        if game_junction_tile is not None:
+            reach_junction_info.game_to_junction_tile[game] = game_junction_tile
+
+    util_common.check(len(reach_junction_info.game_to_junction_tile) > 0, 'no tiles with junction text ' + reach_junction_setup.text)
 
     return reach_junction_info
 

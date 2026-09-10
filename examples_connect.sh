@@ -13,6 +13,7 @@ python tile2scheme.py --outfile work/driller.scheme --tilefile work/driller.tile
 python scheme2output.py --outfile work/driller-null --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --method null" --reach-print-internal
 
 python scheme2output.py --outfile work/driller-flat --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --method flat" --reach-print-internal
+python scheme2output.py --outfile work/driller-flat-search --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --method flat" --reach-print-internal --reach-path-search
 
 python scheme2output.py --outfile work/driller-layered --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --method layered --layers 20" --reach-print-internal
 
@@ -37,6 +38,7 @@ python tile2scheme.py --outfile work/mario.scheme --tilefile work/mario.tile --c
 python scheme2output.py --outfile work/mario-null --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect "--src { --dst } --move platform --method null" --reach-print-internal
 
 python scheme2output.py --outfile work/mario-flat --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect "--src { --dst } --move platform --method flat" --reach-print-internal
+python scheme2output.py --outfile work/mario-flat-search --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect "--src { --dst } --move platform --method flat" --reach-print-internal --reach-path-search
 
 python scheme2output.py --outfile work/mario-layered --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect "--src { --dst } --move platform --method layered --layers 20" --reach-print-internal
 

@@ -3,24 +3,26 @@ import util_common
 
 
 
-PATTERN_SINGLE           = 'single'
-PATTERN_NBR_2            = 'nbr-2'
-PATTERN_NBR_L            = 'nbr-l'
-PATTERN_NBR_PLUS         = 'nbr-plus'
-PATTERN_NBR_RING         = 'nbr-ring'
-PATTERN_RING             = 'ring'
-PATTERN_DIAMOND          = 'diamond'
-PATTERN_BLOCK            = 'block'
-PATTERN_BLOCK_NOOUT      = 'block-noout'
-PATTERN_BLOCK_RST_NOOUT  = 'block-rst-noout'
-PATTERN_RGRAM            = 'rgram'
-PATTERN_CGRAM            = 'cgram'
-PATTERN_ZCGRAM           = 'zcgram'
-PATTERN_CGRAM_NOOUT      = 'cgram-noout'
+PATTERN_SINGLE             = 'single'
+PATTERN_NBR_2              = 'nbr-2'
+PATTERN_NBR_L              = 'nbr-l'
+PATTERN_NBR_PLUS           = 'nbr-plus'
+PATTERN_NBR_RING           = 'nbr-ring'
+PATTERN_PLUS               = 'plus'
+PATTERN_RING               = 'ring'
+PATTERN_DIAMOND            = 'diamond'
+PATTERN_BLOCK              = 'block'
+PATTERN_BLOCK_NOOUT        = 'block-noout'
+PATTERN_BLOCK_RST_NOOUT    = 'block-rst-noout'
+PATTERN_BLOCK_RCSTIJ_NOOUT = 'block-rcstij-noout'
+PATTERN_RGRAM              = 'rgram'
+PATTERN_CGRAM              = 'cgram'
+PATTERN_ZCGRAM             = 'zcgram'
+PATTERN_CGRAM_NOOUT        = 'cgram-noout'
 PATTERN_LIST = [PATTERN_SINGLE,
                 PATTERN_NBR_2, PATTERN_NBR_L, PATTERN_NBR_PLUS, PATTERN_NBR_RING,
-                PATTERN_RING, PATTERN_DIAMOND,
-                PATTERN_BLOCK, PATTERN_BLOCK_NOOUT, PATTERN_BLOCK_RST_NOOUT,
+                PATTERN_PLUS, PATTERN_RING, PATTERN_DIAMOND,
+                PATTERN_BLOCK, PATTERN_BLOCK_NOOUT, PATTERN_BLOCK_RST_NOOUT, PATTERN_BLOCK_RCSTIJ_NOOUT,
                 PATTERN_RGRAM, PATTERN_CGRAM, PATTERN_ZCGRAM, PATTERN_CGRAM_NOOUT]
 
 
@@ -48,6 +50,9 @@ BASIC_PATTERNS = {
                          ([(0, 0)], [( 1, -1)]),
                          ([(0, 0)], [( 1,  0)]),
                          ([(0, 0)], [( 1,  1)])],
+
+    PATTERN_PLUS      : [([(0, 0)],
+                          [(-1, 0), (0, -1), (0, 1), (1, 0)])],
 
     PATTERN_RING      : [([(0, 0)],
                           [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])],
@@ -79,6 +84,17 @@ def patternopts_to_deltas(patternopt_name, patternopt_params, level_rows, level_
         util_common.check(times >= 2, 'times')
         util_common.check(t_step >= rows, 't_step')
         return [([(t_step * tt + rr, cc) for tt in range(times) for rr in range(rows) for cc in range(cols)], None)]
+
+    elif patternopt_name == PATTERN_BLOCK_RCSTIJ_NOOUT:
+        util_common.check(len(patternopt_params) == 6, 'patternopt_params')
+        rows, cols, stories, times, tr_step, ts_step = patternopt_params
+        util_common.check(rows >= 1, 'rows')
+        util_common.check(cols >= 1, 'cols')
+        util_common.check(stories >= 1, 'stories')
+        util_common.check(times >= 2, 'times')
+        util_common.check(tr_step >= rows, 'tr_step')
+        util_common.check(ts_step >= stories, 'ts_step')
+        return [([(tr_step * tt + yy, ts_step * zz + xx) for tt in range(times) for yy in range(rows) for zz in range(stories) for xx in range(cols)], None)]
 
     elif patternopt_name == PATTERN_BLOCK_NOOUT:
         if len(patternopt_params) == 1:
@@ -159,7 +175,7 @@ def normalize(tile_dict):
 
 
 
-def tiles2scheme(tile_info, divs_size, game_to_patternopt, level_rotate):
+def tiles2scheme(tile_info, divs_size, game_to_patternopt, xform_rotate_all, xform_flip_rows, xform_flip_cols):
     ti = tile_info
     si = util_common.SchemeInfo()
 
@@ -220,15 +236,12 @@ def tiles2scheme(tile_info, divs_size, game_to_patternopt, level_rotate):
 
     tile_levels, tag_levels, game_levels = [], [], []
     for tli in ti.levels:
-        tile_level = tli.tiles
-        tag_level = tli.tags
-        game_level = tli.games
+        tile_levels.append(tli.tiles)
+        tag_levels.append(tli.tags)
+        game_levels.append(tli.games)
 
-        tile_levels.append(tile_level)
-        tag_levels.append(tag_level)
-        game_levels.append(game_level)
-
-        if level_rotate:
+    if xform_rotate_all:
+        for tile_level, tag_level, game_level in zip(list(tile_levels), list(tag_levels), list(game_levels)):
             for ii in range(3):
                 tile_level = util_common.xform_grid_rotate_cw(tile_level)
                 tag_level = util_common.xform_grid_rotate_cw(tag_level)
@@ -237,6 +250,18 @@ def tiles2scheme(tile_info, divs_size, game_to_patternopt, level_rotate):
                 tile_levels.append(tile_level)
                 tag_levels.append(tag_level)
                 game_levels.append(game_level)
+
+    if xform_flip_rows:
+        for tile_level, tag_level, game_level in zip(list(tile_levels), list(tag_levels), list(game_levels)):
+            tile_levels.append(util_common.xform_grid_flip_rows(tile_level))
+            tag_levels.append(util_common.xform_grid_flip_rows(tag_level))
+            game_levels.append(util_common.xform_grid_flip_rows(game_level))
+
+    if xform_flip_cols:
+        for tile_level, tag_level, game_level in zip(list(tile_levels), list(tag_levels), list(game_levels)):
+            tile_levels.append(util_common.xform_grid_flip_cols(tile_level))
+            tag_levels.append(util_common.xform_grid_flip_cols(tag_level))
+            game_levels.append(util_common.xform_grid_flip_cols(game_level))
 
     for tile_level, tag_level, game_level in zip(tile_levels, tag_levels, game_levels):
         rows = len(tile_level)
@@ -361,7 +386,9 @@ if __name__ == '__main__':
     parser.add_argument('--tilefile', required=True, type=str, help='Input tile file.')
     parser.add_argument('--count-divs', type=int, nargs=2, help='Count divisions.')
     parser.add_argument('--pattern', type=str, nargs='+', help='Pattern template, from: ' + ','.join(PATTERN_LIST) + '.')
-    parser.add_argument('--level-rotate', action='store_true', help='Rotate levels to create more patterns.')
+    parser.add_argument('--xform-rotate-all', action='store_true', help='Rotate levels to create more patterns.')
+    parser.add_argument('--xform-flip-rows', action='store_true', help='Flip level rows to create more patterns.')
+    parser.add_argument('--xform-flip-cols', action='store_true', help='Flip level cols to create more patterns.')
     parser.add_argument('--quiet', action='store_true', help='Reduce output.')
     args = parser.parse_args()
 
@@ -381,6 +408,6 @@ if __name__ == '__main__':
     else:
         game_to_patternopt = None
 
-    scheme_info = tiles2scheme(tile_info, args.count_divs, game_to_patternopt, args.level_rotate)
+    scheme_info = tiles2scheme(tile_info, args.count_divs, game_to_patternopt, args.xform_rotate_all, args.xform_flip_rows, args.xform_flip_cols)
     with util_common.openz(args.outfile, 'wb') as f:
         pickle.dump(scheme_info, f)
