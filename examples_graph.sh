@@ -97,9 +97,17 @@ python graph2gdesc.py --outfile work/snake.gd --graphfile levels/graphs/snake.gr
 python gdesc2graph.py --outfile work/snake --gdescfile work/snake.gd --solver z3-slv --minsize 10 --maxsize 10 --edgeopt band,2
 
 # pdb
+python pdb2graph.py --outfile work/aspirin.gr --pdbfile levels/graphs/pdb/aspirin.pdb
+python pdb2graph.py --outfile work/cimetidine.gr --pdbfile levels/graphs/pdb/cimetidine.pdb
+
 python pdb2graph.py --outfile work/echinatin.gr --pdbfile levels/graphs/pdb/echinatin.pdb
 python graph2gdesc.py --outfile work/mol.gd --graphfile work/echinatin.gr --edge-polar --nrad edge --cycle-label
 python gdesc2graph.py --outfile work/mol-cn --gdescfile work/mol.gd --solver z3-slv --minsize 5 --maxsize 10 --edgeopt band,4 --cycle-no
 python gdesc2graph.py --outfile work/mol-cy --gdescfile work/mol.gd --solver z3-slv --minsize 5 --maxsize 10 --edgeopt band,4 --cycle-yes
 python graph2pdb.py --outfile work/mol-cn.pdb --graphfile work/mol-cn.gr
 python graph2pdb.py --outfile work/mol-cy.pdb --graphfile work/mol-cy.gr
+
+# grid layout
+python input2tile.py --outfile work/tiny.tile --textfile levels/kenney/tiny-00.lvl
+python tile2graph.py --outfile work/tiny.gr --tilefile work/tiny.tile --text-labels
+python graph2dot.py --graphfile work/tiny.gr --grid

@@ -116,7 +116,11 @@ if __name__ == '__main__':
     elif args.jsonfile is not None:
         with open(args.jsonfile, 'rt') as f:
             text_levels = json.load(f)
+    else:
+        text_levels = None
+        util_common.check(False, 'text_levels')
 
+    game_lvl, game_pad = None, None
     if args.game is not None:
         if len(args.game) == 4:
             game_init, game_intr, game_fini, game_pad = args.game
@@ -126,9 +130,6 @@ if __name__ == '__main__':
             game_pad = args.game[9]
         else:
             util_common.check(False, '--game must be length 4 or 10')
-    else:
-        game_lvl = None
-        game_pad = None
 
     concat_text, concat_game = level2concat(text_levels, args.xform_rotate, args.xform_flip_rows, args.xform_flip_cols, args.term_inst, args.across_cols, args.pad_rows, args.pad_cols, args.pad_around, game_lvl, game_pad)
 

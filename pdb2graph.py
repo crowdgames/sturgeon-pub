@@ -7,7 +7,7 @@ def pdb2graph(pdb_file, gr_name):
     atoms = {}
     bonds = {}
     edges = []
-    bond_type = {'double': [], 'triple': []}
+    bond_type = {'double': {}, 'triple': {}}
 
     with open(pdb_file, 'r') as pdb:
         lines = pdb.readlines()
@@ -16,45 +16,45 @@ def pdb2graph(pdb_file, gr_name):
             s_type = components[0]
 
             if s_type == 'HETATM':
-                    atom_no = int(components [1])
-                    atom_name = components [2]
-                    x_coord = components [5]
-                    y_coord = components [6]
+                atom_no = int(components[1])
+                atom_name = components[2]
+                x_coord = components[5]
+                y_coord = components[6]
 
-                    if atom_name != 'H':
-                        atoms.update({atom_no: (atom_name, x_coord, y_coord)})
+                if atom_name != 'H':
+                    atoms.update({atom_no: (atom_name, x_coord, y_coord)})
 
             elif s_type == 'CONECT':
-                    atom1_no = int(components [1])
-                    bond_atoms = components[2:]
+                atom1_no = int(components[1])
+                bond_atoms = [int(elem) for elem in components[2:]]
 
-                    for n_atoms in bond_atoms:
-                        count = bond_atoms.count(n_atoms)
+                for atom2_no in bond_atoms:
+                    count = bond_atoms.count(atom2_no)
 
-                        if count == 2 and [atom1_no, n_atoms] not in bond_type['double']:
-                            bond_type['double'].append([atom1_no, int(n_atoms)])
-                        elif count == 3 and [atom1_no, n_atoms] not in bond_type['double']:
-                            bond_type['triple'].append([atom1_no, int(n_atoms)])
+                    atomno_lo, atomno_hi = min(atom1_no, atom2_no), max(atom1_no, atom2_no)
 
-                        for b_atom in bond_atoms:
-                            if atom1_no in atoms.keys() and int(b_atom) in atoms.keys():
-                                atom2_no = int(b_atom)
-                                if atom2_no > atom1_no:
-                                    bond = [atom1_no, atom2_no]
-                                else:
-                                    bond = [atom2_no, atom1_no]
+                    util_common.check(atomno_lo != atomno_hi, 'atoms')
+                    util_common.check(atomno_lo in atoms.keys() and atomno_hi in atoms.keys(), 'atoms')
 
-                            if bond[0] not in bonds.keys():
-                                bonds.update({bond[0]:[bond]})
-                            elif bond not in bonds[bond[0]]:
-                                bonds[bond[0]].append(bond)
+                    bond = (atomno_lo, atomno_hi)
+
+                    if count == 2:
+                        bond_type['double'][bond] = None
+                    elif count == 3:
+                        bond_type['triple'][bond] = None
+                    elif count > 3:
+                        util_common.check(False, 'count')
+
+                    if atomno_lo not in bonds.keys():
+                        bonds[atomno_lo] = {}
+                    bonds[atomno_lo][bond] = None
 
         f_occurance = {}
         s_occurance = {}
 
         for e_bond in bonds.keys():
-            for i in range(len(bonds[e_bond])):
-                edges.append(bonds[e_bond][i])
+            for i_bond in bonds[e_bond]:
+                edges.append(i_bond)
 
             count = 0
             s_count = 0

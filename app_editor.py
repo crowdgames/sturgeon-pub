@@ -93,7 +93,7 @@ class PathCanvas(tkinter.Canvas):
         self._text_above_draw = []
 
         self._path_or_point = None if (app_state is None or 'path' not in app_state) else [tuple(pt) for pt in app_state['path']]
-        self._gen_path = None
+        self._gen_paths = None
         self._path_draw = []
 
         self._text_below_draw = []
@@ -258,7 +258,7 @@ class PathCanvas(tkinter.Canvas):
                         self._gen_result = None
                         self._gen_image = None
                         self._gen_text = None
-                        self._gen_path = None
+                        self._gen_paths = None
                         self._gen_objective = None
                         self.redraw_from_image()
                     except queue.Empty:
@@ -273,7 +273,7 @@ class PathCanvas(tkinter.Canvas):
                     self._gen_result = result_info
                     self._update_gen_image()
                     self._gen_text = result_info.text_level
-                    self._gen_path = result_info.reach_info[0].path_edges if result_info.reach_info else None
+                    self._gen_paths = [ri.path_edges for ri in result_info.reach_info] if result_info.reach_info else None
                     self._gen_objective = result_info.solver_objective
 
                     self.redraw_from_image()
@@ -485,7 +485,9 @@ class PathCanvas(tkinter.Canvas):
             for nr, nc in self._path_closed:
                 self._path_draw.append(self.create_rectangle(self.tocvs(nc + 0.25), self.tocvs(nr + 0.25), self.tocvs(nc + 0.75), self.tocvs(nr + 0.75), outline='blue', width=2))
 
-        self._do_draw_path(self._gen_path, True, self._path_color_gen, None)
+        if self._gen_paths is not None:
+            for path in self._gen_paths:
+                self._do_draw_path(path, True, self._path_color_gen, None)
         self._do_draw_path(self._path_or_point, False, self._path_color_edit, (3, 3))
 
         if self._path_nexts is not None:
@@ -601,15 +603,15 @@ class PathCanvas(tkinter.Canvas):
             if self._text_level is not None:
                 app_state['text'] = self._text_level
 
-            outfile_base = cfg.outfile
+            outfile_base = self._cfg.outfile
             if not self._out_no_hash:
                 outfile_base += '_' + hashlib.md5(json.dumps(app_state).encode('utf-8')).hexdigest()
 
-            cfg_outfile = cfg.outfile
-            cfg.outfile = outfile_base + ('_%04d' % self._seed_gen)
-            scheme2output.scheme2output_save_result(cfg, self._gen_result)
-            print('saved to', cfg.outfile)
-            cfg.outfile = cfg_outfile
+            cfg_outfile = self._cfg.outfile
+            self._cfg.outfile = outfile_base + ('_%04d' % self._seed_gen)
+            scheme2output.scheme2output_save_result(self._cfg, self._gen_result)
+            print('saved to', self._cfg.outfile)
+            self._cfg.outfile = cfg_outfile
 
             print('writing app state to ' + outfile_base + '.state')
             with open(outfile_base + '.state', 'wt') as outfile:
@@ -780,7 +782,7 @@ class PathCanvas(tkinter.Canvas):
         if self._game_to_move_info is None:
             return
 
-        self._path_or_point = self._gen_path
+        self._path_or_point = self._gen_paths[0] if self._gen_paths is not None else None
         self.new_manual_path(True)
 
     def on_evt_path_tog_opcl(self, event):
@@ -813,9 +815,9 @@ class PathCanvas(tkinter.Canvas):
         if self._game_to_move_info is None:
             return
 
-        if PathCanvas.is_edge_path(self._gen_path):
-            begin = util_path.path_begin_point(self._gen_path)
-            end = util_path.path_end_point(self._gen_path)
+        if self._gen_paths is not None and PathCanvas.is_edge_path(self._gen_paths[0]):
+            begin = util_path.path_begin_point(self._gen_paths[0])
+            end = util_path.path_end_point(self._gen_paths[0])
             open_locations, closed_locations = util_path.get_level_open_closed(self._gen_text, util_common.OPEN_TEXT, util_common.START_TEXT, util_common.GOAL_TEXT)
             self._path_or_point = util_path.shortest_path_between(begin, end, self._rows, self._cols, self._game_to_move_info, self._game_locations, open_locations, closed_locations)
             self.new_manual_path(False)

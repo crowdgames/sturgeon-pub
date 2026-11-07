@@ -1,4 +1,4 @@
-import json, multiprocessing, queue, random, re, sys
+import json, math, multiprocessing, queue, random, re, sys
 import util_common
 
 
@@ -532,7 +532,7 @@ class PortfolioSolver(_Solver):
             err = result[1]
             raise err
         else:
-            util.check(False, 'unexpected result')
+            util_common.check(False, 'unexpected result')
 
     def get_var(self, vv):
         return self._result[vv]
@@ -1057,7 +1057,7 @@ class _MilpSolver(_SolverImpl):
                 self._constraints.append((coefs, inds, lo, hi))
 
     def _IMPL_solve(self):
-        soln = self._do_solve()
+        soln = self._IMPL_MILP_solve()
 
         if soln is None:
             return False
@@ -1069,13 +1069,17 @@ class _MilpSolver(_SolverImpl):
     def _IMPL_get_var(self, vv):
         return self._result[vv - 1] > 0
 
+    def _IMPL_MILP_solve(self):
+        util_common.check(False, '_IMPL_MILP_solve unimplemented')
+        return {}, math.inf
+
 class SciPySolver(_MilpSolver):
     def __init__(self):
         util_common.check(try_import_scipy(), 'scipy not available')
 
         super().__init__(SOLVER_SCIPY)
 
-    def _do_solve(self):
+    def _IMPL_MILP_solve(self):
         c = numpy.zeros(self._curr_id)
         for coef, ind in self._weights:
             c[ind] += coef
@@ -1114,7 +1118,7 @@ class CvxPySolver(_MilpSolver):
 
         super().__init__(SOLVER_CVXPY)
 
-    def _do_solve(self):
+    def _IMPL_MILP_solve(self):
         x = cvxpy.Variable(self._curr_id, integer=True)
 
         c = numpy.zeros(self._curr_id)
@@ -1481,6 +1485,7 @@ class _GenericSatSolver(_SolverImpl):
 
     def _IMPL_SAT_solve(self):
         util_common.check(False, '_IMPL_SAT_solve unimplemented')
+        return {}, math.inf
 
 class _UnweightedPySatSatSolver(_GenericSatSolver):
     def __init__(self, solver_id, pysat_name):
@@ -1642,22 +1647,26 @@ class ReadDimacsSolver(_CardEncodingPySatSolver, _SolverFilename):
         return result, objective
 
 class _OptionsPySatSolver(_CardEncodingPySatSolver):
-    def __init__(self, solver_id, formula):
+    def __init__(self, solver_id, formula, solve_function):
         super().__init__(solver_id, True, formula)
 
         self._solve_options = {}
+        self._solve_function = solve_function
+
+    def _IMPL_SAT_solve(self):
+        return self._solve_function(self._formula, self._solve_options)
 
 class _BoolOnlyPySatSolver(_OptionsPySatSolver):
-    def __init__(self, solver_id):
+    def __init__(self, solver_id, solve_function):
         util_common.check(try_import_pysat(), 'pysat not available')
 
-        super().__init__(solver_id, pysat.formula.WCNF())
+        super().__init__(solver_id, pysat.formula.WCNF(), solve_function)
 
 class _FullPySatSolver(_OptionsPySatSolver):
-    def __init__(self, solver_id):
+    def __init__(self, solver_id, solve_function):
         util_common.check(try_import_pysat(), 'pysat not available')
 
-        super().__init__(solver_id, pysat.formula.WCNFPlus())
+        super().__init__(solver_id, pysat.formula.WCNFPlus(), solve_function)
 
         self._solve_options['solver'] = 'minicard'
 
@@ -1671,34 +1680,30 @@ class _FullPySatSolver(_OptionsPySatSolver):
         util_common.check(weight is None, 'solver does not support weighted atmost')
         self._formula.append([lls, atmost], is_atmost=True, weight=weight)
 
-class _PySatFMSolveFunc:
-    def _IMPL_SAT_solve(self):
-        fm = pysat.examples.fm.FM(self._formula, **self._solve_options)
-        if fm.compute():
-            return fm.model, fm.cost
+def pysat_fm_solve_func(formula, solve_options):
+    fm = pysat.examples.fm.FM(formula, **solve_options)
+    if fm.compute():
+        return fm.model, fm.cost
+    return None
 
-        return None
-
-class FMPySatSolver(_PySatFMSolveFunc, _FullPySatSolver):
+class FMPySatSolver(_FullPySatSolver):
     def __init__(self):
-        _FullPySatSolver.__init__(self, SOLVER_PYSAT_FM)
+        _FullPySatSolver.__init__(self, SOLVER_PYSAT_FM, pysat_fm_solve_func)
 
-class BoolOnlyFMPySatSolver(_PySatFMSolveFunc, _BoolOnlyPySatSolver):
+class BoolOnlyFMPySatSolver(_BoolOnlyPySatSolver):
     def __init__(self):
-        _BoolOnlyPySatSolver.__init__(self, SOLVER_PYSAT_FM_BOOL)
+        _BoolOnlyPySatSolver.__init__(self, SOLVER_PYSAT_FM_BOOL, pysat_fm_solve_func)
 
-class _PySatRC2SolveFunc:
-    def _IMPL_SAT_solve(self):
-        with pysat.examples.rc2.RC2(self._formula, **self._solve_options) as rc2:
-            for m in rc2.enumerate():
-                return list(m), rc2.cost
+def pysat_rc2_solve_func(formula, solve_options):
+    with pysat.examples.rc2.RC2(formula, **solve_options) as rc2:
+        for m in rc2.enumerate():
+            return list(m), rc2.cost
+    return None
 
-        return None
-
-class RC2PySatSolver(_PySatRC2SolveFunc, _FullPySatSolver):
+class RC2PySatSolver(_FullPySatSolver):
     def __init__(self):
-        _FullPySatSolver.__init__(self, SOLVER_PYSAT_RC2)
+        _FullPySatSolver.__init__(self, SOLVER_PYSAT_RC2, pysat_rc2_solve_func)
 
-class BoolOnlyRC2PySatSolver(_PySatRC2SolveFunc, _BoolOnlyPySatSolver):
+class BoolOnlyRC2PySatSolver(_BoolOnlyPySatSolver):
     def __init__(self):
-        _BoolOnlyPySatSolver.__init__(self, SOLVER_PYSAT_RC2_BOOL)
+        _BoolOnlyPySatSolver.__init__(self, SOLVER_PYSAT_RC2_BOOL, pysat_rc2_solve_func)

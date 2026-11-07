@@ -276,28 +276,31 @@ def read_graphs(filenames):
                     util_common.check(not gr.has_node(node), f'no duplicate nodes {filename} {node}')
                     gr.add_node(node)
                     gr.nodes[node][GATTR_LABEL] = ''
-                    for cattr in node_cattrs:
-                        if cattr == CATTR_LABEL:
-                            util_common.check(len(splt) >= 1, 'splt len')
-                            gr.nodes[node][GATTR_LABEL] = splt[0]
-                            splt = splt[1:]
-                        elif cattr == CATTR_CENTRAL:
-                            util_common.check(len(splt) >= 1, 'splt len')
-                            gr.nodes[node][GATTR_CENTRAL] = read_central(splt[0])
-                            splt = splt[1:]
-                        elif cattr == CATTR_POSITION2:
-                            util_common.check(len(splt) >= 2, 'splt len')
-                            pos = (float(splt[0]), float(splt[1]))
-                            gr.nodes[node][GATTR_POSITION] = pos
-                            splt = splt[2:]
-                        elif cattr == CATTR_POSITION3:
-                            util_common.check(len(splt) >= 3, 'splt len')
-                            pos = (float(splt[0]), float(splt[1]), float(splt[2]))
-                            gr.nodes[node][GATTR_POSITION] = pos
-                            splt = splt[3:]
-                        else:
-                            util_common.check(False, 'unrecognized')
-                    util_common.check(len(splt) == 0, 'unused')
+                    if node_cattrs is None:
+                        util_common.check(False, 'node_cattrs')
+                    else:
+                        for cattr in node_cattrs:
+                            if cattr == CATTR_LABEL:
+                                util_common.check(len(splt) >= 1, 'splt len')
+                                gr.nodes[node][GATTR_LABEL] = splt[0]
+                                splt = splt[1:]
+                            elif cattr == CATTR_CENTRAL:
+                                util_common.check(len(splt) >= 1, 'splt len')
+                                gr.nodes[node][GATTR_CENTRAL] = read_central(splt[0])
+                                splt = splt[1:]
+                            elif cattr == CATTR_POSITION2:
+                                util_common.check(len(splt) >= 2, 'splt len')
+                                pos = (float(splt[0]), float(splt[1]))
+                                gr.nodes[node][GATTR_POSITION] = pos
+                                splt = splt[2:]
+                            elif cattr == CATTR_POSITION3:
+                                util_common.check(len(splt) >= 3, 'splt len')
+                                pos = (float(splt[0]), float(splt[1]), float(splt[2]))
+                                gr.nodes[node][GATTR_POSITION] = pos
+                                splt = splt[3:]
+                            else:
+                                util_common.check(False, 'unrecognized')
+                        util_common.check(len(splt) == 0, 'unused')
 
                 elif key == 'e':
                     util_common.check(len(splt) >= 2, 'splt len')
@@ -309,34 +312,37 @@ def read_graphs(filenames):
                         util_common.check(not gr.has_edge(til, fra), f'no duplicate undirected edges {filename} {fra} {til}')
                     gr.add_edge(fra, til)
                     gr.edges[(fra, til)][GATTR_LABEL] = ''
-                    for cattr in edge_cattrs:
-                        if cattr == CATTR_LABEL:
-                            util_common.check(len(splt) >= 1, 'splt len')
-                            gr.edges[(fra, til)][GATTR_LABEL] = splt[0]
-                            splt = splt[1:]
-                        elif cattr == CATTR_CENTRAL:
-                            util_common.check(len(splt) >= 1, 'splt len')
-                            gr.edges[(fra, til)][GATTR_CENTRAL] = read_central(splt[0])
-                            splt = splt[1:]
-                        elif cattr == CATTR_DELTA2:
-                            util_common.check(len(splt) >= 2, 'splt len')
-                            gr.edges[(fra, til)][GATTR_DELTA] = (float(splt[0]), float(splt[1]))
-                            splt = splt[2:]
-                        elif cattr == CATTR_DELTA3:
-                            util_common.check(len(splt) >= 3, 'splt len')
-                            gr.edges[(fra, til)][GATTR_DELTA] = (float(splt[0]), float(splt[1]), float(splt[2]))
-                            splt = splt[3:]
-                        elif cattr == CATTR_POLAR:
-                            util_common.check(len(splt) >= 3, 'splt len')
-                            gr.edges[(fra, til)][GATTR_POLAR] = (float(splt[0]), float(splt[1]), splt[2] == 'T')
-                            splt = splt[3:]
-                        elif cattr == CATTR_CYCLE:
-                            util_common.check(len(splt) >= 1, 'splt len')
-                            gr.edges[(fra, til)][GATTR_CYCLE] = splt[0]
-                            splt = splt[1:]
-                        else:
-                            util_common.check(False, 'unrecognized')
-                    util_common.check(len(splt) == 0, 'unused')
+                    if edge_cattrs is None:
+                        util_common.check(False, 'edge_cattrs')
+                    else:
+                        for cattr in edge_cattrs:
+                            if cattr == CATTR_LABEL:
+                                util_common.check(len(splt) >= 1, 'splt len')
+                                gr.edges[(fra, til)][GATTR_LABEL] = splt[0]
+                                splt = splt[1:]
+                            elif cattr == CATTR_CENTRAL:
+                                util_common.check(len(splt) >= 1, 'splt len')
+                                gr.edges[(fra, til)][GATTR_CENTRAL] = read_central(splt[0])
+                                splt = splt[1:]
+                            elif cattr == CATTR_DELTA2:
+                                util_common.check(len(splt) >= 2, 'splt len')
+                                gr.edges[(fra, til)][GATTR_DELTA] = (float(splt[0]), float(splt[1]))
+                                splt = splt[2:]
+                            elif cattr == CATTR_DELTA3:
+                                util_common.check(len(splt) >= 3, 'splt len')
+                                gr.edges[(fra, til)][GATTR_DELTA] = (float(splt[0]), float(splt[1]), float(splt[2]))
+                                splt = splt[3:]
+                            elif cattr == CATTR_POLAR:
+                                util_common.check(len(splt) >= 3, 'splt len')
+                                gr.edges[(fra, til)][GATTR_POLAR] = (float(splt[0]), float(splt[1]), splt[2] == 'T')
+                                splt = splt[3:]
+                            elif cattr == CATTR_CYCLE:
+                                util_common.check(len(splt) >= 1, 'splt len')
+                                gr.edges[(fra, til)][GATTR_CYCLE] = splt[0]
+                                splt = splt[1:]
+                            else:
+                                util_common.check(False, 'unrecognized')
+                        util_common.check(len(splt) == 0, 'unused')
 
                 elif key == 'c':
                     util_common.check(len(splt) == 2, 'splt len')
@@ -588,6 +594,10 @@ def get_root_nodes(gr):
     return roots
 
 def layout_grid(gr, east_label, south_label):
+    for node in gr.nodes:
+        if GATTR_POSITION in gr.nodes[node]:
+            del gr.nodes[node][GATTR_POSITION]
+
     roots = get_root_nodes(gr)
     root = roots[0]
 
@@ -606,7 +616,7 @@ def layout_grid(gr, east_label, south_label):
         pos = gr.nodes[node][GATTR_POSITION]
 
         for edge, flip, ind in [(e, -1, 0) for e in in_edges] + [(e, 1, 1) for e in out_edges]:
-            next_node = edge[ind]
+            next_node, next_pos = edge[ind], None
             if gr.edges[edge][GATTR_LABEL] == east_label:
                 next_pos = (pos[0] + 1 * flip, pos[1])
             elif gr.edges[edge][GATTR_LABEL] == south_label:

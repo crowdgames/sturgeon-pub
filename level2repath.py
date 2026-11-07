@@ -63,7 +63,7 @@ if __name__ == '__main__':
                 all_path_edges.append(new_path_edges)
                 all_path_tiles.append(new_path_tiles)
                 meta.append(util_common.meta_path(util_common.MGROUP_PATH, new_path_edges))
-                meta.append(util_common.meta_tile(util_common.MGROUP_PATH, new_path_tiles))
+                meta.append(util_common.meta_tile(util_common.MGROUP_PATH, util_path.flatten_tile_path(new_path_tiles)))
                 if args.enum:
                     meta.append({ 'type': 'path-enum-edge-tile',
                                   'data': list(zip([[]] + new_path_edges, new_path_tiles)) })

@@ -23,7 +23,7 @@ if __name__ == '__main__':
     grs = util_graph.read_graphs(args.graphfile)
 
     if args.grid:
-        util_graph.layout_grid(grs.graphs[0])
+        util_graph.layout_grid(grs.graphs[0], util_graph.LABEL_GRID_EAST, util_graph.LABEL_GRID_SOUTH)
 
     if args.soko:
         write_fn = lambda _out: util_mkiv.write_graph_dot_soko(grs, _out)

@@ -97,6 +97,7 @@ def patternopts_to_deltas(patternopt_name, patternopt_params, level_rows, level_
         return [([(tr_step * tt + yy, ts_step * zz + xx) for tt in range(times) for yy in range(rows) for zz in range(stories) for xx in range(cols)], None)]
 
     elif patternopt_name == PATTERN_BLOCK_NOOUT:
+        rsize, csize = None, None
         if len(patternopt_params) == 1:
             rsize = patternopt_params[0]
             csize = patternopt_params[0]

@@ -311,6 +311,9 @@ def get_move_template(reach_move):
                 steps = [1, 2, 4, 6, 10]
             elif reach_move == RMOVE_TOMB_FULL_50:
                 steps = list(range(1, 51))
+            else:
+                steps = None
+                util_common.check(False, 'reach_move')
 
             for ii in steps:
                 dest = (dr * ii, dc * ii)

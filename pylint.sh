@@ -1,0 +1,1 @@
+pylint --errors-only *.py

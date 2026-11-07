@@ -600,6 +600,9 @@ if __name__ == '__main__':
     else:
         solver = util_solvers.PortfolioSolver(args.solver, None)
 
+
+
+    edgeopt_name, edgeopt_params = None, None
     if args.edgeopt is not None:
         edgeopt_split = args.edgeopt.split(',')
         edgeopt_name = edgeopt_split[0]

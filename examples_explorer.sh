@@ -25,6 +25,13 @@ python explore2summary.py --explorefile work/tiny-image.explore
 python explore2pdf.py --outfile work/tiny-image_i.pdf --explorefile work/tiny-image.explore --image
 python app_explorer.py --test --explorefile work/tiny-image.explore
 
+# tiny levels with sepatare path file
+python input2tile.py --outfile work/tiny-path.tile --textfile levels/kenney/tiny-path.lvl --pathfile levels/kenney/tiny-path.path
+python levels2explore.py --outfile work/tiny-path.explore --tilefile work/tiny-path.tile
+python explore2summary.py --explorefile work/tiny-path.explore
+python explore2pdf.py --outfile work/tiny-path_t.pdf --explorefile work/tiny-path.explore --text
+python app_explorer.py --test --explorefile work/tiny-path.explore
+
 # tiny levels from tileset
 python input2tile.py --outfile work/tiny-tiles.tileset --textfile levels/kenney/tiny-tiles.lvl --imagefile levels/kenney/tiny-tiles.png --out-tileset
 python input2tile.py --outfile work/tiny-tiles.tile --textfile levels/kenney/tiny-tiles-??.lvl --tileset work/tiny-tiles.tileset --text-key-only

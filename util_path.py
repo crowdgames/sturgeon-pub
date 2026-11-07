@@ -53,6 +53,9 @@ def unwrap_edge_path(path):
             util_common.check(False, 'path edge wrong length')
     return path_unwrapped, path_orig_from, path_was_unwrapped
 
+def flatten_tile_path(tile_path):
+    return sum(tile_path, [])
+
 def merge_unwrapped_edge_paths(edge_paths):
     edges = {}
     for edge_path in edge_paths:
@@ -60,6 +63,38 @@ def merge_unwrapped_edge_paths(edge_paths):
         for edge in path_unwrapped:
             edges[edge] = None
     return list(edges.keys())
+
+def merge_tile_paths(tile_paths):
+    tiles = {}
+    for tile_path in tile_paths:
+        for tile_edge in tile_path:
+            for tile in tile_edge:
+                tiles[tile] = None
+    return list(tiles.keys())
+
+def merge_tile_paths_border(tile_paths):
+    borders = {}
+    for tile_path in tile_paths:
+        tile_path = sum(tile_path, [])
+        for rr, cc in tile_path:
+            if (rr - 1, cc) not in tile_path:
+                borders[(rr - 0.5, cc - 0.5, rr - 0.5, cc + 0.5)] = None
+            if (rr + 1, cc) not in tile_path:
+                borders[(rr + 0.5, cc - 0.5, rr + 0.5, cc + 0.5)] = None
+            if (rr, cc - 1) not in tile_path:
+                borders[(rr - 0.5, cc - 0.5, rr + 0.5, cc - 0.5)] = None
+            if (rr, cc + 1) not in tile_path:
+                borders[(rr - 0.5, cc + 0.5, rr + 0.5, cc + 0.5)] = None
+    return list(borders.keys())
+
+def edge_to_wrapped(edge):
+    if len(edge) == 4:
+        fr, fc, tr, tc = edge
+        return (fr, fc, tr, tc, tr, tc)
+    elif len(edge) == 6:
+        return edge
+    else:
+        util_common.check(False, 'path edge wrong length')
 
 def path_begin_point(path):
     return path[0][0:2]
@@ -89,6 +124,34 @@ def get_move_info_delta_moves(move_info, dr, dc):
             ret.append(move)
 
     return ret
+
+def edge_is_up_by(edge, by):
+    fr, fc, tr, tc, pwtr, pwtc = edge_to_wrapped(edge)
+    return pwtr <= fr - by
+
+def edge_is_down_by(edge, by):
+    fr, fc, tr, tc, pwtr, pwtc = edge_to_wrapped(edge)
+    return pwtr >= fr + by
+
+def edge_is_left_by(edge, by):
+    fr, fc, tr, tc, pwtr, pwtc = edge_to_wrapped(edge)
+    return pwtc <= fc - by
+
+def edge_is_right_by(edge, by):
+    fr, fc, tr, tc, pwtr, pwtc = edge_to_wrapped(edge)
+    return pwtc >= fc + by
+
+def edge_delta_cols(edge):
+    fr, fc, tr, tc, pwtr, pwtc = edge_to_wrapped(edge)
+    return pwtc - fc
+
+def edge_is_jump(edge, closed_locations):
+    fr, fc, tr, tc, pwtr, pwtc = edge_to_wrapped(edge)
+    return pwtr < fr and (fr + 1, fc) in closed_locations
+
+def edge_is_onground(edge, closed_locations):
+    fr, fc, tr, tc, pwtr, pwtc = edge_to_wrapped(edge)
+    return (fr + 1, fc) in closed_locations
 
 def get_path_open_closed(path, game_to_move_info, game_locations):
     path_open = {}
@@ -229,16 +292,16 @@ def path_between(start, end, rows, cols, game_to_move_info, game_locations, open
     best_cost = {}
 
     if cost_type == COST_TILE:
-        heapq.heappush(q, (0, [], [start]))
+        heapq.heappush(q, (0, [], [[start]]))
     else:
-        q.append(([], [start]))
+        q.append(([], [[start]]))
     best_cost[start] = 0
 
     found_paths, found_paths_cost = None, None
     while len(q) > 0:
         if cost_type == COST_TILE:
             cost, path_edges, path_tiles = heapq.heappop(q)
-            util_common.check(len(path_tiles) - 1 == cost, 'cost')
+            util_common.check(sum([len(subpath) for subpath in path_tiles]) - 1 == cost, 'cost')
         else:
             path_edges, path_tiles = q.pop()
             cost = len(path_edges)
@@ -302,7 +365,7 @@ def path_between(start, end, rows, cols, game_to_move_info, game_locations, open
 
             best_cost[n] = new_cost
             next_path_edges = path_edges + [util_common.get_path_edge(fr, fc, tr, tc, pwtr, pwtc)]
-            next_path_tiles = path_tiles + list(need_path)
+            next_path_tiles = path_tiles + [list(need_path)]
             if cost_type == COST_TILE:
                 heapq.heappush(q, (new_cost, next_path_edges, next_path_tiles))
             else:

@@ -114,6 +114,7 @@ def input2tiles(tileset_input, text_levels, image_levels, tag_levels, game_strs_
         elif image_sz:
             rows, cols = image_sz
         else:
+            rows, cols = None, None
             util_common.check(False, 'text and image both missing')
 
         tile_level = []
@@ -185,7 +186,7 @@ def input2tiles(tileset_input, text_levels, image_levels, tag_levels, game_strs_
                     util_common.check(game_level[rr][cc] != util_common.VOID_TEXT, 'void')
 
         if path is not None:
-            meta.insert(0, util_common.meta_path(path))
+            meta.insert(0, util_common.meta_path(util_common.MGROUP_PATH, path))
 
         util_common.print_tile_level(tile_level)
         print()

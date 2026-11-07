@@ -788,7 +788,7 @@ class ExplorerFrame(tkinter.Frame):
                 tile_filename = filename + '.tlvl'
                 filenames.append(tile_filename)
                 with util_common.openz(tile_filename, 'wt') as f:
-                    util_common.print_tile_level_json(tile_level, meta=meta, outfile=f)
+                    util_common.print_tile_level_json(tile_level, meta=meta, outstream=f)
 
                 if len(self._ex.tind_to_text) > 0:
                     text_level = util_common.tile_level_to_text_level(tile_level, self._ex.tileset)
@@ -796,7 +796,7 @@ class ExplorerFrame(tkinter.Frame):
                     text_filename = filename + '.lvl'
                     filenames.append(text_filename)
                     with util_common.openz(text_filename, 'wt') as f:
-                        util_common.print_text_level(text_level, meta=meta, outfile=f)
+                        util_common.print_text_level(text_level, meta=meta, outstream=f)
 
                 if len(self._ex.tind_to_image) > 0:
                     image_level = util_common.tile_level_to_image_level(tile_level, self._ex.tileset)

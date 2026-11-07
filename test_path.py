@@ -59,39 +59,47 @@ if __name__ == '__main__':
     (edges, tiles), reachable = util_path.path_between(start, end, rows, cols, game_to_maze, game_locations, open_locations, closed_locations, util_path.COST_EDGE, None, 0, False)
     util_common.check(len(edges) == 4, 'path')
     util_common.check(len(tiles) == 5, 'path')
+    util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')
 
     paths, reachable = util_path.path_between(start, end, rows, cols, game_to_maze, game_locations, open_locations, closed_locations, util_path.COST_EDGE, None, 0, True)
     util_common.check(len(paths) == 4, 'path')
     for edges, tiles in paths:
         util_common.check(len(edges) == 4, 'path')
         util_common.check(len(tiles) == 5, 'path')
+        util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')
 
     (edges, tiles), reachable = util_path.path_between(start, end, rows, cols, game_to_maze_skip, game_locations, open_locations, closed_locations, util_path.COST_EDGE, None, 0, False)
     util_common.check(len(edges) == 3, 'path')
-    util_common.check(len(tiles) == 5, 'path')
+    util_common.check(len(tiles) == 4, 'path')
+    util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')
 
     paths, reachable = util_path.path_between(start, end, rows, cols, game_to_maze_skip, game_locations, open_locations, closed_locations, util_path.COST_EDGE, None, 0, True)
     util_common.check(len(paths) == 2, 'path')
     for edges, tiles in paths:
         util_common.check(len(edges) == 3, 'path')
-        util_common.check(len(tiles) == 5, 'path')
+        util_common.check(len(tiles) == 4, 'path')
+        util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')
 
     (edges, tiles), reachable = util_path.path_between(start, end, rows, cols, game_to_maze, game_locations, open_locations, closed_locations, util_path.COST_TILE, None, 0, False)
     util_common.check(len(edges) == 4, 'path')
     util_common.check(len(tiles) == 5, 'path')
+    util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')
 
     paths, reachable = util_path.path_between(start, end, rows, cols, game_to_maze, game_locations, open_locations, closed_locations, util_path.COST_TILE, None, 0, True)
     util_common.check(len(paths) == 4, 'path')
     for edges, tiles in paths:
         util_common.check(len(edges) == 4, 'path')
         util_common.check(len(tiles) == 5, 'path')
+        util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')
 
     (edges, tiles), reachable = util_path.path_between(start, end, rows, cols, game_to_maze_skip, game_locations, open_locations, closed_locations, util_path.COST_TILE, None, 0, False)
     util_common.check(len(edges) in [3, 4], 'path')
-    util_common.check(len(tiles) == 5, 'path')
+    util_common.check(len(tiles) in [4, 5], 'path')
+    util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')
 
     paths, reachable = util_path.path_between(start, end, rows, cols, game_to_maze_skip, game_locations, open_locations, closed_locations, util_path.COST_TILE, None, 0, True)
     util_common.check(len(paths) == 6, 'path')
     for edges, tiles in paths:
         util_common.check(len(edges) in [3, 4], 'path')
-        util_common.check(len(tiles) == 5, 'path')
+        util_common.check(len(tiles) in [4, 5], 'path')
+        util_common.check(len(util_path.flatten_tile_path(tiles)) == 5, 'path')

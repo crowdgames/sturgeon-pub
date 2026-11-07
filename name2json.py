@@ -1,4 +1,4 @@
-import argparse, json
+import argparse, json, sys
 import util_common, util_mkiv, util_reach
 
 
@@ -37,13 +37,13 @@ if __name__ == '__main__':
         out['directed'] = mkiv_info.directed
 
         rules = []
-        for nodes, edges in mkiv_info.rep_rules:
+        for layer_hint_lo, layer_hint_hi, chain, nodes, edges in mkiv_info.rep_rules:
             rule_nodes = []
             for static_node_label, dynamic_node_label0, dynamic_node_label1 in nodes:
                 rule_nodes.append({'st':static_node_label, 'dy-lhs': dynamic_node_label0, 'dy-rhs': dynamic_node_label1})
 
             rule_edges = []
-            for fra, til, static_edge_label, dynamic_edge_label0, dynamic_edge_label1 in edges:
+            for fra, til, ind_hint_lo, ind_hint_hi, static_edge_label, dynamic_edge_label0, dynamic_edge_label1 in edges:
                 rule_edges.append({'src':fra, 'dst': til, 'st':static_edge_label, 'dy-lhs': dynamic_edge_label0, 'dy-rhs': dynamic_edge_label1})
 
             rules.append({

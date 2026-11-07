@@ -1,5 +1,5 @@
 import argparse, pickle, os, json
-import util_common, util_reach
+import util_common, util_path, util_reach, util_solvers
 
 
 
@@ -31,6 +31,8 @@ CUST_FWDBWD_REACH_SINK   = 'fwdbwd-reach-sink'
 CUST_FWDBWD_COUNT_SINK   = 'fwdbwd-count-sink'
 CUST_FWDBWD_COUNT_FWDBWD = 'fwdbwd-count-fwdbwd'
 
+CUST_PATH_STATE          = 'path-state'
+
 CUST_RESULT              = 'result'
 
 CUST_LIST = [CUST_TEXT_COUNT, CUST_TEXT_EXCLUDE, CUST_TEXT_MIN, CUST_TEXT_MAX,
@@ -38,6 +40,7 @@ CUST_LIST = [CUST_TEXT_COUNT, CUST_TEXT_EXCLUDE, CUST_TEXT_MIN, CUST_TEXT_MAX,
              CUST_FLAT_PATH, CUST_FLAT_ENDS, CUST_FLAT_FWD, CUST_FLAT_MIN,
              CUST_LAYERED_FWD, CUST_LAYERED_MIN_EDGE, CUST_LAYERED_MIN_TILE,
              CUST_FWDBWD_NOSTUCK, CUST_FWDBWD_STUCK, CUST_FWDBWD_REACH_OPEN, CUST_FWDBWD_REACH_SINK, CUST_FWDBWD_COUNT_SINK, CUST_FWDBWD_COUNT_FWDBWD,
+             CUST_PATH_STATE,
              CUST_RESULT]
 
 
@@ -173,6 +176,11 @@ def args_to_custom(cust, args):
         fwdlo, fwdhi, bwdlo, bwdhi, weight = arg_cvt(args, (int, int, int, int, str_to_weight))
 
         return FwdBwdCountFwdBwdConstraint(fwdlo, fwdhi, bwdlo, bwdhi, weight)
+
+
+    elif cust == CUST_PATH_STATE:
+        what, cost, reach_layers, unreach_layers, weight = arg_cvt(args, (str, str, int, int, str_to_weight))
+        return PathStateConstraint(what, cost, reach_layers, unreach_layers, weight)
 
 
     elif cust == CUST_RESULT:
@@ -404,6 +412,7 @@ class FlatPathConstraint(CustomConstraint):
                 elif len(edge) == 6:
                     fr, fc, tr, tc, pwtr, pwtc = edge
                 else:
+                    fr, fc, tr, tc, pwtr, pwtc = None, None, None, None, None, None
                     util_common.check(False, 'edge length')
 
                 path_cache[(fr, fc, tr, tc, pwtr, pwtc)] = None
@@ -470,6 +479,7 @@ class FlatFwdConstraint(CustomConstraint):
                 elif self._direction == util_reach.RSGLOC_L_R:
                     exclude = (ctc <= cfc)
                 else:
+                    exclude = None
                     util_common.check(False, 'direction')
 
                 if exclude:
@@ -522,6 +532,7 @@ class LayeredFwdConstraint(CustomConstraint):
                     elif self._direction == util_reach.RSGLOC_L_R:
                         exclude = (tc <= fc)
                     else:
+                        exclude = None
                         util_common.check(False, 'direction')
 
                     if exclude:
@@ -565,7 +576,7 @@ class LayeredMinTileConstraint(CustomConstraint):
             for layer in vars_layer_edge:
                 for edge_key, edge_var in vars_layer_edge[layer].items():
                     fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
-                    tile_len = 1 + len(need_open_path) + len(need_closed_path)
+                    tile_len = util_path.edge_key_cost_tile(edge_key)
                     tile_max = max(tile_max, tile_len)
 
             for layer in vars_layer_edge:
@@ -575,7 +586,7 @@ class LayeredMinTileConstraint(CustomConstraint):
 
                 for edge_key, edge_var in vars_layer_edge[layer].items():
                     fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
-                    tile_len = 1 + len(need_open_path) + len(need_closed_path)
+                    tile_len = util_path.edge_key_cost_tile(edge_key)
                     for tt, len_vv in enumerate(tile_len_vars):
                         if tt < tile_len:
                             gen._solver.cnstr_implies_disj(edge_var, True, [len_vv], True, None)
@@ -741,6 +752,461 @@ class FwdBwdCountFwdBwdConstraint(CustomConstraint):
 
             gen._solver.cnstr_count(list(fwd_reachable_vars.values()), True, self._fwdlo, self._fwdhi, self._weight)
             gen._solver.cnstr_count(list(bwd_reachable_vars.values()), True, self._bwdlo, self._bwdhi, self._weight)
+
+
+
+PATH_ANY                   = 'any'
+
+PATH_COUNT_EDGE            = 'count-edge'
+PATH_COUNT_EDGE_UP         = 'count-edge-up'
+PATH_COUNT_EDGE_DOWN       = 'count-edge-down'
+PATH_COUNT_EDGE_LEFT       = 'count-edge-left'
+PATH_COUNT_EDGE_RIGHT      = 'count-edge-right'
+PATH_COUNT_EDGE_JUMP       = 'count-edge-jump'
+PATH_COUNT_EDGE_ONGROUND   = 'count-edge-onground'
+PATH_COUNT_TILE            = 'count-tile'
+
+PATH_AIRTIME_JUMP          = 'airtime-jump'
+
+PATH_JUMP_ENTROPY          = 'jumpentropy'
+PATH_SPEED                 = 'speed'
+PATH_ONGROUNDRATIO         = 'ongroundratio'
+PATH_AVERAGE_ROW           = 'average-row'
+
+class PathStateConstraint(CustomConstraint):
+    def __init__(self, what, cost, reach_layers, unreach_layers, weight):
+        self._what = what
+        self._cost = cost
+        self._reach_layers = reach_layers
+        self._unreach_layers = unreach_layers
+        self._weight = weight
+
+    def add(self, gen):
+        print('add custom path state constraint', self._what, self._cost, self._reach_layers, self._unreach_layers, self._weight)
+
+        reach_layers = self._reach_layers
+        unreach_layers = self._unreach_layers
+
+        util_common.check(reach_layers >= 0 and unreach_layers >= 0 and (reach_layers > 0 or unreach_layers > 0), 'layers')
+
+        what_splt = self._what.split(',')
+        what_type = what_splt[0]
+        what_args = what_splt[1:]
+
+        def edge_key_to_edge(_edge_key):
+            _fr, _fc, _tr, _tc, _pwtr, _pwtc, _need_open_path, _need_open_aux, _need_closed_path, _need_closed_aux = _edge_key
+            return (_fr, _fc, _tr, _tc, _pwtr, _pwtc)
+
+        def edge_key_to_need_closed_aux(_edge_key):
+            _fr, _fc, _tr, _tc, _pwtr, _pwtc, _need_open_path, _need_open_aux, _need_closed_path, _need_closed_aux = _edge_key
+            return _need_closed_aux
+
+        def edge_is_jump(_edge_key):
+            return util_path.edge_is_jump(edge_key_to_edge(_edge_key), edge_key_to_need_closed_aux(_edge_key))
+
+        def edge_is_onground(_edge_key):
+            return util_path.edge_is_onground(edge_key_to_edge(_edge_key), edge_key_to_need_closed_aux(_edge_key))
+
+        def edge_accum_rows(_edge_key, _include_from):
+            _fr, _fc, _tr, _tc, _pwtr, _pwtc, _need_open_path, _need_open_aux, _need_closed_path, _need_closed_aux = _edge_key
+            _tiles = _need_open_path + _need_closed_path + ((_pwtr, _pwtc),)
+            if _include_from:
+                _tiles += ((_fr, _fc),)
+            return sum([_rr for _rr, _cc in _tiles])
+
+        if what_type in [PATH_ANY]:
+            util_common.check(len(what_args) == 0, 'what_args')
+
+            state_start = None
+
+            def state_reachable_func(_state):
+                return True
+
+            state_unreachable_func = None
+
+            def state_next_func(_state, _edge_key):
+                return None
+
+        elif what_type in [PATH_COUNT_EDGE, PATH_COUNT_EDGE_UP, PATH_COUNT_EDGE_DOWN, PATH_COUNT_EDGE_LEFT, PATH_COUNT_EDGE_RIGHT, PATH_COUNT_EDGE_JUMP, PATH_COUNT_EDGE_ONGROUND, PATH_COUNT_TILE]:
+            count_lo, count_hi = arg_cvt(what_args[:2], (int, int))
+            what_args = what_args[2:]
+
+            if what_type == PATH_COUNT_TILE: # adjust for not counting starting tile
+                count_lo -= 1
+                count_hi -= 1
+
+            state_start = 0
+
+            def state_reachable_func(_state):
+                return count_lo <= _state and _state <= count_hi
+
+            def state_unreachable_func(_state):
+                return _state < count_lo
+
+            if what_type == PATH_COUNT_EDGE:
+                util_common.check(len(what_args) == 0, 'what_args')
+                count_func = lambda _edge_key: 1
+            elif what_type == PATH_COUNT_EDGE_UP:
+                by, = (1,) if len(what_args) == 0 else arg_cvt(what_args, (int,))
+                count_func = lambda _edge_key: util_path.edge_is_up_by(edge_key_to_edge(_edge_key), by)
+            elif what_type == PATH_COUNT_EDGE_DOWN:
+                by, = (1,) if len(what_args) == 0 else arg_cvt(what_args, (int,))
+                count_func = lambda _edge_key: util_path.edge_is_down_by(edge_key_to_edge(_edge_key), by)
+            elif what_type == PATH_COUNT_EDGE_LEFT:
+                by, = (1,) if len(what_args) == 0 else arg_cvt(what_args, (int,))
+                count_func = lambda _edge_key: util_path.edge_is_left_by(edge_key_to_edge(_edge_key), by)
+            elif what_type == PATH_COUNT_EDGE_RIGHT:
+                by, = (1,) if len(what_args) == 0 else arg_cvt(what_args, (int,))
+                count_func = lambda _edge_key: util_path.edge_is_right_by(edge_key_to_edge(_edge_key), by)
+            elif what_type == PATH_COUNT_EDGE_JUMP:
+                util_common.check(len(what_args) == 0, 'what_args')
+                count_func = edge_is_jump
+            elif what_type == PATH_COUNT_EDGE_ONGROUND:
+                util_common.check(len(what_args) == 0, 'what_args')
+                count_func = edge_is_onground
+            elif what_type == PATH_COUNT_TILE:
+                util_common.check(len(what_args) == 0, 'what_args')
+                count_func = util_path.edge_key_cost_tile
+            else:
+                count_func = None
+                util_common.check(False, 'count_func')
+
+            def state_next_func(_state, _edge_key):
+                return min(count_hi + 1, _state + count_func(_edge_key))
+
+        elif what_type == PATH_AIRTIME_JUMP:
+            count_lo, count_hi = arg_cvt(what_args, (int, int))
+
+            state_start = (0, 0)
+
+            def state_reachable_func(_state):
+                _curr, _high = _state
+                return count_lo <= _high and _high <= count_hi
+
+            state_unreachable_func = None
+
+            def state_next_func(_state, _edge_key):
+                _curr, _high = _state
+                if edge_is_jump(_edge_key): # start with a jump
+                    _curr = min(count_hi + 1, util_path.edge_key_cost_tile(_edge_key))
+                elif _curr > 0 and not edge_is_onground(_edge_key): # continuing a jump
+                    _curr = min(count_hi + 1, _curr + util_path.edge_key_cost_tile(_edge_key))
+                else:
+                    _curr = 0
+                _high = max(_curr, _high)
+                return (_curr, _high)
+
+        elif what_type in [PATH_JUMP_ENTROPY, PATH_SPEED, PATH_ONGROUNDRATIO, PATH_AVERAGE_ROW]:
+            if len(what_args) == 3:
+                target_lo, target_hi, target_bound_lo = arg_cvt(what_args, (float, float, float))
+                target_bound_hi = target_bound_lo
+            elif len(what_args) == 4:
+                target_lo, target_hi, target_bound_lo, target_bound_hi = arg_cvt(what_args, (float, float, float, float))
+            else:
+                target_lo, target_hi, target_bound_lo, target_bound_hi = None, None, None, None
+                util_common.check(False, 'what_args')
+
+            state_start = (0, 0)
+
+            def state_reachable_func(_state):
+                if _state is None:
+                    return False
+
+                _numer, _denom = _state
+
+                if _denom <= 0:
+                    return False
+
+                _val = _numer / _denom
+                return target_lo <= _val and _val <= target_hi
+
+            state_unreachable_func = None
+
+            def state_next_func(_state, _edge_key):
+                if _state is None:
+                    return None
+
+                _numer, _denom = _state
+
+                if what_type == PATH_JUMP_ENTROPY:
+                    if edge_is_jump(_edge_key):
+                        _numer += 1
+                        _denom += 1
+                    _denom += abs(util_path.edge_delta_cols(edge_key_to_edge(_edge_key)))
+
+                elif what_type in [PATH_SPEED, PATH_ONGROUNDRATIO, PATH_AVERAGE_ROW]:
+                    include_from = (_denom == 0)
+
+                    if what_type == PATH_SPEED:
+                        _numer += util_path.edge_delta_cols(edge_key_to_edge(_edge_key))
+                    elif what_type == PATH_ONGROUNDRATIO:
+                        _numer += edge_is_onground(_edge_key)
+                    elif what_type == PATH_AVERAGE_ROW:
+                        _numer += edge_accum_rows(_edge_key, include_from)
+                    else:
+                        util_common.check(False, 'what_type')
+
+                    _denom += util_path.edge_key_cost_tile(_edge_key)
+                    if include_from:
+                        _denom += 1
+
+                util_common.check(_denom >= 0, 'denom')
+
+                if _denom == 0:
+                    return None
+
+                if _denom >= reach_layers + 1:
+                    return None
+
+                _val = _numer / _denom
+                _bound_lo = target_bound_lo if target_bound_lo >= 0.0 else -target_bound_lo / _denom
+                _bound_hi = target_bound_hi if target_bound_hi >= 0.0 else -target_bound_hi / _denom
+                if _val < target_lo - _bound_lo or target_hi + _bound_hi < _val:
+                    return None
+
+                return (_numer, _denom)
+
+        else:
+            state_start = None
+            state_reachable_func = None
+            state_unreachable_func = None
+            state_next_func = None
+            util_common.check(False, 'what')
+
+        if self._cost in util_path.COST_EDGE:
+            def reach_edge_cost(_edge_key):
+                return 1
+        elif self._cost == util_path.COST_TILE:
+            def reach_edge_cost(_edge_key):
+                return util_path.edge_key_cost_tile(_edge_key)
+        else:
+            reach_edge_cost = None
+            util_common.check(False, 'cost')
+
+        start_key = (state_start, 0)
+
+        var_false = gen._solver.make_var()
+        gen._solver.cnstr_count([var_false], True, 0, 0, None)
+
+        util_common.check(gen.get_num_reach_connect() > 0, 'no reach move')
+
+        for connect_index in range(gen.get_num_reach_connect()):
+            util_common.check(gen._reach_connect_entry[connect_index].method == util_common.REACH_METHOD_NULL, 'method')
+
+            if gen.is_unreachable(connect_index):
+                continue
+
+            reach_connect_info = gen._reach_connect_entry[connect_index].connect_info
+            open_vars = gen._reach_connect_entry[connect_index].vars_open
+            rgraph = gen._reach_connect_entry[connect_index].rgraph
+
+
+            reach_vars_edge = gen._make_edge_vars(rgraph)
+
+            for edge_key, edge_var in reach_vars_edge.items():
+                fr, fc, tr, tc, pwtr, pwtc, need_open_path, need_open_aux, need_closed_path, need_closed_aux = edge_key
+
+                edge_needed_vars = []
+                edge_needed_settings = []
+
+                for nor, noc in ((fr, fc),) + need_open_path + ((tr, tc),) + need_open_aux:
+                    open_out_var = open_vars[(nor, noc)]
+                    edge_needed_vars.append(open_out_var)
+                    edge_needed_settings.append(True)
+
+                for ncr, ncc in need_closed_path + need_closed_aux:
+                    open_out_var = open_vars[(ncr, ncc)]
+                    edge_needed_vars.append(open_out_var)
+                    edge_needed_settings.append(False)
+
+                conj_needed = gen._solver.make_conj(edge_needed_vars, edge_needed_settings)
+                gen._solver.cnstr_implies_disj(conj_needed, True, [edge_var], True, None)
+                gen._solver.cnstr_implies_disj(conj_needed, False, [edge_var], False, None)
+
+
+            def find_layer_var_for(_vars_sl_node, _state, _layer, _rr, _cc):
+                while _layer >= 0:
+                    _key = (_state, _layer, _rr, _cc)
+                    if _key in _vars_sl_node:
+                        return _vars_sl_node[_key], _layer
+                    _layer = _layer - 1
+                return var_false, None
+
+            src_tile_vars = {}
+            dst_tile_vars = {}
+            for rr, cc in rgraph.nodes:
+                game = gen._game_level[rr][cc]
+                src_tile = gen._reach_junction_info[reach_connect_info.src].game_to_junction_tile[game]
+                dst_tile = gen._reach_junction_info[reach_connect_info.dst].game_to_junction_tile[game]
+
+                src_tile_vars[(rr, cc)] = gen._tile_var(rr, cc, src_tile) if gen._tile_has_var(rr, cc, src_tile) else None
+                dst_tile_vars[(rr, cc)] = gen._tile_var(rr, cc, dst_tile) if gen._tile_has_var(rr, cc, dst_tile) else None
+
+            def setup_reach_problem(_edge_cost, _layers):
+                _state_possible = {}
+
+                _state_layer_possible = { start_key: None }
+                _state_layer_queue = [start_key]
+
+                while len(_state_layer_queue) > 0:
+                    (_state, _layer), _state_layer_queue = _state_layer_queue[0], _state_layer_queue[1:]
+
+                    _state_possible[_state] = None
+
+                    for _edge_key in rgraph.edges:
+                        _layer_dst = _layer + _edge_cost(_edge_key)
+                        if _layer_dst >= _layers:
+                            continue
+                        _state_dst = state_next_func(_state, _edge_key)
+
+                        _possible_key = (_state_dst, _layer_dst)
+                        if _possible_key not in _state_layer_possible:
+                            _state_layer_possible[_possible_key] = None
+                            _state_layer_queue.append(_possible_key)
+
+                _state_edges_incoming = {}
+
+                for _state, _layer in _state_layer_possible.keys():
+                    for _edge_key in rgraph.edges:
+                        _fr, _fc, _tr, _tc, _pwtr, _pwtc, _need_open_path, _need_open_aux, _need_closed_path, _need_closed_aux = _edge_key
+
+                        _layer_dst = _layer + _edge_cost(_edge_key)
+                        if _layer_dst >= _layers:
+                            continue
+                        _state_dst = state_next_func(_state, _edge_key)
+
+                        _incoming_key = (_state_dst, _layer_dst, _fr, _fc, _tr, _tc)
+                        if _incoming_key not in _state_edges_incoming:
+                            _state_edges_incoming[_incoming_key] = []
+                        _state_edges_incoming[_incoming_key].append((_state, _layer))
+
+                _vars_sl_node = {}
+
+                for _rr, _cc in rgraph.nodes:
+                    for _state, _layer in _state_layer_possible.keys():
+                        _vars_sl_node[(_state, _layer, _rr, _cc)] = gen._solver.make_var()
+
+
+                for _rr, _cc in rgraph.nodes:
+                    src_tile_var = src_tile_vars[(_rr, _cc)]
+
+                    for _state, _layer in _state_layer_possible.keys():
+                        _node_var = _vars_sl_node[(_state, _layer, _rr, _cc)]
+
+                        if _layer == 0:
+                            # src is reachable in initial state/layer, others are not
+                            util_common.check(_state == state_start, 'state_start')
+                            if src_tile_var is not None:
+                                gen._solver.cnstr_implies_disj(src_tile_var, True, [_node_var], True, None)
+                                gen._solver.cnstr_implies_disj(src_tile_var, False, [_node_var], False, None)
+                            else:
+                                gen._solver.cnstr_count([_node_var], False, 1, 1, None)
+
+                        else:
+                            # in other layers, previously reachable or any incoming reachable edge means reachable, otherwise, not
+                            _prev_node_var, _prev_node_var_layer = find_layer_var_for(_vars_sl_node, _state, _layer - 1, _rr, _cc)
+
+                            _in_vvs = []
+                            for _edge_key in rgraph.in_edges[(_rr, _cc)]:
+                                _fr, _fc, _tr, _tc, _pwtr, _pwtc, _need_open_path, _need_open_aux, _need_closed_path, _need_closed_aux = _edge_key
+                                _key = (_state, _layer, _fr, _fc, _tr, _tc)
+                                if _key not in _state_edges_incoming:
+                                    continue
+                                _in_node_vars = [_vars_sl_node[(_in_state, _in_layer, _fr, _fc)] for _in_state, _in_layer in _state_edges_incoming[_key]]
+                                _in_node_var, _ = util_solvers.make_disj_cache(gen._solver, {}, _in_node_vars, True)
+                                _in_edge_var = reach_vars_edge[_edge_key]
+                                _in_var = gen._solver.make_conj([_in_node_var, _in_edge_var], True) # TODO?: prevent moving out of dst?
+                                _in_vvs.append(_in_var)
+
+                            _conj_not_prev_or_in = gen._solver.make_conj([_prev_node_var] + _in_vvs, False)
+                            gen._solver.cnstr_implies_disj(_conj_not_prev_or_in, True, [_node_var], False, None)
+                            gen._solver.cnstr_implies_disj(_conj_not_prev_or_in, False, [_node_var], True, None)
+
+                return _state_possible, _state_layer_possible, _state_edges_incoming, _vars_sl_node
+
+
+            if reach_layers != 0:
+                util_common.check(state_reachable_func is not None, 'reach_layers')
+                pr_state_possible, pr_state_layer_possible, pr_state_edges_incoming, pr_node_vars = setup_reach_problem(reach_edge_cost, reach_layers)
+
+                state_reachable = {}
+                state_blocked = {}
+
+                for state in pr_state_possible:
+                    if state_reachable_func(state):
+                        util_common.check(state not in state_blocked, 'state')
+                        state_reachable[state] = None
+                    else:
+                        util_common.check(state not in state_reachable, 'state')
+                        state_blocked[state] = None
+
+                util_common.check(len(state_reachable) > 0, 'no reachable states')
+
+                var_disj_reachable = {}
+                var_disj_blocked = {}
+
+                for rr, cc in rgraph.nodes:
+                    for layer in range(reach_layers):
+                        vars_reachable = []
+                        vars_blocked = []
+                        for state in pr_state_possible:
+                            state_var, state_var_layer = find_layer_var_for(pr_node_vars, state, layer, rr, cc)
+                            if state_var_layer is not None:
+                                if state in state_reachable:
+                                    vars_reachable.append(state_var)
+                                if state in state_blocked:
+                                    vars_blocked.append(state_var)
+                        var_disj_reachable[(layer, rr, cc)], _ = util_solvers.make_disj_cache(gen._solver, {}, vars_reachable, True) if len(vars_reachable) > 0 else (var_false, False)
+                        var_disj_blocked[(layer, rr, cc)], _ = util_solvers.make_disj_cache(gen._solver, {}, vars_blocked, True) if len(vars_blocked) > 0 else (var_false, False)
+
+                for rr, cc in rgraph.nodes:
+                    dst_tile_var = dst_tile_vars[(rr, cc)]
+
+                    if dst_tile_var is not None:
+                        state_dst_reachable_any_vars = []
+
+                        for state, layer in pr_state_layer_possible.keys():
+                            if state in state_reachable:
+                                node_var = pr_node_vars[(state, layer, rr, cc)]
+                                any_reach_prev = var_disj_reachable[(layer - 1, rr, cc)] if layer > 0 else var_false
+                                to_block_curr = var_disj_blocked[(layer, rr, cc)]
+
+                                # in state where dst must be reachable in some layer
+                                state_dst_reachable_any_vars.append(node_var)
+
+                                # in state where dst must not be reachable in same layers as blocked states, unless it was previously reachable
+                                gen._solver.cnstr_implies_disj(gen._solver.make_conj([dst_tile_var, node_var, any_reach_prev], [True, True, False]), True, [to_block_curr], False, None)
+
+                        gen._solver.cnstr_implies_disj(dst_tile_var, True, state_dst_reachable_any_vars, True, None)
+
+
+            if unreach_layers != 0:
+                util_common.check(state_unreachable_func is not None, 'unreach_layers')
+                pr_state_possible, pr_state_layer_possible, pr_state_edges_incoming, pr_node_vars = setup_reach_problem(lambda _edge_key: 1, unreach_layers)
+
+                state_unreachable = {}
+
+                for state in pr_state_possible:
+                    if state_unreachable_func(state):
+                        state_unreachable[state] = None
+
+                util_common.check(len(state_unreachable) > 0, 'no unreachable states')
+
+                for rr, cc in rgraph.nodes:
+                    dst_tile_var = dst_tile_vars[(rr, cc)]
+
+                    for state in pr_state_possible:
+                        final_node_var1, final_node_var1_layer = find_layer_var_for(pr_node_vars, state, unreach_layers - 1, rr, cc)
+                        final_node_var2, final_node_var2_layer = find_layer_var_for(pr_node_vars, state, unreach_layers - 2, rr, cc)
+
+                        # saturation check
+                        gen._solver.cnstr_implies_disj(final_node_var1, True, [final_node_var2], True, None)
+                        gen._solver.cnstr_implies_disj(final_node_var1, False, [final_node_var2], False, None)
+
+                        # unreachable at dst
+                        if dst_tile_var is not None:
+                            if state in state_unreachable:
+                                gen._solver.cnstr_implies_disj(dst_tile_var, True, [final_node_var1], False, None)
 
 
 

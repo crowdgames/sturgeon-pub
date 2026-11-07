@@ -1,6 +1,8 @@
 import os, sys
 import util_common, util_solvers
 
+# pylint: disable=function-redefined
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         solvers_to_test = sys.argv[1:]

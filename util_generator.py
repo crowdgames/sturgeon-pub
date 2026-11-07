@@ -480,7 +480,7 @@ class Generator:
                     continue
 
             else:
-                util_common.check(False)
+                util_common.check(False, 'sink')
 
             edge_keys = util_common.get_edge_keys_from((rr, cc), self._rows, self._cols, move_info, locations, {}, {}, {})
 
@@ -1099,7 +1099,7 @@ class Generator:
                 maxlayer = max(locations_fwd)
                 util_common.check(maxlayer == max(locations_fwd), 'maxlayer')
                 util_common.check(maxlayer == max(locations_bwd), 'maxlayer')
-                util_common.check(maxlayer == max(locations_sink), 'maxlayer')
+                util_common.check(locations_sink is None or maxlayer == max(locations_sink), 'maxlayer')
 
                 reach_info.extra_meta.append(util_common.meta_tile(util_common.MGROUP_REACHABLE, sorted(locations_fwd[maxlayer])))
                 reach_info.extra_meta.append(util_common.meta_tile(util_common.MGROUP_REACHABLE_BACK, sorted(locations_bwd[maxlayer])))

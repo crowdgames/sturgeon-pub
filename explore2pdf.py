@@ -50,6 +50,7 @@ def explore2pdf(explorer_info, cell_size, layout, text_colors, use_text, use_ima
     else:
         util_common.check(False, 'unknown layout ' + layout)
 
+    tind_to_data = None
     if use_text and use_image:
         util_common.check(False, 'cannot use both text and image')
     elif use_text:

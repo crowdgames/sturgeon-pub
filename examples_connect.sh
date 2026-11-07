@@ -31,6 +31,8 @@ python scheme2output.py --outfile work/driller-fb-unreachable-nosink --schemefil
 
 python scheme2output.py --outfile work/driller-fb-unreachable-count --schemefile work/driller.scheme --size 10 10 --pattern-hard --reach-junction "{" tl 3 --reach-junction "}" br 3 --reach-connect "--src { --dst } --move driller --method fwdbwd --layers 20 --sink bottom --unreachable" --reach-print-internal --custom fwdbwd-count-fwdbwd 26 100 26 100 hard --custom fwdbwd-count-sink 0 0 hard
 
+python name2json.py --reach-move driller
+
 # mario
 python input2tile.py --outfile work/mario.tile --textfile levels/vglc/mario-1-1-generic.lvl
 python tile2scheme.py --outfile work/mario.scheme --tilefile work/mario.tile --count-divs 1 1 --pattern ring
@@ -55,3 +57,5 @@ python scheme2output.py --outfile work/mario-fb-nostuck-nosink-allopen --schemef
 python scheme2output.py --outfile work/mario-fb-unreachable-nosink --schemefile work/mario.scheme --size 10 20 --pattern-hard --reach-junction "{" l 4 --reach-junction "}" r 4 --reach-connect "--src { --dst } --move platform --method fwdbwd --layers 20 --sink bottom --unreachable" --custom fwdbwd-count-sink 0 0 hard --reach-print-internal
 
 python scheme2output.py --outfile work/mario-fb-repair --schemefile work/mario.scheme --size 10 29 --pattern-hard --reach-junction "{" l 3 --reach-junction "}" r 3 --reach-connect "--src { --dst } --move platform --method fwdbwd --layers 25 --sink bottom" --reach-print-internal --custom fwdbwd-nostuck hard --custom text-level levels/vglc/mario-1-1-cst-pit.lvl soft
+
+python name2json.py --reach-move platform

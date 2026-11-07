@@ -16,6 +16,9 @@ python graph2gdesc.py --outfile work/visit.gd --graphfile levels/graphs/mkiv/vis
 python gdesc2graph.py --outfile work/visit --gdescfile work/visit.gd --solver pysat-minicard --minsize 8 --maxsize 10 --edgeopt band,4 --mkiv-example visit-edge --mkiv-layers 10
 python gdesc2graph.py --outfile work/visit --gdescfile work/visit.gd --solver pysat-minicard --minsize 8 --maxsize 10 --edgeopt band,4 --mkiv-example visit-node --mkiv-layers 10
 
+python name2json.py --mkiv-example visit-edge
+python name2json.py --mkiv-example visit-node
+
 # color
 
 python graph2gdesc.py --outfile work/color.gd --graphfile levels/graphs/mkiv/color.gr --nrad edge
