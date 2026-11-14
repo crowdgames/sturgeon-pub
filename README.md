@@ -47,6 +47,7 @@ For example usage (within pipenv), see:
 * `examples_basic.sh` - basic use with tile-based levels
 * `examples_solver.sh` - use of different solvers
 * `examples_custom.sh` - custom contraints, such as tile counts, level repair, and level extension
+* `examples_custom_state.sh` - custom contraints using path-state constraints
 * `examples_junction.sh` - junctions for adding multiple reachable and unreachable paths
 * `examples_blend.sh` - blending different games, using tiles and reachabiity from multiple games in one level
 * `examples_mkiii.sh` - MKIII tile rewrite rules for generating playthroughs
@@ -141,3 +142,5 @@ Graph Utilities:
 * Akshar Vandara, Kaylah Facey and Seth Cooper. 2025. "Spacetime level generation and editing with constraints from examples." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment, 21(1), 142-152. https://doi.org/10.1609/aiide.v21i1.36818
 
 * Akshar Vandara and Seth Cooper. 2026. "Constraint-based four-dimensional spacetime blending of learned game mechanics along orthogonal planes." Proceedings of the 17th Workshop on Procedural Content Generation. https://doi.org/10.1145/3815598.3815702
+
+* Samuel Randall, Mahsa Bazzaz and Seth Cooper. 2026. "Constraining the expressive range of shortest paths." Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment. https://doi.org/10.1609/aiide.v22i1.43592
